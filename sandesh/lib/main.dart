@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:phone_form_field/phone_form_field.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/local_db_service.dart';
 import 'theme/app_theme.dart';
@@ -46,6 +48,15 @@ class SandeshApp extends StatelessWidget {
       title: 'Sandesh',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      localizationsDelegates: [
+        ...PhoneFieldLocalization.delegates,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+      ],
       home: const SplashScreen(),
     );
   }

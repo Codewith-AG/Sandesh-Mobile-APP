@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/contact_model.dart';
 import '../models/message_model.dart';
 import '../services/local_db_service.dart';
@@ -45,8 +46,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final prefs = await SharedPreferences.getInstance();
-    _myUsername = prefs.getString('username') ?? '';
+    // Primary: get username from Supabase session metadata
+    final supabase = Supabase.instance.client;
+    final session = supabase.auth.currentSession;
+
+    if (session != null) {
+      final meta = session.user.userMetadata ?? {};
+      final sessionName = (meta['full_name'] as String? ??
+              meta['name'] as String? ??
+              session.user.email?.split('@').first ??
+              '')
+          .trim();
+      if (sessionName.isNotEmpty) {
+        _myUsername = sessionName;
+      }
+    }
+
+    // Fallback: SharedPreferences
+    if (_myUsername.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      _myUsername = prefs.getString('username') ?? '';
+    }
 
     if (_myUsername.isEmpty) return;
 
@@ -180,19 +200,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           hashedPhone: '',
                         ));
                       }
-                      if (context.mounted) Navigator.pop(context);
+                      if (!context.mounted) return;
+                      final nav = Navigator.of(context);
+                      nav.pop();
                       await _loadContacts();
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              myUsername: _myUsername,
-                              receiverUsername: username,
-                            ),
+                      if (!mounted) return;
+                      nav.push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(
+                            myUsername: _myUsername,
+                            receiverUsername: username,
                           ),
-                        ).then((_) => _loadContacts());
-                      }
+                        ),
+                      ).then((_) => _loadContacts());
                     }
                   },
                   style: ElevatedButton.styleFrom(

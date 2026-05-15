@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 import 'dart:async';
 import '../models/message_model.dart';
@@ -17,15 +15,16 @@ class SupabaseBroadcastService {
 
   final SupabaseClient _client = Supabase.instance.client;
   String _myUsername = '';
-  
+
   /// Tracks the user we are currently chatting with to prevent local notifications
   String? activeChatUser;
 
   /// Active room channels keyed by the canonical room name
   final Map<String, RealtimeChannel> _roomChannels = {};
 
-  /// Broadcast stream for incoming messages
-  final StreamController<Message> _messageStreamController = StreamController<Message>.broadcast();
+  /// Broadcast stream for incoming messages — broadcast so multiple listeners are safe
+  final StreamController<Message> _messageStreamController =
+      StreamController<Message>.broadcast();
   Stream<Message> get messageStream => _messageStreamController.stream;
 
   // ──────────────────────────── Helpers ────────────────────────────
@@ -37,13 +36,53 @@ class SupabaseBroadcastService {
     return 'room_${sorted[0]}_${sorted[1]}';
   }
 
+  /// Normalize a raw phone number string to E.164 format.
+  /// Handles Indian numbers (10 digits → +91...) and international formats.
+  static String? normalizeToE164(String raw) {
+    // Strip everything except digits and leading +
+    final hasPlus = raw.trimLeft().startsWith('+');
+    final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
+
+    if (digits.isEmpty || digits.length < 7) return null;
+
+    if (hasPlus) {
+      // Already has country code — reconstruct with +
+      return '+$digits';
+    }
+
+    if (digits.length == 10) {
+      // Bare 10-digit Indian mobile number
+      return '+91$digits';
+    }
+
+    if (digits.length == 11 && digits.startsWith('0')) {
+      // Indian format with leading 0 trunk code
+      return '+91${digits.substring(1)}';
+    }
+
+    if (digits.length == 12 && digits.startsWith('91')) {
+      // Indian number prefixed with country code (no +)
+      return '+$digits';
+    }
+
+    // International number without + — best-effort
+    if (digits.length >= 10) {
+      return '+$digits';
+    }
+
+    return null;
+  }
+
   // ──────────────────────────── Lifecycle ────────────────────────────
 
   void initialize(String myUsername) {
     _myUsername = myUsername.toLowerCase();
 
     // Subscribe to a personal global channel to listen for new chat requests
-    final globalChannel = _client.channel('global_$_myUsername', opts: const RealtimeChannelConfig(self: true));
+    final globalChannel = _client.channel(
+      'global_$_myUsername',
+      opts: const RealtimeChannelConfig(self: true),
+    );
     globalChannel.onBroadcast(
       event: 'ping',
       callback: (payload) {
@@ -51,13 +90,13 @@ class SupabaseBroadcastService {
         if (sender != null && sender.isNotEmpty) {
           debugPrint('Received global ping from $sender, subscribing to room...');
           subscribeToRoom(sender);
-          
+
           // If the ping includes a message payload, handle it instantly
           if (payload.containsKey('id') && payload.containsKey('text')) {
-             _handleIncomingMessage(payload);
+            _handleIncomingMessage(payload);
           }
         }
-      }
+      },
     ).subscribe();
   }
 
@@ -151,11 +190,16 @@ class SupabaseBroadcastService {
 
       // Show local notification if not in active chat
       if (activeChatUser != message.senderUsername) {
-        _showLocalNotification(message.senderUsername, message.text ?? 'Sent an attachment');
+        _showLocalNotification(
+            message.senderUsername, message.text ?? 'Sent an attachment');
       }
 
-      // Notify UI globally
-      _messageStreamController.add(message);
+      // Notify UI globally — use microtask so listeners are guaranteed to be ready
+      Future.microtask(() {
+        if (!_messageStreamController.isClosed) {
+          _messageStreamController.add(message);
+        }
+      });
     } catch (e) {
       debugPrint('Error handling incoming message: $e');
     }
@@ -163,16 +207,21 @@ class SupabaseBroadcastService {
 
   Future<void> _showLocalNotification(String title, String body) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails('messages_channel', 'Messages',
-            importance: Importance.max, priority: Priority.high, showWhen: true);
+        AndroidNotificationDetails(
+      'messages_channel',
+      'Messages',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+    );
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
     try {
       final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
       await flutterLocalNotificationsPlugin.show(
-        id: DateTime.now().millisecond, 
-        title: title, 
-        body: body, 
+        id: DateTime.now().millisecond,
+        title: title,
+        body: body,
         notificationDetails: platformChannelSpecifics,
       );
     } catch (e) {
@@ -212,8 +261,9 @@ class SupabaseBroadcastService {
       );
 
       // Ping the receiver globally so they wake up and subscribe if they haven't yet
-      final pingChannel = _client.channel('global_${message.receiverUsername}');
-      await pingChannel.subscribe();
+      final pingChannel =
+          _client.channel('global_${message.receiverUsername}');
+      pingChannel.subscribe();
       await pingChannel.sendBroadcastMessage(
         event: 'ping',
         payload: {
@@ -234,16 +284,18 @@ class SupabaseBroadcastService {
 
   // ──────────────────────────── Profile Sync ────────────────────────────
 
-  /// Upserts the user profile to the Supabase `profiles` table
+  /// Upserts the user profile to the Supabase `profiles` table.
+  /// Uses the Supabase auth user ID as the conflict key.
   Future<void> syncProfile(UserProfile profile) async {
     try {
+      final user = _client.auth.currentUser;
       await _client.from('profiles').upsert(
-        profile.toSupabaseMap(),
-        onConflict: 'username',
+        profile.toSupabaseMap(authId: user?.id),
+        onConflict: user != null ? 'id' : 'username',
       );
       debugPrint('Profile synced to Supabase');
     } catch (e) {
-      debugPrint('Failed to sync profile (table may not exist): $e');
+      debugPrint('Failed to sync profile: $e');
     }
   }
 
@@ -256,18 +308,20 @@ class SupabaseBroadcastService {
     try {
       final response = await _client
           .from('profiles')
-          .select('username, hashed_phone, bio, avatar_url')
+          .select('username, phone_e164, bio, avatar_url')
           .neq('username', _myUsername);
 
       final users = response as List<dynamic>;
 
       for (final user in users) {
         final username = (user['username'] as String).toLowerCase();
+        if (username == _myUsername) continue;
         final exists = await LocalDbService().contactExists(username);
         if (!exists) {
           await LocalDbService().insertContact(Contact(
             username: username,
-            hashedPhone: (user['hashed_phone'] ?? '') as String,
+            phone: (user['phone_e164'] ?? '') as String,
+            hashedPhone: '',
             bio: (user['bio'] ?? '') as String,
             avatarUrl: (user['avatar_url'] ?? '') as String,
           ));
@@ -279,54 +333,54 @@ class SupabaseBroadcastService {
 
       debugPrint('Discovered $newContacts new contacts from Supabase');
     } catch (e) {
-      debugPrint('Contact discovery failed (table may not exist): $e');
+      debugPrint('Contact discovery failed: $e');
     }
     return newContacts;
   }
 
-  /// Hash a phone number list and query Supabase for matches.
+  /// Fetches device contacts, normalizes their numbers to E.164, and matches
+  /// them against the Supabase `profiles.phone_e164` column.
   /// Returns the number of new contacts found.
   Future<int> syncPhoneContacts(List<String> rawPhoneNumbers) async {
     int newContacts = 0;
     try {
-      // Clean and hash phone numbers
-      final hashes = <String>[];
-      final phoneMap = <String, String>{};
+      // Normalize all device phone numbers to E.164
+      final e164Numbers = <String>[];
+      final e164ToRaw = <String, String>{};
 
-      for (final phone in rawPhoneNumbers) {
-        final cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
-        // Take last 10 digits to normalize country codes
-        final normalized =
-            cleaned.length > 10 ? cleaned.substring(cleaned.length - 10) : cleaned;
-        if (normalized.length >= 7) {
-          final hash = sha256.convert(utf8.encode(normalized)).toString();
-          hashes.add(hash);
-          phoneMap[hash] = phone;
+      for (final raw in rawPhoneNumbers) {
+        final e164 = normalizeToE164(raw);
+        if (e164 != null && !e164Numbers.contains(e164)) {
+          e164Numbers.add(e164);
+          e164ToRaw[e164] = raw;
         }
       }
 
-      if (hashes.isEmpty) return 0;
+      if (e164Numbers.isEmpty) return 0;
 
-      // Query Supabase for matching hashed phones
+      debugPrint(
+          'Syncing ${e164Numbers.length} normalized E.164 phone numbers with Supabase...');
+
+      // Query Supabase for matching E.164 phone numbers directly
       final response = await _client
           .from('profiles')
-          .select('username, hashed_phone, bio, avatar_url')
-          .inFilter('hashed_phone', hashes)
+          .select('username, phone_e164, bio, avatar_url')
+          .inFilter('phone_e164', e164Numbers)
           .neq('username', _myUsername);
 
       final users = response as List<dynamic>;
 
       for (final user in users) {
         final username = (user['username'] as String).toLowerCase();
-        final hash = (user['hashed_phone'] ?? '') as String;
-        final rawPhone = phoneMap[hash] ?? '';
+        if (username == _myUsername) continue;
+        final phoneE164 = (user['phone_e164'] ?? '') as String;
 
         final exists = await LocalDbService().contactExists(username);
         if (!exists) {
           await LocalDbService().insertContact(Contact(
             username: username,
-            phone: rawPhone,
-            hashedPhone: hash,
+            phone: phoneE164,
+            hashedPhone: '',
             bio: (user['bio'] ?? '') as String,
             avatarUrl: (user['avatar_url'] ?? '') as String,
           ));
@@ -349,6 +403,8 @@ class SupabaseBroadcastService {
       _client.removeChannel(channel);
     }
     _roomChannels.clear();
-    _messageStreamController.close();
+    if (!_messageStreamController.isClosed) {
+      _messageStreamController.close();
+    }
   }
 }

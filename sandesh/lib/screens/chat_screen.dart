@@ -44,10 +44,17 @@ class _ChatScreenState extends State<ChatScreen> {
     // Subscribe to the shared room for this conversation
     SupabaseBroadcastService().subscribeToRoom(widget.receiverUsername);
 
-    // Register callback so incoming messages refresh this screen
-    _messageSubscription = SupabaseBroadcastService()
-        .messageStream
-        .listen(_handleNewMessage);
+    // Delay stream subscription until after first frame so widget is fully mounted
+    // and the stream listener is guaranteed to be attached before any messages fire.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _messageSubscription = SupabaseBroadcastService()
+          .messageStream
+          .listen(_handleNewMessage);
+      // Re-load from DB to catch any messages that arrived between
+      // the initial load and the subscription being active.
+      _loadMessages();
+    });
   }
 
   Future<void> _loadReceiverAvatar() async {
@@ -76,19 +83,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _handleNewMessage(Message message) {
-    if (message.senderUsername == widget.receiverUsername ||
-        message.receiverUsername == widget.receiverUsername) {
-      if (mounted) {
-        setState(() {
-          // Check if message already exists to avoid duplicates from self-sends
-          final exists = _messages.any((m) => m.id == message.id);
-          if (!exists) {
-            _messages.add(message);
-          }
-        });
-        _scrollToBottom();
-      }
+    // Only handle messages FROM the peer we're chatting with (strict incoming filter)
+    if (message.senderUsername.toLowerCase() !=
+        widget.receiverUsername.toLowerCase()) {
+      return;
     }
+    if (!mounted) return;
+    setState(() {
+      // Guard against duplicates
+      final exists = _messages.any((m) => m.id == message.id);
+      if (!exists) {
+        _messages.add(message);
+      }
+    });
+    _scrollToBottom();
   }
 
   Future<void> _loadMessages() async {
@@ -336,7 +344,7 @@ class _ChatScreenState extends State<ChatScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 4,
               offset: const Offset(0, 1),
             ),
@@ -377,7 +385,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -403,7 +411,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   timeString,
                   style: GoogleFonts.urbanist(
                     color: isMe
-                        ? Colors.white.withOpacity(0.7)
+                        ? Colors.white.withValues(alpha: 0.7)
                         : AppTheme.textLight,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -414,7 +422,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Icon(
                     Icons.done_all,
                     size: 14,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ],
               ],
@@ -432,7 +440,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: AppTheme.surfaceWhite,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),

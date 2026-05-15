@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
+import 'phone_setup_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -47,18 +48,69 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _navigateAfterDelay() async {
     await Future.delayed(const Duration(milliseconds: 2500));
+    if (!mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final username = prefs.getString('username');
+    final supabase = Supabase.instance.client;
+    final session = supabase.auth.currentSession;
+
+    Widget destination;
+
+    if (session != null) {
+      // User is authenticated — check if phone setup is done
+      final prefs = await SharedPreferences.getInstance();
+      final phoneE164 = prefs.getString('phone_e164') ?? '';
+
+      if (phoneE164.isNotEmpty) {
+        // Fully set up — go to HomeScreen
+        destination = const HomeScreen();
+      } else {
+        // Authenticated but phone not set up yet — check Supabase profile
+        try {
+          final profileData = await supabase
+              .from('profiles')
+              .select('username, phone_e164')
+              .eq('id', session.user.id)
+              .maybeSingle();
+
+          if (profileData != null &&
+              (profileData['phone_e164'] as String? ?? '').isNotEmpty) {
+            // Profile exists in DB — cache locally and go home
+            await prefs.setString(
+                'username', profileData['username'] as String? ?? '');
+            await prefs.setString(
+                'phone_e164', profileData['phone_e164'] as String);
+            destination = const HomeScreen();
+          } else {
+            // Authenticated but no phone — send to phone setup
+            final meta = session.user.userMetadata ?? {};
+            final googleName = (meta['full_name'] as String? ??
+                    meta['name'] as String? ??
+                    session.user.email?.split('@').first ??
+                    'User')
+                .trim();
+            destination = PhoneSetupScreen(googleName: googleName);
+          }
+        } catch (_) {
+          // On error, fallback to phone setup
+          final meta = session.user.userMetadata ?? {};
+          final googleName = (meta['full_name'] as String? ??
+                  meta['name'] as String? ??
+                  session.user.email?.split('@').first ??
+                  'User')
+              .trim();
+          destination = PhoneSetupScreen(googleName: googleName);
+        }
+      }
+    } else {
+      // Not authenticated — go to login
+      destination = const LoginScreen();
+    }
 
     if (mounted) {
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) =>
-              (username != null && username.isNotEmpty)
-                  ? const HomeScreen()
-                  : const LoginScreen(),
+          pageBuilder: (_, __, ___) => destination,
           transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(opacity: animation, child: child);
           },
@@ -88,7 +140,7 @@ class _SplashScreenState extends State<SplashScreen>
           ),
           // Light overlay for text readability
           Container(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
           ),
           // Content
           SafeArea(
@@ -106,10 +158,10 @@ class _SplashScreenState extends State<SplashScreen>
                           width: 110,
                           height: 110,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withValues(alpha: 0.3),
                               width: 2,
                             ),
                           ),
@@ -152,7 +204,8 @@ class _SplashScreenState extends State<SplashScreen>
                     height: 28,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white70),
                     ),
                   ),
                 ),

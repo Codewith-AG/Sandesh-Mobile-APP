@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_profile_model.dart';
 import '../services/local_db_service.dart';
 import '../services/supabase_broadcast_service.dart';
@@ -186,6 +187,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
       SupabaseBroadcastService().dispose();
+      // Sign out from Supabase to clear the auth session
+      try {
+        await Supabase.instance.client.auth.signOut();
+      } catch (_) {}
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
