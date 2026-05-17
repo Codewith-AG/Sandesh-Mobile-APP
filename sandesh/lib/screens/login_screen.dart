@@ -85,14 +85,15 @@ class _LoginScreenState extends State<LoginScreen>
         _handleSuccessfulSignIn(response.user!);
       }
     } catch (e) {
-      // Silently ignore user-cancellation signals
+      // Only suppress the explicit user-cancellation signal.
+      // Every other exception (network errors, Supabase auth failures, etc.)
+      // must surface as a visible SnackBar so it NEVER fails silently.
       final msg = e.toString();
-      final isCancelled = msg.contains('sign_in_canceled') ||
-          msg.contains('sign_in_failed') ||
-          msg.contains('network_error') == false && msg.isEmpty;
+      final isUserCancelled = msg.contains('sign_in_cancelled') ||
+          msg.contains('sign_in_canceled');
 
       if (mounted) {
-        if (!isCancelled) {
+        if (!isUserCancelled) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(

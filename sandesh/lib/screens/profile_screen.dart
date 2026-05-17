@@ -49,7 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (profile == null) {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('username') ?? '';
-      final phone = prefs.getString('phone') ?? '';
+      final phone = prefs.getString('phone_e164') ?? '';
       final hashedPhone = prefs.getString('hashed_phone') ?? '';
       if (username.isNotEmpty) {
         profile = UserProfile(

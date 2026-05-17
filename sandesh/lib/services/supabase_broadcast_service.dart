@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:async';
 import '../models/message_model.dart';
 import '../models/contact_model.dart';
@@ -19,8 +20,8 @@ class SupabaseBroadcastService {
   /// Tracks the user we are currently chatting with to prevent local notifications
   String? activeChatUser;
 
-  /// Active room channels keyed by the canonical room name
-  final Map<String, RealtimeChannel> _roomChannels = {};
+  /// The single Postgres realtime channel that listens for all incoming messages
+  RealtimeChannel? _inboxChannel;
 
   /// Broadcast stream for incoming messages — broadcast so multiple listeners are safe
   final StreamController<Message> _messageStreamController =
@@ -75,83 +76,113 @@ class SupabaseBroadcastService {
 
   // ──────────────────────────── Lifecycle ────────────────────────────
 
+  /// Initialises the service for [myUsername].
+  /// Sets up a single Postgres realtime listener on the `messages` table
+  /// filtered to rows where `receiver_username = _myUsername`, then
+  /// immediately syncs any messages that arrived while the app was offline.
   void initialize(String myUsername) {
     _myUsername = myUsername.toLowerCase();
 
-    // Subscribe to a personal global channel to listen for new chat requests
-    final globalChannel = _client.channel(
-      'global_$_myUsername',
-      opts: const RealtimeChannelConfig(self: true),
-    );
-    globalChannel.onBroadcast(
-      event: 'ping',
-      callback: (payload) {
-        final sender = payload['sender'] as String?;
-        if (sender != null && sender.isNotEmpty) {
-          debugPrint('Received global ping from $sender, subscribing to room...');
-          subscribeToRoom(sender);
-
-          // If the ping includes a message payload, handle it instantly
-          if (payload.containsKey('id') && payload.containsKey('text')) {
-            _handleIncomingMessage(payload);
-          }
-        }
-      },
-    ).subscribe();
-  }
-
-  // ──────────────────────────── Room Subscription ────────────────────────────
-
-  /// Subscribe to a shared room channel between [_myUsername] and [peerUsername].
-  /// Safe to call multiple times — it won't re-subscribe if already active.
-  void subscribeToRoom(String peerUsername) {
-    final roomName = getRoomName(_myUsername, peerUsername);
-
-    if (_roomChannels.containsKey(roomName)) {
-      debugPrint('Already subscribed to $roomName');
-      return;
-    }
-
-    final channel = _client.channel(
-      roomName,
-      opts: const RealtimeChannelConfig(self: true),
-    );
-
-    channel
-        .onBroadcast(
-          event: 'new_message',
+    // STEP 3: Replace broadcast listener with a Postgres INSERT listener.
+    // One single channel per user — no per-room subscriptions needed.
+    _inboxChannel = _client
+        .channel('public:messages:inbox:$_myUsername')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'receiver_username',
+            value: _myUsername,
+          ),
           callback: (payload) async {
-            if (payload.isNotEmpty) {
-              await _handleIncomingMessage(payload);
+            final row = payload.newRecord;
+            if (row.isEmpty) return;
+
+            // Handle the incoming message (save locally + notify UI)
+            await _handleIncomingMessage(row);
+
+            // The magic — DELETE the cloud copy immediately after local save
+            final messageId = row['id'] as String?;
+            if (messageId != null) {
+              try {
+                await _client
+                    .from('messages')
+                    .delete()
+                    .eq('id', messageId);
+                debugPrint('Deleted cloud message $messageId after delivery');
+              } catch (e) {
+                debugPrint('Failed to delete cloud message $messageId: $e');
+              }
             }
           },
         )
         .subscribe((status, [error]) {
-      debugPrint('Room $roomName status: $status');
+      debugPrint('Inbox channel status: $status${error != null ? " | $error" : ""}');
     });
 
-    _roomChannels[roomName] = channel;
+    // STEP 1: Sync messages that arrived while we were offline
+    syncPendingMessages();
+
+    // STEP 4: Get FCM token and save it to Supabase
+    _syncFcmToken();
   }
 
-  /// Unsubscribe from a specific room
-  void unsubscribeFromRoom(String peerUsername) {
-    final roomName = getRoomName(_myUsername, peerUsername);
-    final channel = _roomChannels.remove(roomName);
-    if (channel != null) {
-      _client.removeChannel(channel);
+  Future<void> _syncFcmToken() async {
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await _client
+            .from('profiles')
+            .update({'fcm_token': fcmToken})
+            .eq('username', _myUsername);
+        debugPrint('FCM token saved: $fcmToken');
+      }
+      
+      // Listen for foreground messages (optional, already handled by Realtime)
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        debugPrint('FCM foreground message: ${message.data}');
+      });
+    } catch (e) {
+      debugPrint('Failed to sync FCM token: $e');
     }
   }
 
-  /// Subscribe to rooms for ALL existing contacts (called on app startup)
-  Future<void> subscribeToAllContactRooms() async {
+  // ──────────────────────────── STEP 1: Offline Sync ────────────────────────────
+
+  /// Fetches all messages addressed to [_myUsername] from the Supabase
+  /// `messages` table, saves each one locally, then deletes it from the cloud.
+  /// This handles the "store-and-forward" catch-up on every app launch.
+  Future<void> syncPendingMessages() async {
     try {
-      final contacts = await LocalDbService().getContacts();
-      for (final contact in contacts) {
-        subscribeToRoom(contact.username);
+      final rows = await _client
+          .from('messages')
+          .select()
+          .eq('receiver_username', _myUsername);
+
+      final messages = rows as List<dynamic>;
+      debugPrint('syncPendingMessages: found ${messages.length} pending message(s)');
+
+      for (final row in messages) {
+        final record = Map<String, dynamic>.from(row as Map);
+
+        // Save locally and notify UI
+        await _handleIncomingMessage(record);
+
+        // Delete from cloud immediately after safe local storage
+        final messageId = record['id'] as String?;
+        if (messageId != null) {
+          try {
+            await _client.from('messages').delete().eq('id', messageId);
+            debugPrint('syncPendingMessages: deleted cloud message $messageId');
+          } catch (e) {
+            debugPrint('syncPendingMessages: failed to delete $messageId: $e');
+          }
+        }
       }
-      debugPrint('Subscribed to ${contacts.length} room channels');
     } catch (e) {
-      debugPrint('Error subscribing to contact rooms: $e');
+      debugPrint('syncPendingMessages error: $e');
     }
   }
 
@@ -184,12 +215,10 @@ class SupabaseBroadcastService {
           username: message.senderUsername,
           hashedPhone: '',
         ));
-        // Also subscribe to their room
-        subscribeToRoom(message.senderUsername);
       }
 
-      // Show local notification if not in active chat
-      if (activeChatUser != message.senderUsername) {
+      // Show local notification if not actively chatting with sender
+      if (activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
         _showLocalNotification(
             message.senderUsername, message.text ?? 'Sent an attachment');
       }
@@ -229,56 +258,30 @@ class SupabaseBroadcastService {
     }
   }
 
-  // ──────────────────────────── Sending Messages ────────────────────────────
+  // ──────────────────────────── STEP 2: Sending Messages ────────────────────────────
 
+  /// Sends a message using the Store-and-Forward pattern:
+  /// 1. Saves locally for instant UI feedback.
+  /// 2. INSERTs into Supabase `messages` table for durable delivery.
+  /// The receiver's Postgres listener (or `syncPendingMessages`) will pick it
+  /// up, save it locally, and DELETE it from the cloud immediately.
   Future<void> sendMessage(Message message) async {
     // Save locally immediately so the UI updates instantly
     await LocalDbService().insertMessage(message);
 
-    // Ensure we are subscribed to the room
-    subscribeToRoom(message.receiverUsername);
-
-    final roomName = getRoomName(message.senderUsername, message.receiverUsername);
-    final channel = _roomChannels[roomName];
-
-    if (channel == null) {
-      debugPrint('ERROR: no channel for room $roomName');
-      return;
-    }
-
-    // Broadcast to the shared room
+    // INSERT into Supabase — durable, offline-safe delivery
     try {
-      await channel.sendBroadcastMessage(
-        event: 'new_message',
-        payload: {
-          'id': message.id,
-          'sender_username': message.senderUsername,
-          'receiver_username': message.receiverUsername,
-          'text': message.text,
-          'media_base64': message.mediaBase64,
-          'timestamp': message.timestamp,
-        },
-      );
-
-      // Ping the receiver globally so they wake up and subscribe if they haven't yet
-      final pingChannel =
-          _client.channel('global_${message.receiverUsername}');
-      pingChannel.subscribe();
-      await pingChannel.sendBroadcastMessage(
-        event: 'ping',
-        payload: {
-          'sender': message.senderUsername,
-          'id': message.id,
-          'sender_username': message.senderUsername,
-          'receiver_username': message.receiverUsername,
-          'text': message.text,
-          'media_base64': message.mediaBase64,
-          'timestamp': message.timestamp,
-        },
-      );
-      await _client.removeChannel(pingChannel);
+      await _client.from('messages').insert({
+        'id': message.id,
+        'sender_username': message.senderUsername,
+        'receiver_username': message.receiverUsername,
+        'text': message.text,
+        'media_base64': message.mediaBase64,
+        'timestamp': message.timestamp,
+      });
+      debugPrint('Message ${message.id} inserted into Supabase for delivery');
     } catch (e) {
-      debugPrint('Error broadcasting message: $e');
+      debugPrint('Error inserting message into Supabase: $e');
     }
   }
 
@@ -302,7 +305,7 @@ class SupabaseBroadcastService {
   // ──────────────────────────── Contact Discovery ────────────────────────────
 
   /// Queries the Supabase `profiles` table and auto-adds any registered users
-  /// as local contacts (excluding self). Also subscribes to their rooms.
+  /// as local contacts (excluding self).
   Future<int> discoverContacts() async {
     int newContacts = 0;
     try {
@@ -327,8 +330,6 @@ class SupabaseBroadcastService {
           ));
           newContacts++;
         }
-        // Subscribe to room for this contact
-        subscribeToRoom(username);
       }
 
       debugPrint('Discovered $newContacts new contacts from Supabase');
@@ -385,7 +386,6 @@ class SupabaseBroadcastService {
             avatarUrl: (user['avatar_url'] ?? '') as String,
           ));
           newContacts++;
-          subscribeToRoom(username);
         }
       }
 
@@ -396,13 +396,18 @@ class SupabaseBroadcastService {
     return newContacts;
   }
 
+  // Backward compatibility stubs for UI screens
+  void subscribeToRoom(String peerUsername) {}
+  void unsubscribeFromRoom(String peerUsername) {}
+  Future<void> subscribeToAllContactRooms() async {}
+
   // ──────────────────────────── Cleanup ────────────────────────────
 
   void dispose() {
-    for (final channel in _roomChannels.values) {
-      _client.removeChannel(channel);
+    if (_inboxChannel != null) {
+      _client.removeChannel(_inboxChannel!);
+      _inboxChannel = null;
     }
-    _roomChannels.clear();
     if (!_messageStreamController.isClosed) {
       _messageStreamController.close();
     }

@@ -146,8 +146,8 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // Fire and forget broadcast
-    SupabaseBroadcastService().sendMessage(newMessage);
+    // Persist to Supabase for store-and-forward delivery (awaited so errors surface)
+    await SupabaseBroadcastService().sendMessage(newMessage);
   }
 
   /// Groups messages by date and inserts date separator keys
