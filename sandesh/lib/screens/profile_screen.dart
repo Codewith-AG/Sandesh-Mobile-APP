@@ -50,28 +50,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfile() async {
     if (_isReadOnly) {
+      final peer = widget.peerUsername!;
       final client = Supabase.instance.client;
       try {
         final data = await client
             .from('profiles')
             .select('username, phone_e164, bio, avatar_url')
-            .eq('username', widget.peerUsername!)
+            .eq('username', peer)
             .maybeSingle();
 
         if (data != null) {
           final profile = UserProfile(
-            username: data['username'] ?? '',
-            phone: data['phone_e164'] ?? '',
+            username: (data['username'] as String?) ?? peer,
+            phone: (data['phone_e164'] as String?) ?? '',
             hashedPhone: '',
-            bio: data['bio'] ?? '',
-            avatarUrl: data['avatar_url'] ?? '',
+            bio: (data['bio'] as String?) ?? '',
+            avatarUrl: (data['avatar_url'] as String?) ?? '',
           );
           _usernameController.text = profile.username;
           _bioController.text = profile.bio;
           _phoneController.text = profile.phone;
           _profile = profile;
+        } else {
+          // Supabase row not found — fall back to local contacts DB
+          final contacts = await LocalDbService().getContacts();
+          try {
+            final c = contacts.firstWhere(
+                (c) => c.username.toLowerCase() == peer.toLowerCase());
+            _usernameController.text = c.username;
+            _bioController.text = c.bio;
+            _phoneController.text = c.phone;
+            _profile = UserProfile(
+              username: c.username,
+              phone: c.phone,
+              hashedPhone: '',
+              bio: c.bio,
+              avatarUrl: c.avatarUrl,
+            );
+          } catch (_) {
+            // Absolute fallback: just show the username
+            _usernameController.text = peer;
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Peer profile load error: $e');
+        _usernameController.text = peer;
+      }
       if (mounted) setState(() => _isLoading = false);
       return;
     }
@@ -309,10 +333,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text('Profile',
-            style: GoogleFonts.inter(
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0D0D0D))),
+        title: Text(
+          _isReadOnly
+              ? (_usernameController.text.isNotEmpty
+                  ? _usernameController.text
+                  : (widget.peerUsername ?? 'Profile'))
+              : 'Profile',
+          style: GoogleFonts.inter(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0D0D0D))),
         iconTheme: const IconThemeData(color: Color(0xFF0D0D0D)),
       ),
       body: _isLoading

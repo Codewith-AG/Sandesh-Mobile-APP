@@ -86,55 +86,61 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _listenToPeerPresence() async {
     final client = Supabase.instance.client;
-    
-    // Initial fetch
+    final peer = widget.receiverUsername.toLowerCase();
+
+    // ── Initial fetch ──
     try {
       final data = await client
           .from('profiles')
           .select('is_online, last_seen')
-          .eq('username', widget.receiverUsername)
+          .eq('username', peer)
           .maybeSingle();
-          
+
       if (data != null && mounted) {
         setState(() {
           _isPeerOnline = data['is_online'] == true;
-          if (data['last_seen'] != null) {
-            _peerLastSeen = DateTime.tryParse(data['last_seen']);
-          }
+          final raw = data['last_seen'] as String?;
+          if (raw != null) _peerLastSeen = DateTime.tryParse(raw);
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Presence initial fetch error: $e');
+    }
 
-    // Subscribe to changes
+    // ── Realtime subscription ──
+    // NOTE: Column filters on non-PK columns are unreliable in Supabase Realtime.
+    // We subscribe to ALL profile updates and filter client-side by username.
+    // This is the only reliable pattern without changing the DB schema.
     _presenceChannel = client
-        .channel('public:profiles:${widget.receiverUsername}')
+        .channel('presence_peer_$peer')
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'profiles',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'username',
-            value: widget.receiverUsername,
-          ),
           callback: (payload) {
             final record = payload.newRecord;
-            if (mounted && record.isNotEmpty) {
-              setState(() {
-                _isPeerOnline = record['is_online'] == true;
-                if (record['last_seen'] != null) {
-                  _peerLastSeen = DateTime.tryParse(record['last_seen']);
-                }
-              });
-            }
+            if (!mounted || record.isEmpty) return;
+            // Client-side filter: only handle updates for our peer
+            final updatedUser = (record['username'] as String? ?? '').toLowerCase();
+            if (updatedUser != peer) return;
+            setState(() {
+              _isPeerOnline = record['is_online'] == true;
+              final raw = record['last_seen'] as String?;
+              if (raw != null) _peerLastSeen = DateTime.tryParse(raw);
+            });
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          debugPrint('Presence channel status: $status ${error ?? ""}');
+        });
   }
 
   @override
   void dispose() {
-    _presenceChannel?.unsubscribe();
+    if (_presenceChannel != null) {
+      Supabase.instance.client.removeChannel(_presenceChannel!);
+      _presenceChannel = null;
+    }
     SupabaseBroadcastService().activeChatUser = null;
     _messageSubscription?.cancel();
     _textController.dispose();

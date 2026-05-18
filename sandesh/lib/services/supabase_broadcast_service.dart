@@ -473,9 +473,17 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_myUsername.isEmpty) return;
-    // App is considered online if resumed
-    final isOnline = state == AppLifecycleState.resumed;
-    _updatePresence(isOnline);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _updatePresence(true);
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        _updatePresence(false);
+        break;
+    }
   }
 
   Future<void> _updatePresence(bool isOnline) async {
