@@ -8,6 +8,7 @@ import '../models/message_model.dart'; // includes MessageType & MessageTypeX
 import '../models/contact_model.dart';
 import '../models/user_profile_model.dart';
 import 'local_db_service.dart';
+import 'media_upload_service.dart';
 
 class SupabaseBroadcastService with WidgetsBindingObserver {
   static final SupabaseBroadcastService _instance =
@@ -228,6 +229,16 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       // Save to local vault
       await LocalDbService().insertMessage(message);
 
+      // ── Auto-Download & Auto-Delete (Receiver side only) ──────────────────
+      // For image and video messages with a network URL, immediately download
+      // the file to local storage, update the DB record, then delete from cloud.
+      if ((message.messageType == MessageType.image ||
+              message.messageType == MessageType.video) &&
+          message.mediaUrl != null &&
+          message.mediaUrl!.startsWith('http')) {
+        _autoDownloadAndClean(message);
+      }
+
       // Auto-add sender to contacts if not already there
       final exists = await LocalDbService().contactExists(message.senderUsername);
       if (!exists) {
@@ -426,6 +437,36 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   void subscribeToRoom(String peerUsername) {}
   void unsubscribeFromRoom(String peerUsername) {}
   Future<void> subscribeToAllContactRooms() async {}
+
+  // ──────────────────────────── Auto-Download ────────────────────────────
+
+  /// Downloads the media file in [message] to local storage, updates the DB
+  /// record with the local path, then deletes the file from Supabase Storage.
+  /// Runs fire-and-forget — errors are swallowed so they never crash the inbox.
+  void _autoDownloadAndClean(Message message) {
+    Future(() async {
+      try {
+        final url = message.mediaUrl!;
+        // Build a deterministic, safe file name from the message id
+        final ext = message.messageType == MessageType.image ? '.jpg' : '.mp4';
+        final fileName = '${message.id}$ext';
+
+        final localPath = await MediaUploadService().downloadAndSave(url, fileName);
+        if (localPath == null) return;
+
+        // Update DB so the bubble renders from local file next time
+        await LocalDbService().updateMessageLocalPath(message.id, localPath);
+
+        // Delete from Supabase Storage bucket
+        await MediaUploadService().deleteFromStorage(url, 'chat_media');
+
+        debugPrint('Auto-download complete: $localPath');
+      } catch (e) {
+        debugPrint('_autoDownloadAndClean error: $e');
+      }
+    });
+  }
+
 
   // ──────────────────────────── Presence ────────────────────────────
 

@@ -19,10 +19,9 @@ class LocalDbService {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    // v5: adds media_url, file_name, message_type to messages table.
-    // Using a new filename so existing devices get a clean slate without
-    // needing a complex ALTER TABLE migration path.
-    final path = join(dbPath, 'sandesh_v5.db');
+    // v6: adds local_path column to messages for auto-downloaded media.
+    // New filename ensures a clean migration without ALTER TABLE complexity.
+    final path = join(dbPath, 'sandesh_v6.db');
 
     return await openDatabase(
       path,
@@ -41,6 +40,7 @@ class LocalDbService {
         media_base64 TEXT,
         media_url TEXT,
         file_name TEXT,
+        local_path TEXT,
         message_type TEXT NOT NULL DEFAULT 'text',
         is_me INTEGER NOT NULL,
         timestamp INTEGER NOT NULL
@@ -93,6 +93,17 @@ class LocalDbService {
       orderBy: 'timestamp ASC',
     );
     return results.map((m) => Message.fromMap(m)).toList();
+  }
+
+  /// Updates the local_path for a media message once it has been downloaded.
+  Future<void> updateMessageLocalPath(String messageId, String localPath) async {
+    final db = await database;
+    await db.update(
+      'messages',
+      {'local_path': localPath},
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
   }
 
   Future<void> deleteChatHistory(String myUsername, String chatWithUsername) async {

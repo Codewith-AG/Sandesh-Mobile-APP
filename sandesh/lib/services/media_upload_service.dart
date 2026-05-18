@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path/path.dart' as p;
@@ -155,4 +156,55 @@ class MediaUploadService {
         return 'application/octet-stream';
     }
   }
+
+  // ──────────────────────────── Auto-Download (Receiver Side) ────────────────────────────
+
+  /// Downloads a media file from [url] and saves it to the app's documents
+  /// directory.  Returns the absolute local path on success, or null on failure.
+  Future<String?> downloadAndSave(String url, String fileName) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final savePath = p.join(dir.path, 'sandesh_media', fileName);
+      final saveFile = File(savePath);
+
+      // Ensure directory exists
+      await saveFile.parent.create(recursive: true);
+
+      // Skip if already downloaded
+      if (await saveFile.exists()) return savePath;
+
+      final dio = Dio();
+      await dio.download(url, savePath,
+          options: Options(receiveTimeout: const Duration(seconds: 60)));
+
+      debugPrint('Downloaded media to $savePath');
+      return savePath;
+    } catch (e) {
+      debugPrint('downloadAndSave error: $e');
+      return null;
+    }
+  }
+
+  /// Extracts the Supabase storage path from a public URL and deletes that
+  /// object from the given [bucket].
+  ///
+  /// Supabase public URL format:
+  ///   https://<project>.supabase.co/storage/v1/object/public/<bucket>/<storagePath>
+  Future<void> deleteFromStorage(String publicUrl, String bucket) async {
+    try {
+      // Parse the storage path from the public URL
+      final uri = Uri.parse(publicUrl);
+      // path segments: ['', 'storage', 'v1', 'object', 'public', bucket, ...rest]
+      final segments = uri.pathSegments;
+      final bucketIndex = segments.indexOf(bucket);
+      if (bucketIndex == -1 || bucketIndex + 1 >= segments.length) return;
+
+      final storagePath = segments.sublist(bucketIndex + 1).join('/');
+      await _client.storage.from(bucket).remove([storagePath]);
+      debugPrint('Deleted from Supabase Storage: $bucket/$storagePath');
+    } catch (e) {
+      debugPrint('deleteFromStorage error: $e');
+    }
+  }
 }
+

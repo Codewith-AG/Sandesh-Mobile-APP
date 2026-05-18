@@ -200,6 +200,12 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final picked = await ImagePicker().pickImage(source: source);
       if (picked == null) return;
+
+      // Show preview — only upload if user confirms
+      if (!mounted) return;
+      final confirmed = await _showImagePreview(File(picked.path));
+      if (confirmed != true) return;
+
       setState(() { _isSendingMedia = true; _uploadProgress = 0; });
       final url = await MediaUploadService().uploadChatImage(File(picked.path));
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -208,6 +214,8 @@ class _ChatScreenState extends State<ChatScreen> {
         senderUsername: widget.myUsername,
         receiverUsername: widget.receiverUsername,
         mediaUrl: url,
+        // Sender stores the original local file path for immediate local rendering
+        localPath: picked.path,
         messageType: MessageType.image,
         isMe: true,
         timestamp: timestamp,
@@ -226,6 +234,12 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
       if (picked == null) return;
+
+      // Show preview thumbnail before upload
+      if (!mounted) return;
+      final confirmed = await _showVideoPreview(File(picked.path));
+      if (confirmed != true) return;
+
       setState(() { _isSendingMedia = true; _uploadProgress = 0; });
       final url = await MediaUploadService().uploadChatVideo(
         File(picked.path),
@@ -237,6 +251,7 @@ class _ChatScreenState extends State<ChatScreen> {
         senderUsername: widget.myUsername,
         receiverUsername: widget.receiverUsername,
         mediaUrl: url,
+        localPath: picked.path,
         messageType: MessageType.video,
         isMe: true,
         timestamp: timestamp,
@@ -276,6 +291,78 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => _isSendingMedia = false);
       if (mounted) _showError('Document upload failed: $e');
     }
+  }
+
+  /// Shows a fullscreen preview of a picked image with Send/Cancel buttons.
+  /// Returns true if the user confirmed sending.
+  Future<bool?> _showImagePreview(File imageFile) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.file(imageFile, fit: BoxFit.contain),
+            Positioned(
+              bottom: 32,
+              left: 0, right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    label: Text('Cancel', style: GoogleFonts.urbanist(color: Colors.white, fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black54, shape: const StadiumBorder()),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    icon: const Icon(Icons.send_rounded, color: Colors.white),
+                    label: Text('Send', style: GoogleFonts.urbanist(color: Colors.white, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryPurple, shape: const StadiumBorder()),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 40, left: 16,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(ctx, false),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Shows a simple confirmation dialog for video before upload.
+  Future<bool?> _showVideoPreview(File videoFile) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Send Video?', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
+        content: Row(
+          children: [
+            const Icon(Icons.videocam_outlined, size: 40),
+            const SizedBox(width: 12),
+            Expanded(child: Text('The video will be compressed and sent.', style: GoogleFonts.urbanist())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryPurple),
+            child: Text('Send', style: GoogleFonts.urbanist(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showError(String msg) {
@@ -636,6 +723,59 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildImageContent(Message message, bool isMe, String timeString) {
+    // Priority: local file > network URL > placeholder
+    final localPath = message.localPath;
+    final networkUrl = message.mediaUrl;
+
+    Widget imageWidget;
+    if (localPath != null && File(localPath).existsSync()) {
+      // Downloaded to device — render from local file (works offline)
+      imageWidget = Image.file(
+        File(localPath),
+        width: 220, height: 220, fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+            width: 220, height: 220,
+            color: const Color(0xFFE8E8EC),
+            child: const Icon(Icons.broken_image_outlined)),
+      );
+    } else if (networkUrl != null && networkUrl.startsWith('http')) {
+      // Still on network (sender bubble or download pending)
+      imageWidget = Image.network(
+        networkUrl,
+        width: 220, height: 220, fit: BoxFit.cover,
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : Container(
+                width: 220, height: 220,
+                color: const Color(0xFFE8E8EC),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress.expectedTotalBytes != null
+                          ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                          : null,
+                      strokeWidth: 2, color: AppTheme.primaryPurple,
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Loading…', style: GoogleFonts.urbanist(fontSize: 11, color: AppTheme.textLight)),
+                  ],
+                ),
+              ),
+        errorBuilder: (_, __, ___) => Container(
+            width: 220, height: 100,
+            color: const Color(0xFFE8E8EC),
+            child: const Icon(Icons.broken_image_outlined)),
+      );
+    } else {
+      // No path available yet
+      imageWidget = Container(
+        width: 220, height: 220,
+        color: const Color(0xFFE8E8EC),
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.only(
         topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
@@ -643,18 +783,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Stack(
         children: [
-          message.mediaUrl != null
-              ? Image.network(message.mediaUrl!,
-                  width: 220, height: 220, fit: BoxFit.cover,
-                  loadingBuilder: (_, child, progress) => progress == null
-                      ? child
-                      : Container(width: 220, height: 220,
-                          color: const Color(0xFFE8E8EC),
-                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
-                  errorBuilder: (_, __, ___) => Container(width: 220, height: 100,
-                      color: const Color(0xFFE8E8EC),
-                      child: const Icon(Icons.broken_image_outlined)))
-              : Container(width: 220, height: 220, color: const Color(0xFFE8E8EC)),
+          imageWidget,
           Positioned(bottom: 6, right: 8, child: _buildTimestampOverlay(timeString, isMe)),
         ],
       ),

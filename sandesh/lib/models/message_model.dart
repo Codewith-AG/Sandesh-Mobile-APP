@@ -41,6 +41,8 @@ class Message {
   final String? mediaUrl;
   /// Original file name for documents.
   final String? fileName;
+  /// Local device path after auto-download (replaces mediaUrl for offline reading).
+  final String? localPath;
   /// Content type: text | image | video | document.
   final MessageType messageType;
   final bool isMe;
@@ -54,6 +56,7 @@ class Message {
     this.mediaBase64,
     this.mediaUrl,
     this.fileName,
+    this.localPath,
     MessageType? messageType,
     required this.isMe,
     required this.timestamp,
@@ -69,6 +72,7 @@ class Message {
       'media_base64': mediaBase64,
       'media_url': mediaUrl,
       'file_name': fileName,
+      'local_path': localPath,
       'message_type': messageType.value,
       'is_me': isMe ? 1 : 0,
       'timestamp': timestamp,
@@ -84,6 +88,7 @@ class Message {
       mediaBase64: map['media_base64'] as String?,
       mediaUrl: map['media_url'] as String?,
       fileName: map['file_name'] as String?,
+      localPath: map['local_path'] as String?,
       messageType: MessageTypeX.fromString(map['message_type'] as String?),
       isMe: (map['is_me'] as int) == 1,
       timestamp: map['timestamp'] as int,
