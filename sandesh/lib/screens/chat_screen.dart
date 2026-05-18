@@ -16,6 +16,7 @@ import 'profile_screen.dart';
 import 'media_viewer_screen.dart';
 import 'call_screen.dart';
 import '../services/call_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ChatScreen extends StatefulWidget {
   final String myUsername;
@@ -598,7 +599,17 @@ class _ChatScreenState extends State<ChatScreen> {
         IconButton(
           icon: const Icon(Icons.call_outlined, color: AppTheme.primaryPurple, size: 22),
           tooltip: 'Audio Call',
-          onPressed: () {
+          onPressed: () async {
+            final statuses = await [Permission.camera, Permission.microphone].request();
+            if (statuses[Permission.camera] != PermissionStatus.granted || 
+                statuses[Permission.microphone] != PermissionStatus.granted) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Camera and Microphone permissions are required to make a call.'),
+                ));
+              }
+              return;
+            }
             CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'audio',
@@ -623,7 +634,17 @@ class _ChatScreenState extends State<ChatScreen> {
         IconButton(
           icon: const Icon(Icons.videocam_outlined, color: AppTheme.primaryPurple, size: 24),
           tooltip: 'Video Call',
-          onPressed: () {
+          onPressed: () async {
+            final statuses = await [Permission.camera, Permission.microphone].request();
+            if (statuses[Permission.camera] != PermissionStatus.granted || 
+                statuses[Permission.microphone] != PermissionStatus.granted) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Camera and Microphone permissions are required to make a call.'),
+                ));
+              }
+              return;
+            }
             CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'video',
