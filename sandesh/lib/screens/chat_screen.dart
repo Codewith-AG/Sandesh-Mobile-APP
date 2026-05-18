@@ -600,8 +600,9 @@ class _ChatScreenState extends State<ChatScreen> {
           icon: const Icon(Icons.call_outlined, color: AppTheme.primaryPurple, size: 22),
           tooltip: 'Audio Call',
           onPressed: () async {
+            // Step 1: Request permissions first and strictly await the result
             final statuses = await [Permission.camera, Permission.microphone].request();
-            if (statuses[Permission.camera] != PermissionStatus.granted || 
+            if (statuses[Permission.camera] != PermissionStatus.granted ||
                 statuses[Permission.microphone] != PermissionStatus.granted) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -610,24 +611,26 @@ class _ChatScreenState extends State<ChatScreen> {
               }
               return;
             }
-            CallService().initiateCall(
+            // Step 2: Initiate call — returns null on success, or an error string
+            final error = await CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'audio',
-            ).then((ok) {
-              if (!ok && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Could not start call. Check mic permission.'),
-                ));
-              } else if (ok && mounted) {
-                // Navigate caller to CallScreen once token + signal sent
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => _buildCallScreen('audio'),
-                  ),
-                );
-              }
-            });
+            );
+            if (!mounted) return;
+            if (error != null) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Call failed: $error'),
+                duration: const Duration(seconds: 6),
+              ));
+            } else {
+              // Step 3: Navigate to CallScreen only on confirmed success
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => _buildCallScreen('audio'),
+                ),
+              );
+            }
           },
         ),
         // Video call button
@@ -635,8 +638,9 @@ class _ChatScreenState extends State<ChatScreen> {
           icon: const Icon(Icons.videocam_outlined, color: AppTheme.primaryPurple, size: 24),
           tooltip: 'Video Call',
           onPressed: () async {
+            // Step 1: Request permissions first and strictly await the result
             final statuses = await [Permission.camera, Permission.microphone].request();
-            if (statuses[Permission.camera] != PermissionStatus.granted || 
+            if (statuses[Permission.camera] != PermissionStatus.granted ||
                 statuses[Permission.microphone] != PermissionStatus.granted) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -645,23 +649,26 @@ class _ChatScreenState extends State<ChatScreen> {
               }
               return;
             }
-            CallService().initiateCall(
+            // Step 2: Initiate call — returns null on success, or an error string
+            final error = await CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'video',
-            ).then((ok) {
-              if (!ok && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Could not start call. Check camera/mic permission.'),
-                ));
-              } else if (ok && mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => _buildCallScreen('video'),
-                  ),
-                );
-              }
-            });
+            );
+            if (!mounted) return;
+            if (error != null) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Call failed: $error'),
+                duration: const Duration(seconds: 6),
+              ));
+            } else {
+              // Step 3: Navigate to CallScreen only on confirmed success
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => _buildCallScreen('video'),
+                ),
+              );
+            }
           },
         ),
         PopupMenuButton<String>(

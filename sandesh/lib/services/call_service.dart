@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/message_model.dart';
 import 'supabase_broadcast_service.dart';
@@ -67,55 +66,82 @@ class CallService {
   Stream<CallEvent> get callSignalStream => _signalCtrl.stream;
 
   // ════════════════════════════════════════════════════════════════════════════
-  // Init
+  // Init — called on login. Safe to call multiple times.
   // ════════════════════════════════════════════════════════════════════════════
 
   Future<void> initialize(String myUsername) async {
     _myUsername = myUsername.toLowerCase();
+    // Engine is now initialized lazily on first call attempt.
+    // This avoids the race condition where AGORA_APP_ID is not yet available.
+    debugPrint('CallService: username set to $_myUsername (engine will init on first call)');
+  }
+
+  // ── Lazy engine init — called just before joining a channel ─────────────────
+  Future<String?> _ensureEngineReady() async {
+    if (_engine != null) return null; // already ready
+
     final appId = dotenv.env['AGORA_APP_ID'] ?? '';
     if (appId.isEmpty) {
-      debugPrint('CallService: AGORA_APP_ID not set in .env — calls disabled.');
-      return;
+      const msg = 'AGORA_APP_ID is not set in .env. Calls are disabled.';
+      debugPrint('CallService: $msg');
+      return msg;
     }
-    if (_engine != null) return; // already init
-    _engine = createAgoraRtcEngine();
-    await _engine!.initialize(RtcEngineContext(appId: appId));
-    debugPrint('CallService: Agora engine ready (appId=$appId)');
+
+    try {
+      _engine = createAgoraRtcEngine();
+      await _engine!.initialize(RtcEngineContext(appId: appId));
+      debugPrint('CallService: Agora engine initialized (appId=$appId)');
+      return null; // success
+    } catch (e) {
+      _engine = null;
+      final msg = 'Agora engine failed to initialize: $e';
+      debugPrint('CallService: $msg');
+      return msg;
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
   // Initiating a call — caller side
+  // Returns null on success, or an error string describing the failure.
+  // Permissions MUST be granted by the caller (chat_screen.dart) before calling this.
   // ════════════════════════════════════════════════════════════════════════════
 
-  Future<bool> initiateCall({
+  Future<String?> initiateCall({
     required String receiverUsername,
     required String callType,
   }) async {
-    if (_isInCall || !isEngineReady) return false;
-
-    // Request mic + camera permissions
-    final statuses = await [Permission.microphone, Permission.camera].request();
-    if (statuses[Permission.microphone] != PermissionStatus.granted) {
-      debugPrint('CallService: mic permission denied');
-      return false;
+    if (_isInCall) {
+      return 'Already in a call.';
     }
 
+    // Lazily initialize the Agora engine if not already done
+    final engineError = await _ensureEngineReady();
+    if (engineError != null) return engineError;
+
     final ch = _makeChannelName(_myUsername, receiverUsername);
-    final token = await _fetchToken(ch);
-    if (token == null) {
-      debugPrint('CallService: token fetch failed');
-      return false;
+
+    // Fetch token from Supabase Edge Function
+    final tokenResult = await _fetchToken(ch);
+    if (tokenResult == null) {
+      return 'Could not get a call token from the server. '
+          'Ensure the "agora-token" Edge Function is deployed and '
+          'AGORA_APP_ID / AGORA_APP_CERTIFICATE secrets are set.';
     }
 
     _isInCall = true;
 
-    // Signal receiver
-    await _sendSignal(
-      type: MessageType.callInvite,
-      to: receiverUsername.toLowerCase(),
-      channelName: ch,
-      callType: callType,
-    );
+    // Signal receiver via existing store-and-forward pipeline
+    try {
+      await _sendSignal(
+        type: MessageType.callInvite,
+        to: receiverUsername.toLowerCase(),
+        channelName: ch,
+        callType: callType,
+      );
+    } catch (e) {
+      _isInCall = false;
+      return 'Failed to send call signal: $e';
+    }
 
     // Emit an event so the caller's ChatScreen can navigate to CallScreen
     _signalCtrl.add(CallEvent(
@@ -126,7 +152,7 @@ class CallService {
       callType: callType,
     ));
 
-    return true;
+    return null; // success
   }
 
   /// Returns the channel name and token for the caller to use in CallScreen.
@@ -211,7 +237,11 @@ class CallService {
     try {
       final res = await Supabase.instance.client.functions
           .invoke('agora-token', body: {'channelName': channelName, 'uid': 0});
-      return res.data['token'] as String?;
+      final token = res.data['token'] as String?;
+      if (token == null || token.isEmpty) {
+        debugPrint('_fetchToken: server returned null/empty token. Response: ${res.data}');
+      }
+      return token;
     } catch (e) {
       debugPrint('_fetchToken error: $e');
       return null;
