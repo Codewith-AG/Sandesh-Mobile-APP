@@ -373,9 +373,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildContactTile(Contact contact) {
     Widget avatarWidget;
-    if (contact.avatarUrl.isNotEmpty) {
+    final url = contact.avatarUrl;
+
+    if (url.startsWith('http')) {
+      // URL from Supabase Storage — display as network image
+      avatarWidget = CircleAvatar(
+        radius: 28,
+        backgroundColor: AppTheme.lightPurple,
+        backgroundImage: NetworkImage(url),
+        onBackgroundImageError: (_, __) {},
+      );
+    } else if (url.isNotEmpty) {
+      // Legacy base64 path (backward compat)
       try {
-        final bytes = base64Decode(contact.avatarUrl);
+        final bytes = base64Decode(url);
         avatarWidget = CircleAvatar(
           radius: 28,
           backgroundImage: MemoryImage(bytes),

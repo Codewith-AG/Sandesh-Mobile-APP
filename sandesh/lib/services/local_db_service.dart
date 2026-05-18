@@ -19,7 +19,10 @@ class LocalDbService {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'sandesh_v4.db');
+    // v5: adds media_url, file_name, message_type to messages table.
+    // Using a new filename so existing devices get a clean slate without
+    // needing a complex ALTER TABLE migration path.
+    final path = join(dbPath, 'sandesh_v5.db');
 
     return await openDatabase(
       path,
@@ -36,6 +39,9 @@ class LocalDbService {
         receiver_username TEXT NOT NULL,
         text TEXT,
         media_base64 TEXT,
+        media_url TEXT,
+        file_name TEXT,
+        message_type TEXT NOT NULL DEFAULT 'text',
         is_me INTEGER NOT NULL,
         timestamp INTEGER NOT NULL
       )
@@ -110,11 +116,20 @@ class LocalDbService {
 
   Future<void> insertContact(Contact contact) async {
     final db = await database;
-    // Use LOWER username as the unique key to avoid duplicates
     final map = contact.toMap();
     map['username'] = (map['username'] as String).toLowerCase();
     await db.insert('contacts', map,
         conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateContactAvatar(String username, String avatarUrl) async {
+    final db = await database;
+    await db.update(
+      'contacts',
+      {'avatar_url': avatarUrl},
+      where: 'LOWER(username) = ?',
+      whereArgs: [username.toLowerCase()],
+    );
   }
 
   Future<List<Contact>> getContacts() async {
@@ -130,6 +145,26 @@ class LocalDbService {
 
     for (final contact in contacts) {
       final lastMsg = await getLastMessage(myUsername, contact.username);
+
+      // Build a human-readable subtitle for media messages
+      String? lastMessageText;
+      if (lastMsg != null) {
+        switch (lastMsg.messageType) {
+          case MessageType.image:
+            lastMessageText = '📷 Photo';
+            break;
+          case MessageType.video:
+            lastMessageText = '🎥 Video';
+            break;
+          case MessageType.document:
+            lastMessageText = '📄 ${lastMsg.fileName ?? 'Document'}';
+            break;
+          case MessageType.text:
+            lastMessageText = lastMsg.text;
+            break;
+        }
+      }
+
       enriched.add(Contact(
         id: contact.id,
         username: contact.username,
@@ -137,12 +172,11 @@ class LocalDbService {
         displayName: contact.displayName,
         bio: contact.bio,
         avatarUrl: contact.avatarUrl,
-        lastMessage: lastMsg?.text,
+        lastMessage: lastMessageText,
         lastMessageTime: lastMsg?.timestamp,
       ));
     }
 
-    // Sort by last message time (most recent first), contacts without messages at end
     enriched.sort((a, b) {
       if (a.lastMessageTime == null && b.lastMessageTime == null) return 0;
       if (a.lastMessageTime == null) return 1;

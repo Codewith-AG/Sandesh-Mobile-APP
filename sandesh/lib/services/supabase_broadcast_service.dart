@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:async';
-import '../models/message_model.dart';
+import '../models/message_model.dart'; // includes MessageType & MessageTypeX
 import '../models/contact_model.dart';
 import '../models/user_profile_model.dart';
 import 'local_db_service.dart';
@@ -213,6 +213,9 @@ class SupabaseBroadcastService {
         receiverUsername: payload['receiver_username'] as String,
         text: payload['text'] as String?,
         mediaBase64: payload['media_base64'] as String?,
+        mediaUrl: payload['media_url'] as String?,
+        fileName: payload['file_name'] as String?,
+        messageType: MessageTypeX.fromString(payload['message_type'] as String?),
         isMe: false,
         timestamp: payload['timestamp'] as int,
       );
@@ -288,7 +291,9 @@ class SupabaseBroadcastService {
         'sender_username': message.senderUsername,
         'receiver_username': message.receiverUsername,
         'text': message.text,
-        'media_base64': message.mediaBase64,
+        'media_url': message.mediaUrl,
+        'file_name': message.fileName,
+        'message_type': message.messageType.value,
         'timestamp': message.timestamp,
       });
       debugPrint('Message ${message.id} inserted into Supabase for delivery');
@@ -331,6 +336,7 @@ class SupabaseBroadcastService {
       for (final user in users) {
         final username = (user['username'] as String).toLowerCase();
         if (username == _myUsername) continue;
+        final avatarUrl = (user['avatar_url'] ?? '') as String;
         final exists = await LocalDbService().contactExists(username);
         if (!exists) {
           await LocalDbService().insertContact(Contact(
@@ -338,9 +344,12 @@ class SupabaseBroadcastService {
             phone: (user['phone_e164'] ?? '') as String,
             hashedPhone: '',
             bio: (user['bio'] ?? '') as String,
-            avatarUrl: (user['avatar_url'] ?? '') as String,
+            avatarUrl: avatarUrl,
           ));
           newContacts++;
+        } else if (avatarUrl.isNotEmpty) {
+          // Always update avatar_url so URL changes (re-uploads) propagate
+          await LocalDbService().updateContactAvatar(username, avatarUrl);
         }
       }
 
