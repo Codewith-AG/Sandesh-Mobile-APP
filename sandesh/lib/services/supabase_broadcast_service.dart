@@ -8,7 +8,7 @@ import '../models/contact_model.dart';
 import '../models/user_profile_model.dart';
 import 'local_db_service.dart';
 
-class SupabaseBroadcastService {
+class SupabaseBroadcastService with WidgetsBindingObserver {
   static final SupabaseBroadcastService _instance =
       SupabaseBroadcastService._internal();
   factory SupabaseBroadcastService() => _instance;
@@ -82,6 +82,10 @@ class SupabaseBroadcastService {
   /// immediately syncs any messages that arrived while the app was offline.
   void initialize(String myUsername) {
     _myUsername = myUsername.toLowerCase();
+    
+    // Add lifecycle observer for presence tracking
+    WidgetsBinding.instance.addObserver(this);
+    _updatePresence(true);
 
     // STEP 3: Replace broadcast listener with a Postgres INSERT listener.
     // One single channel per user — no per-room subscriptions needed.
@@ -422,9 +426,35 @@ class SupabaseBroadcastService {
   void unsubscribeFromRoom(String peerUsername) {}
   Future<void> subscribeToAllContactRooms() async {}
 
+  // ──────────────────────────── Presence ────────────────────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_myUsername.isEmpty) return;
+    // App is considered online if resumed
+    final isOnline = state == AppLifecycleState.resumed;
+    _updatePresence(isOnline);
+  }
+
+  Future<void> _updatePresence(bool isOnline) async {
+    try {
+      await _client.from('profiles').update({
+        'is_online': isOnline,
+        'last_seen': DateTime.now().toUtc().toIso8601String(),
+      }).eq('username', _myUsername);
+    } catch (e) {
+      debugPrint('Failed to update presence: $e');
+    }
+  }
+
   // ──────────────────────────── Cleanup ────────────────────────────
 
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (_myUsername.isNotEmpty) {
+      _updatePresence(false);
+    }
+
     if (_inboxChannel != null) {
       _client.removeChannel(_inboxChannel!);
       _inboxChannel = null;

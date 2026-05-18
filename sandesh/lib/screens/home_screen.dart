@@ -24,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _myUsername = '';
+  String _myAvatarUrl = '';
   List<Contact> _contacts = [];
   bool _isLoading = true;
   StreamSubscription<Message>? _messageSubscription;
@@ -84,6 +85,14 @@ class _HomeScreenState extends State<HomeScreen> {
     await _syncDeviceContacts();
 
     await _loadContacts();
+
+    // Fetch own profile for avatar
+    final profile = await LocalDbService().getProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        _myAvatarUrl = profile.avatarUrl;
+      });
+    }
   }
 
   Future<void> _syncDeviceContacts() async {
@@ -119,6 +128,13 @@ class _HomeScreenState extends State<HomeScreen> {
     await SupabaseBroadcastService().discoverContacts();
     await _syncDeviceContacts();
     await _loadContacts();
+    
+    final profile = await LocalDbService().getProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        _myAvatarUrl = profile.avatarUrl;
+      });
+    }
   }
 
   void _addContactDialog() {
@@ -268,17 +284,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const ProfileScreen()),
               ).then((_) => _loadContacts());
             },
-            child: CircleAvatar(
-              backgroundColor: AppTheme.lightPurple,
-              child: Text(
-                _myUsername.isNotEmpty ? _myUsername[0].toUpperCase() : '?',
-                style: GoogleFonts.urbanist(
-                  color: AppTheme.primaryPurple,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-            ),
+            child: _myAvatarUrl.startsWith('http')
+                ? CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppTheme.lightPurple,
+                    backgroundImage: NetworkImage(_myAvatarUrl),
+                    onBackgroundImageError: (_, __) {},
+                  )
+                : CircleAvatar(
+                    backgroundColor: AppTheme.lightPurple,
+                    child: Text(
+                      _myUsername.isNotEmpty ? _myUsername[0].toUpperCase() : '?',
+                      style: GoogleFonts.urbanist(
+                        color: AppTheme.primaryPurple,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
           ),
         ),
         title: Text(

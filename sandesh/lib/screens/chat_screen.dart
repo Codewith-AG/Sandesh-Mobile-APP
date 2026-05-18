@@ -37,6 +37,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSendingMedia = false;
   double _uploadProgress = 0;
   String _receiverAvatarUrl = '';
+  
+  RealtimeChannel? _presenceChannel;
+  bool _isPeerOnline = false;
+  DateTime? _peerLastSeen;
 
   @override
   void initState() {
@@ -52,6 +56,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       _loadMessages();
     });
+    _listenToPeerPresence();
   }
 
   Future<void> _loadReceiverAvatar() async {
@@ -78,8 +83,57 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _listenToPeerPresence() async {
+    final client = Supabase.instance.client;
+    
+    // Initial fetch
+    try {
+      final data = await client
+          .from('profiles')
+          .select('is_online, last_seen')
+          .eq('username', widget.receiverUsername)
+          .maybeSingle();
+          
+      if (data != null && mounted) {
+        setState(() {
+          _isPeerOnline = data['is_online'] == true;
+          if (data['last_seen'] != null) {
+            _peerLastSeen = DateTime.tryParse(data['last_seen']);
+          }
+        });
+      }
+    } catch (_) {}
+
+    // Subscribe to changes
+    _presenceChannel = client
+        .channel('public:profiles:${widget.receiverUsername}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'profiles',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'username',
+            value: widget.receiverUsername,
+          ),
+          callback: (payload) {
+            final record = payload.newRecord;
+            if (mounted && record.isNotEmpty) {
+              setState(() {
+                _isPeerOnline = record['is_online'] == true;
+                if (record['last_seen'] != null) {
+                  _peerLastSeen = DateTime.tryParse(record['last_seen']);
+                }
+              });
+            }
+          },
+        )
+        .subscribe();
+  }
+
   @override
   void dispose() {
+    _presenceChannel?.unsubscribe();
     SupabaseBroadcastService().activeChatUser = null;
     _messageSubscription?.cancel();
     _textController.dispose();
@@ -302,6 +356,23 @@ class _ChatScreenState extends State<ChatScreen> {
     return items;
   }
 
+  String _formatLastSeen(DateTime? lastSeen) {
+    if (lastSeen == null) return 'Offline';
+    final now = DateTime.now();
+    final local = lastSeen.toLocal();
+    final diff = now.difference(local);
+
+    if (diff.inMinutes < 1) return 'Last seen just now';
+    if (diff.inMinutes < 60) return 'Last seen ${diff.inMinutes} mins ago';
+    if (diff.inHours < 24 && now.day == local.day) {
+      return 'Last seen today at ${DateFormat('h:mm a').format(local)}';
+    }
+    if (diff.inHours < 48 && now.day - local.day == 1) {
+      return 'Last seen yesterday at ${DateFormat('h:mm a').format(local)}';
+    }
+    return 'Last seen on ${DateFormat('MMM d, yyyy').format(local)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _buildMessageListWithDates();
@@ -380,10 +451,14 @@ class _ChatScreenState extends State<ChatScreen> {
               Text(widget.receiverUsername,
                   style: GoogleFonts.urbanist(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textDark)),
               Row(children: [
-                Container(width: 8, height: 8,
-                    decoration: const BoxDecoration(color: AppTheme.onlineGreen, shape: BoxShape.circle)),
-                const SizedBox(width: 4),
-                Text('Online', style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.onlineGreen, fontWeight: FontWeight.w500)),
+                if (_isPeerOnline) ...[
+                  Container(width: 8, height: 8,
+                      decoration: const BoxDecoration(color: AppTheme.onlineGreen, shape: BoxShape.circle)),
+                  const SizedBox(width: 4),
+                  Text('Online', style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.onlineGreen, fontWeight: FontWeight.w500)),
+                ] else ...[
+                  Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.textLight, fontWeight: FontWeight.w500)),
+                ],
               ]),
             ],
           ),
