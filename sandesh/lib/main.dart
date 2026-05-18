@@ -17,22 +17,31 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // MUST be the very first call in a background isolate —
+  // path_provider (used by SQLite) requires Flutter bindings to be ready.
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  // Initialize what you need manually — Flutter binding is not available.
-  await LocalDbService().database; // ensure DB is ready
 
   final data = message.data;
-  if (data['id'] != null) {
-    final msg = Message(
-      id: data['id'],
-      senderUsername: data['sender_username'] ?? '',
-      receiverUsername: data['receiver_username'] ?? '',
-      text: data['text'],
-      isMe: false,
-      timestamp: int.tryParse(data['timestamp'] ?? '') ??
-          DateTime.now().millisecondsSinceEpoch,
-    );
-    await LocalDbService().insertMessage(msg);
+  // The notification is already shown by the OS via the `notification` object
+  // in the FCM payload. Here we just save the message to the local DB.
+  if (data['id'] != null && data['id']!.isNotEmpty) {
+    try {
+      await LocalDbService().database; // ensure DB is open
+      final msg = Message(
+        id: data['id']!,
+        senderUsername: data['sender_username'] ?? '',
+        receiverUsername: data['receiver_username'] ?? '',
+        text: data['text'],
+        isMe: false,
+        timestamp: int.tryParse(data['timestamp'] ?? '') ??
+            DateTime.now().millisecondsSinceEpoch,
+      );
+      await LocalDbService().insertMessage(msg);
+    } catch (e) {
+      // DB errors in background must never crash the handler
+      debugPrint('Background handler DB error: $e');
+    }
   }
 }
 

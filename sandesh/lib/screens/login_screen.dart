@@ -17,9 +17,8 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
 
   late AnimationController _animController;
-  late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late Animation<Offset> _slideAnimation;
 
   // Native Google Sign-In — bypasses the browser redirect entirely
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -32,18 +31,19 @@ class _LoginScreenState extends State<LoginScreen>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: const Interval(0.0, 0.65, curve: Curves.easeOut),
     );
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.18),
+      begin: const Offset(0, 0.12),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
-    );
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+    ));
     _animController.forward();
   }
 
@@ -56,25 +56,18 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Show the native Google account picker
       final googleUser = await _googleSignIn.signIn();
-
-      // User cancelled the picker — silently reset
       if (googleUser == null) {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      // 2. Get the authentication tokens
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken;
       final accessToken = googleAuth.accessToken;
 
-      if (idToken == null) {
-        throw Exception('Could not retrieve ID token from Google.');
-      }
+      if (idToken == null) throw Exception('Could not retrieve ID token.');
 
-      // 3. Authenticate directly with Supabase using the ID token (no browser)
       final response = await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
@@ -85,12 +78,9 @@ class _LoginScreenState extends State<LoginScreen>
         _handleSuccessfulSignIn(response.user!);
       }
     } catch (e) {
-      // Only suppress the explicit user-cancellation signal.
-      // Every other exception (network errors, Supabase auth failures, etc.)
-      // must surface as a visible SnackBar so it NEVER fails silently.
       final msg = e.toString();
-      final isUserCancelled = msg.contains('sign_in_cancelled') ||
-          msg.contains('sign_in_canceled');
+      final isUserCancelled =
+          msg.contains('sign_in_cancelled') || msg.contains('sign_in_canceled');
 
       if (mounted) {
         if (!isUserCancelled) {
@@ -98,12 +88,11 @@ class _LoginScreenState extends State<LoginScreen>
             SnackBar(
               content: Text(
                 'Sign-in failed: ${msg.replaceAll('Exception:', '').trim()}',
-                style: GoogleFonts.urbanist(fontWeight: FontWeight.w500),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
               ),
               backgroundColor: AppTheme.errorRed,
               behavior: SnackBarBehavior.floating,
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
         }
@@ -114,7 +103,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _handleSuccessfulSignIn(User user) {
     if (!mounted) return;
-    // Extract Google display name from metadata
     final meta = user.userMetadata ?? {};
     final googleName = (meta['full_name'] as String? ??
             meta['name'] as String? ??
@@ -123,15 +111,13 @@ class _LoginScreenState extends State<LoginScreen>
         .trim();
 
     setState(() => _isLoading = false);
-
-    // Check if user already completed phone setup
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => PhoneSetupScreen(googleName: googleName),
         transitionsBuilder: (_, animation, __, child) =>
             FadeTransition(opacity: animation, child: child),
-        transitionDuration: const Duration(milliseconds: 400),
+        transitionDuration: const Duration(milliseconds: 350),
       ),
     );
   }
@@ -139,184 +125,208 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final brightness = MediaQuery.of(context).platformBrightness;
-    final isDark = brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0D0B1A) : AppTheme.backgroundWhite,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Main content
-          SafeArea(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Spacer(flex: 2),
+                  SizedBox(height: size.height * 0.08),
 
-                  // Logo & brand
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppTheme.primaryPurple, AppTheme.accentPurple],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.primaryPurple.withValues(alpha: 0.4),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 46,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Sandesh',
-                            style: GoogleFonts.urbanist(
-                              fontSize: 42,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : AppTheme.textDark,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Private. Fast. Yours.',
-                            style: GoogleFonts.urbanist(
-                              fontSize: 15,
-                              color: isDark
-                                  ? Colors.white54
-                                  : AppTheme.textLight,
-                              fontWeight: FontWeight.w400,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
+                  // ── App Icon ──
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F4F6),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFFE8E8EC),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.chat_bubble_rounded,
+                        size: 38,
+                        color: Color(0xFF1A1A2E),
                       ),
                     ),
                   ),
 
-                  const Spacer(flex: 3),
+                  const SizedBox(height: 24),
 
-                  // Sign-in card
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(28),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF1C1830)
-                              : AppTheme.surfaceWhite,
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(
-                            color: isDark
-                                ? AppTheme.primaryPurple.withValues(alpha: 0.2)
-                                : AppTheme.lightGrey,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryPurple.withValues(alpha:
-                                      isDark ? 0.1 : 0.08),
-                              blurRadius: 32,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
+                  // ── Brand Name ──
+                  Text(
+                    'Sandesh',
+                    style: GoogleFonts.inter(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0D0D0D),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Private messaging, built for trust.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      color: const Color(0xFF8A8A9A),
+                      fontWeight: FontWeight.w400,
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // ── Feature pills row ──
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _FeaturePill(icon: Icons.lock_outline_rounded, label: 'Encrypted'),
+                      const SizedBox(width: 10),
+                      _FeaturePill(icon: Icons.bolt_rounded, label: 'Instant'),
+                      const SizedBox(width: 10),
+                      _FeaturePill(icon: Icons.do_not_disturb_on_outlined, label: 'No Ads'),
+                    ],
+                  ),
+
+                  const SizedBox(height: 36),
+
+                  // ── Sign-in card ──
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFEAEAEF), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Get started',
+                          style: GoogleFonts.inter(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0D0D0D),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sign in with your Google account to continue.',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: const Color(0xFF8A8A9A),
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // ── Google Sign-In Button ──
+                        _GoogleSignInButton(
+                          isLoading: _isLoading,
+                          onPressed: _isLoading ? null : _signInWithGoogle,
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // ── Security note ──
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            Icon(
+                              Icons.verified_user_outlined,
+                              size: 13,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(width: 5),
                             Text(
-                              'Welcome',
-                              style: GoogleFonts.urbanist(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : AppTheme.textDark,
+                              'End-to-end encrypted · Zero server storage',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: Colors.grey.shade400,
+                                fontWeight: FontWeight.w400,
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Sign in securely with your Google account to continue',
-                              style: GoogleFonts.urbanist(
-                                fontSize: 14,
-                                color: isDark
-                                    ? Colors.white54
-                                    : AppTheme.textLight,
-                                height: 1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-
-                            // Google Sign-In Button
-                            _GoogleSignInButton(
-                              isLoading: _isLoading,
-                              onPressed: _isLoading ? null : _signInWithGoogle,
-                            ),
-
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.security_rounded,
-                                  size: 14,
-                                  color: isDark
-                                      ? Colors.white38
-                                      : AppTheme.textLight,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'End-to-end encrypted · Zero server storage',
-                                  style: GoogleFonts.urbanist(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? Colors.white38
-                                        : AppTheme.textLight,
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
                   ),
 
-                  const SizedBox(height: 32),
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: Text(
-                      'By continuing, you agree to our Terms of Service\nand Privacy Policy.',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.urbanist(
-                        fontSize: 12,
-                        color: isDark ? Colors.white30 : AppTheme.textLight,
-                        height: 1.6,
-                      ),
+                  const SizedBox(height: 24),
+
+                  // ── Terms ──
+                  Text(
+                    'By continuing, you agree to our Terms of Service\nand Privacy Policy.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      color: const Color(0xFFB0B0C0),
+                      height: 1.7,
                     ),
                   ),
-                  SizedBox(height: size.height * 0.05),
+                  SizedBox(height: size.height * 0.04),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Feature Pill ──────────────────────────────────────────────────────────────
+
+class _FeaturePill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _FeaturePill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F6F9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEAEAEF)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF5A5A72)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF5A5A72),
             ),
           ),
         ],
@@ -325,14 +335,12 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
+// ─── Google Sign-In Button ─────────────────────────────────────────────────────
+
 class _GoogleSignInButton extends StatefulWidget {
   final bool isLoading;
   final VoidCallback? onPressed;
-
-  const _GoogleSignInButton({
-    required this.isLoading,
-    required this.onPressed,
-  });
+  const _GoogleSignInButton({required this.isLoading, required this.onPressed});
 
   @override
   State<_GoogleSignInButton> createState() => _GoogleSignInButtonState();
@@ -340,24 +348,24 @@ class _GoogleSignInButton extends StatefulWidget {
 
 class _GoogleSignInButtonState extends State<_GoogleSignInButton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _pressController;
+  late AnimationController _pressCtrl;
   late Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
-    _pressController = AnimationController(
+    _pressCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 100),
     );
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _pressController, curve: Curves.easeOut),
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut),
     );
   }
 
   @override
   void dispose() {
-    _pressController.dispose();
+    _pressCtrl.dispose();
     super.dispose();
   }
 
@@ -366,22 +374,22 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
     return ScaleTransition(
       scale: _scaleAnim,
       child: GestureDetector(
-        onTapDown: (_) => _pressController.forward(),
+        onTapDown: (_) => _pressCtrl.forward(),
         onTapUp: (_) {
-          _pressController.reverse();
+          _pressCtrl.reverse();
           widget.onPressed?.call();
         },
-        onTapCancel: () => _pressController.reverse(),
+        onTapCancel: () => _pressCtrl.reverse(),
         child: Container(
-          height: 58,
+          height: 54,
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border.all(color: const Color(0xFFDADADA), width: 1.5),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFDDDDE5), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 8,
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
             ],
@@ -389,44 +397,31 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
           child: widget.isLoading
               ? const Center(
                   child: SizedBox(
-                    width: 24,
-                    height: 24,
+                    width: 22,
+                    height: 22,
                     child: CircularProgressIndicator(
-                      color: Color(0xFF4285F4),
-                      strokeWidth: 2.5,
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4285F4)),
                     ),
                   ),
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Google G logo (drawn with circles — no asset needed)
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'G',
-                          style: GoogleFonts.roboto(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF4285F4),
-                          ),
-                        ),
-                      ),
+                    // Official Google "G" mark
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CustomPaint(painter: _GoogleGPainter()),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Text(
                       'Continue with Google',
-                      style: GoogleFonts.urbanist(
-                        fontSize: 16,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF3C4043),
-                        letterSpacing: 0.2,
+                        color: const Color(0xFF1F1F2E),
+                        letterSpacing: 0.1,
                       ),
                     ),
                   ],
@@ -435,4 +430,62 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
       ),
     );
   }
+}
+
+// ─── Accurate Google "G" logo painter ─────────────────────────────────────────
+
+class _GoogleGPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double cx = size.width / 2;
+    final double cy = size.height / 2;
+    final double r = size.width / 2;
+
+    // Draw coloured arcs: Blue, Red, Yellow, Green (clockwise from right)
+    final segments = [
+      // [startAngle (degrees), sweepAngle, color]
+      [-10.0, 100.0, const Color(0xFF4285F4)], // Blue
+      [90.0, 100.0, const Color(0xFF34A853)],  // Green
+      [190.0, 80.0, const Color(0xFFFBBC05)],  // Yellow
+      [270.0, 100.0, const Color(0xFFEA4335)], // Red
+    ];
+
+    const toRad = 3.1415926535 / 180;
+
+    for (final seg in segments) {
+      final paint = Paint()
+        ..color = seg[2] as Color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.22;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.72),
+        (seg[0] as double) * toRad,
+        (seg[1] as double) * toRad,
+        false,
+        paint,
+      );
+    }
+
+    // White horizontal bar for the crossbar of the G
+    final barPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+      Rect.fromLTWH(cx, cy - size.height * 0.12, r * 0.72, size.height * 0.24),
+      barPaint,
+    );
+
+    // Blue fill on the bar
+    final bluePaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+      Rect.fromLTWH(cx, cy - size.height * 0.12, r * 0.72, size.height * 0.24),
+      bluePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GoogleGPainter oldDelegate) => false;
 }

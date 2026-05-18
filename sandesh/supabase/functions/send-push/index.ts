@@ -10,33 +10,42 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ─── Base64url helper (RFC 4648 §5) ───────────────────────────────────────────
+
+/** Correctly encodes a Uint8Array as base64url with no padding. */
+function base64url(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+/** Encodes a plain JS object as a base64url JSON segment (for JWT headers/claims). */
+function encodeJwtPart(obj: object): string {
+  return base64url(new TextEncoder().encode(JSON.stringify(obj)));
+}
+
 // ─── Google OAuth2 JWT helper ──────────────────────────────────────────────────
 
 async function getGoogleAccessToken(): Promise<string> {
-  const projectId = Deno.env.get("FIREBASE_PROJECT_ID")!;
   const clientEmail = Deno.env.get("FIREBASE_CLIENT_EMAIL")!;
   // Supabase secrets preserve literal \n — replace them with real newlines
   const privateKeyRaw = Deno.env.get("FIREBASE_PRIVATE_KEY")!.replace(/\\n/g, "\n");
 
   const now = Math.floor(Date.now() / 1000);
 
-  // Build unsigned JWT header + claim
-  const header = { alg: "RS256", typ: "JWT" };
-  const claim = {
+  // Build JWT header + claim using correct base64url encoding
+  const signingInput = `${encodeJwtPart({ alg: "RS256", typ: "JWT" })}.${encodeJwtPart({
     iss: clientEmail,
     scope: "https://www.googleapis.com/auth/firebase.messaging",
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
-  };
-
-  const encode = (obj: object) =>
-    btoa(JSON.stringify(obj))
-      .replace(/=/g, "")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_");
-
-  const signingInput = `${encode(header)}.${encode(claim)}`;
+  })}`;
 
   // Import the RSA private key for signing
   const keyData = privateKeyRaw
@@ -60,12 +69,7 @@ async function getGoogleAccessToken(): Promise<string> {
     new TextEncoder().encode(signingInput)
   );
 
-  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
-
-  const jwt = `${signingInput}.${signatureB64}`;
+  const jwt = `${signingInput}.${base64url(new Uint8Array(signature))}`;
 
   // Exchange JWT for a short-lived Google OAuth2 access token
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -127,15 +131,20 @@ serve(async (req) => {
     const accessToken = await getGoogleAccessToken();
     const projectId = Deno.env.get("FIREBASE_PROJECT_ID")!;
 
+    // Null-safe body — never send the string "null" to FCM
+    const messageBody = (text != null && String(text).trim() !== "" && String(text) !== "null")
+      ? String(text)
+      : "📎 Sent an attachment";
+
     // Build the FCM HTTP v1 payload
     const fcmPayload = {
       message: {
         token: profile.fcm_token,
 
-        // Visible system notification (shown even when app is killed)
+        // Visible system notification (shown even when app is killed/background)
         notification: {
-          title: sender_username,
-          body: text ?? "Sent an attachment",
+          title: String(sender_username ?? "New Message"),
+          body: messageBody,
         },
 
         // Data payload — processed by Flutter _firebaseMessagingBackgroundHandler
@@ -143,18 +152,26 @@ serve(async (req) => {
           id: String(id ?? ""),
           sender_username: String(sender_username ?? ""),
           receiver_username: String(receiver_username ?? ""),
-          text: String(text ?? ""),
+          text: messageBody,
           timestamp: String(timestamp ?? Date.now()),
         },
 
-        // Android-specific: high priority to wake device, correct channel
+        // Android: high priority wakes the device even when terminated
         android: {
           priority: "high",
           notification: {
             channel_id: "messages_channel",
             sound: "default",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
+            notification_priority: "PRIORITY_MAX",
+            visibility: "PUBLIC",
           },
+        },
+
+        // APNs (iOS) — harmless placeholder for future use
+        apns: {
+          headers: { "apns-priority": "10" },
+          payload: { aps: { sound: "default", "content-available": 1 } },
         },
       },
     };
