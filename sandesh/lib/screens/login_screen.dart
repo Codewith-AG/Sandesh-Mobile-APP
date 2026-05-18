@@ -147,42 +147,6 @@ class _LoginScreenState extends State<LoginScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Gradient background orbs
-          Positioned(
-            top: -80,
-            right: -60,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppTheme.primaryPurple.withValues(alpha: 0.25),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -100,
-            left: -80,
-            child: Container(
-              width: 340,
-              height: 340,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppTheme.accentPurple.withValues(alpha: 0.2),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
           // Main content
           SafeArea(
             child: Padding(
@@ -411,17 +375,14 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
         child: Container(
           height: 58,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppTheme.primaryPurple, AppTheme.accentPurple],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFDADADA), width: 1.5),
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primaryPurple.withValues(alpha: 0.38),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -431,7 +392,7 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: Color(0xFF4285F4),
                       strokeWidth: 2.5,
                     ),
                   ),
@@ -463,8 +424,8 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
                       'Continue with Google',
                       style: GoogleFonts.urbanist(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF3C4043),
                         letterSpacing: 0.2,
                       ),
                     ),

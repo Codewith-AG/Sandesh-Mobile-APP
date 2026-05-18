@@ -44,15 +44,16 @@ class _ChatScreenState extends State<ChatScreen> {
     // Subscribe to the shared room for this conversation
     SupabaseBroadcastService().subscribeToRoom(widget.receiverUsername);
 
-    // Delay stream subscription until after first frame so widget is fully mounted
-    // and the stream listener is guaranteed to be attached before any messages fire.
+    // Subscribe immediately — attaching in addPostFrameCallback would open a
+    // race window where messages could fire before the listener is active.
+    _messageSubscription = SupabaseBroadcastService()
+        .messageStream
+        .listen(_handleNewMessage);
+
+    // Re-load from DB after stream is attached to catch any messages that
+    // arrived between the initial load and the subscription being active.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _messageSubscription = SupabaseBroadcastService()
-          .messageStream
-          .listen(_handleNewMessage);
-      // Re-load from DB to catch any messages that arrived between
-      // the initial load and the subscription being active.
       _loadMessages();
     });
   }

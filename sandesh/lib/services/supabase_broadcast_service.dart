@@ -120,6 +120,18 @@ class SupabaseBroadcastService {
         )
         .subscribe((status, [error]) {
       debugPrint('Inbox channel status: $status${error != null ? " | $error" : ""}');
+      // Auto-reconnect if the channel drops unexpectedly
+      if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut) {
+        debugPrint('Inbox channel lost — reconnecting in 3s...');
+        Future.delayed(const Duration(seconds: 3), () {
+          if (_myUsername.isNotEmpty) {
+            _client.removeChannel(_inboxChannel!);
+            _inboxChannel = null;
+            initialize(_myUsername);
+          }
+        });
+      }
     });
 
     // STEP 1: Sync messages that arrived while we were offline
