@@ -12,6 +12,7 @@ import '../services/supabase_broadcast_service.dart';
 import '../services/media_upload_service.dart';
 import '../theme/app_theme.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String myUsername;
@@ -373,6 +374,57 @@ class _ChatScreenState extends State<ChatScreen> {
     return 'Last seen on ${DateFormat('MMM d, yyyy').format(local)}';
   }
 
+  void _showClearChatConfirm() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Clear Chat', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
+        content: Text('Are you sure you want to delete all messages? This cannot be undone locally.', style: GoogleFonts.urbanist()),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await LocalDbService().deleteChatHistory(widget.myUsername, widget.receiverUsername);
+              if (mounted) {
+                setState(() {
+                  _messages.clear();
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
+            child: Text('Clear', style: GoogleFonts.urbanist(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBlockUserConfirm() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Block User', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
+        content: Text('Are you sure you want to block this user?', style: GoogleFonts.urbanist()),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('User blocked.', style: GoogleFonts.urbanist()), backgroundColor: AppTheme.primaryPurple),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
+            child: Text('Block', style: GoogleFonts.urbanist(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _buildMessageListWithDates();
@@ -441,33 +493,56 @@ class _ChatScreenState extends State<ChatScreen> {
         icon: const Icon(Icons.arrow_back_ios_new, size: 20),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Row(
-        children: [
-          _buildReceiverAvatar(),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.receiverUsername,
-                  style: GoogleFonts.urbanist(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textDark)),
-              Row(children: [
-                if (_isPeerOnline) ...[
-                  Container(width: 8, height: 8,
-                      decoration: const BoxDecoration(color: AppTheme.onlineGreen, shape: BoxShape.circle)),
-                  const SizedBox(width: 4),
-                  Text('Online', style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.onlineGreen, fontWeight: FontWeight.w500)),
-                ] else ...[
-                  Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.textLight, fontWeight: FontWeight.w500)),
-                ],
-              ]),
-            ],
-          ),
-        ],
+      title: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProfileScreen(peerUsername: widget.receiverUsername),
+            ),
+          );
+        },
+        child: Row(
+          children: [
+            _buildReceiverAvatar(),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.receiverUsername,
+                    style: GoogleFonts.urbanist(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textDark)),
+                Row(children: [
+                  if (_isPeerOnline) ...[
+                    Container(width: 8, height: 8,
+                        decoration: const BoxDecoration(color: AppTheme.onlineGreen, shape: BoxShape.circle)),
+                    const SizedBox(width: 4),
+                    Text('Online', style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.onlineGreen, fontWeight: FontWeight.w500)),
+                  ] else ...[
+                    Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.textLight, fontWeight: FontWeight.w500)),
+                  ],
+                ]),
+              ],
+            ),
+          ],
+        ),
       ),
       actions: [
         IconButton(icon: const Icon(Icons.videocam_outlined, color: AppTheme.primaryPurple, size: 24), onPressed: () {}),
         IconButton(icon: const Icon(Icons.call_outlined, color: AppTheme.primaryPurple, size: 22), onPressed: () {}),
-        IconButton(icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textMedium, size: 22), onPressed: () {}),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textMedium, size: 22),
+          onSelected: (value) {
+            if (value == 'clear') {
+              _showClearChatConfirm();
+            } else if (value == 'block') {
+              _showBlockUserConfirm();
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.urbanist())),
+            PopupMenuItem(value: 'block', child: Text('Block User', style: GoogleFonts.urbanist())),
+          ],
+        ),
         const SizedBox(width: 4),
       ],
     );

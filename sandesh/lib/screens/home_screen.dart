@@ -12,6 +12,7 @@ import '../services/supabase_broadcast_service.dart';
 import '../theme/app_theme.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
+import 'login_screen.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -317,10 +318,52 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.search_rounded, color: AppTheme.textMedium),
             onPressed: () {},
           ),
-          IconButton(
-            icon:
-                const Icon(Icons.more_vert_rounded, color: AppTheme.textMedium),
-            onPressed: () {},
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textMedium),
+            onSelected: (value) async {
+              if (value == 'profile') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                ).then((_) => _refreshContacts());
+              } else if (value == 'logout') {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: Text('Logout', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
+                    content: Text('Are you sure you want to logout? Your chat history will be preserved locally.', style: GoogleFonts.urbanist()),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
+                        child: Text('Logout', style: GoogleFonts.urbanist(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true && mounted) {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.clear();
+                  SupabaseBroadcastService().dispose();
+                  try {
+                    await Supabase.instance.client.auth.signOut();
+                  } catch (_) {}
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  }
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(value: 'profile', child: Text('My Profile', style: GoogleFonts.urbanist())),
+              PopupMenuItem(value: 'logout', child: Text('Log Out', style: GoogleFonts.urbanist(color: AppTheme.errorRed))),
+            ],
           ),
           const SizedBox(width: 8),
         ],

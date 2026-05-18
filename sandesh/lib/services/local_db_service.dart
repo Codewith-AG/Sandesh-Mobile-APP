@@ -95,6 +95,18 @@ class LocalDbService {
     return results.map((m) => Message.fromMap(m)).toList();
   }
 
+  Future<void> deleteChatHistory(String myUsername, String chatWithUsername) async {
+    final db = await database;
+    final my = myUsername.toLowerCase();
+    final peer = chatWithUsername.toLowerCase();
+    await db.delete(
+      'messages',
+      where:
+          '(LOWER(sender_username) = ? AND LOWER(receiver_username) = ?) OR (LOWER(sender_username) = ? AND LOWER(receiver_username) = ?)',
+      whereArgs: [my, peer, peer, my],
+    );
+  }
+
   /// Returns the last message exchanged with a given user
   Future<Message?> getLastMessage(String myUsername, String withUsername) async {
     final db = await database;

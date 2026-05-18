@@ -12,7 +12,8 @@ import '../theme/app_theme.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final String? peerUsername;
+  const ProfileScreen({super.key, this.peerUsername});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -45,7 +46,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  bool get _isReadOnly => widget.peerUsername != null;
+
   Future<void> _loadProfile() async {
+    if (_isReadOnly) {
+      final client = Supabase.instance.client;
+      try {
+        final data = await client
+            .from('profiles')
+            .select('username, phone_e164, bio, avatar_url')
+            .eq('username', widget.peerUsername!)
+            .maybeSingle();
+
+        if (data != null) {
+          final profile = UserProfile(
+            username: data['username'] ?? '',
+            phone: data['phone_e164'] ?? '',
+            hashedPhone: '',
+            bio: data['bio'] ?? '',
+            avatarUrl: data['avatar_url'] ?? '',
+          );
+          _usernameController.text = profile.username;
+          _bioController.text = profile.bio;
+          _phoneController.text = profile.phone;
+          _profile = profile;
+        }
+      } catch (_) {}
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
     UserProfile? profile = await LocalDbService().getProfile();
 
     if (profile == null) {
@@ -232,23 +262,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return GestureDetector(
-      onTap: _isSaving ? null : _pickAvatar,
+      onTap: (_isSaving || _isReadOnly) ? null : _pickAvatar,
       child: Stack(
         children: [
           avatarContent,
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A2E),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+          if (!_isReadOnly)
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A2E),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
               ),
-              child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
             ),
-          ),
         ],
       ),
     );
@@ -320,58 +351,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _bioController,
                     label: 'Bio',
                     icon: Icons.edit_note_outlined,
-                    readOnly: false,
+                    readOnly: _isReadOnly,
                     maxLines: 3,
                     hintText: 'Tell something about yourself...',
                   ),
                   const SizedBox(height: 32),
 
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _saveProfile,
-                      icon: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.check_circle_outline,
-                              color: Colors.white),
-                      label: Text(
-                        _isUploadingAvatar ? 'Uploading...' : 'Save Profile',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                  if (!_isReadOnly) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _saveProfile,
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.check_circle_outline,
+                                color: Colors.white),
+                        label: Text(
+                          _isUploadingAvatar ? 'Uploading...' : 'Save Profile',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A1A2E),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1A1A2E),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 48),
+                    const SizedBox(height: 48),
 
-                  TextButton.icon(
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout, color: AppTheme.errorRed),
-                    label: Text(
-                      'Logout',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.errorRed,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                    TextButton.icon(
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout, color: AppTheme.errorRed),
+                      label: Text(
+                        'Logout',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.errorRed,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
