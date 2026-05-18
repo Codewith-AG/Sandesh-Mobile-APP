@@ -17,6 +17,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
   // Initialize what you need manually — Flutter binding is not available.
   await LocalDbService().database; // ensure DB is ready
 
@@ -63,6 +64,16 @@ void main() async {
   await flutterLocalNotificationsPlugin.initialize(
     settings: initializationSettings,
   );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(const AndroidNotificationChannel(
+        'messages_channel',
+        'Messages Notifications',
+        description: 'This channel is used for chat message notifications.',
+        importance: Importance.max,
+      ));
 
   // Request notification permission on Android 13+ (API 33+)
   // On older Android versions this is a no-op — permission is granted by default.
