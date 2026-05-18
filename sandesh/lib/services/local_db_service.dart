@@ -19,9 +19,9 @@ class LocalDbService {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    // v6: adds local_path column to messages for auto-downloaded media.
+    // v7: adds call_type column to messages.
     // New filename ensures a clean migration without ALTER TABLE complexity.
-    final path = join(dbPath, 'sandesh_v6.db');
+    final path = join(dbPath, 'sandesh_v7.db');
 
     return await openDatabase(
       path,
@@ -41,6 +41,7 @@ class LocalDbService {
         media_url TEXT,
         file_name TEXT,
         local_path TEXT,
+        call_type TEXT,
         message_type TEXT NOT NULL DEFAULT 'text',
         is_me INTEGER NOT NULL,
         timestamp INTEGER NOT NULL
