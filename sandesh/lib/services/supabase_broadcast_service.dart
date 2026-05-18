@@ -9,6 +9,7 @@ import '../models/contact_model.dart';
 import '../models/user_profile_model.dart';
 import 'local_db_service.dart';
 import 'media_upload_service.dart';
+import 'package:gal/gal.dart';
 
 class SupabaseBroadcastService with WidgetsBindingObserver {
   static final SupabaseBroadcastService _instance =
@@ -454,13 +455,20 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
         final localPath = await MediaUploadService().downloadAndSave(url, fileName);
         if (localPath == null) return;
 
+        // Ensure it is saved to the native gallery
+        if (message.messageType == MessageType.image) {
+          await Gal.putImage(localPath);
+        } else if (message.messageType == MessageType.video) {
+          await Gal.putVideo(localPath);
+        }
+
         // Update DB so the bubble renders from local file next time
         await LocalDbService().updateMessageLocalPath(message.id, localPath);
 
         // Delete from Supabase Storage bucket
         await MediaUploadService().deleteFromStorage(url, 'chat_media');
 
-        debugPrint('Auto-download complete: $localPath');
+        debugPrint('Auto-download complete & saved to gallery: $localPath');
       } catch (e) {
         debugPrint('_autoDownloadAndClean error: $e');
       }

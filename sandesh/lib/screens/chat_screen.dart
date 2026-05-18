@@ -13,6 +13,7 @@ import '../services/media_upload_service.dart';
 import '../theme/app_theme.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'profile_screen.dart';
+import 'media_viewer_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String myUsername;
@@ -732,6 +733,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // Priority: local file > network URL > placeholder
     final localPath = message.localPath;
     final networkUrl = message.mediaUrl;
+    final heroTag = 'media_${message.id}';
 
     Widget imageWidget;
     if (localPath != null && File(localPath).existsSync()) {
@@ -787,11 +789,25 @@ class _ChatScreenState extends State<ChatScreen> {
         topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
         bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
       ),
-      child: Stack(
-        children: [
-          imageWidget,
-          Positioned(bottom: 6, right: 8, child: _buildTimestampOverlay(timeString, isMe)),
-        ],
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MediaViewerScreen(
+                heroTag: heroTag,
+                localPath: localPath,
+                networkUrl: networkUrl,
+              ),
+            ),
+          );
+        },
+        child: Stack(
+          children: [
+            Hero(tag: heroTag, child: imageWidget),
+            Positioned(bottom: 6, right: 8, child: _buildTimestampOverlay(timeString, isMe)),
+          ],
+        ),
       ),
     );
   }
