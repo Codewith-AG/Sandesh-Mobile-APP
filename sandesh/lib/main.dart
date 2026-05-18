@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:phone_form_field/phone_form_field.dart';
@@ -93,9 +94,51 @@ void main() async {
 
   runApp(const SandeshApp());
 }
-
-class SandeshApp extends StatelessWidget {
+class SandeshApp extends StatefulWidget {
   const SandeshApp({super.key});
+
+  @override
+  State<SandeshApp> createState() => _SandeshAppState();
+}
+
+class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Set online on initial startup
+    _updatePresence(true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _updatePresence(true);
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.inactive) {
+      _updatePresence(false);
+    }
+  }
+
+  Future<void> _updatePresence(bool isOnline) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username');
+      if (username != null && username.isNotEmpty) {
+        await Supabase.instance.client.from('profiles').update({
+          'is_online': isOnline,
+          'last_seen': DateTime.now().toUtc().toIso8601String(),
+        }).eq('username', username);
+      }
+    } catch (e) {
+      debugPrint('Lifecycle presence update error: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

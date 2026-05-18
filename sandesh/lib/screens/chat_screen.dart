@@ -40,7 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   double _uploadProgress = 0;
   String _receiverAvatarUrl = '';
   
-  RealtimeChannel? _presenceChannel;
+  StreamSubscription<List<Map<String, dynamic>>>? _presenceSubscription;
   bool _isPeerOnline = false;
   DateTime? _peerLastSeen;
 
@@ -85,63 +85,34 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _listenToPeerPresence() async {
+  void _listenToPeerPresence() {
     final client = Supabase.instance.client;
     final peer = widget.receiverUsername.toLowerCase();
 
-    // ── Initial fetch ──
-    try {
-      final data = await client
-          .from('profiles')
-          .select('is_online, last_seen')
-          .eq('username', peer)
-          .maybeSingle();
-
-      if (data != null && mounted) {
+    // NOTE: We use the `.stream()` API instead of `.channel()` because it is much
+    // more reliable and automatically handles fetching initial state plus all realtime
+    // updates under the hood.
+    _presenceSubscription = client
+        .from('profiles')
+        .stream(primaryKey: ['username'])
+        .eq('username', peer)
+        .listen((data) {
+      if (data.isNotEmpty && mounted) {
+        final profile = data.first;
         setState(() {
-          _isPeerOnline = data['is_online'] == true;
-          final raw = data['last_seen'] as String?;
+          _isPeerOnline = profile['is_online'] == true;
+          final raw = profile['last_seen'] as String?;
           if (raw != null) _peerLastSeen = DateTime.tryParse(raw);
         });
       }
-    } catch (e) {
-      debugPrint('Presence initial fetch error: $e');
-    }
-
-    // ── Realtime subscription ──
-    // NOTE: Column filters on non-PK columns are unreliable in Supabase Realtime.
-    // We subscribe to ALL profile updates and filter client-side by username.
-    // This is the only reliable pattern without changing the DB schema.
-    _presenceChannel = client
-        .channel('presence_peer_$peer')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'profiles',
-          callback: (payload) {
-            final record = payload.newRecord;
-            if (!mounted || record.isEmpty) return;
-            // Client-side filter: only handle updates for our peer
-            final updatedUser = (record['username'] as String? ?? '').toLowerCase();
-            if (updatedUser != peer) return;
-            setState(() {
-              _isPeerOnline = record['is_online'] == true;
-              final raw = record['last_seen'] as String?;
-              if (raw != null) _peerLastSeen = DateTime.tryParse(raw);
-            });
-          },
-        )
-        .subscribe((status, [error]) {
-          debugPrint('Presence channel status: $status ${error ?? ""}');
-        });
+    }, onError: (e) {
+      debugPrint('Presence stream error: $e');
+    });
   }
 
   @override
   void dispose() {
-    if (_presenceChannel != null) {
-      Supabase.instance.client.removeChannel(_presenceChannel!);
-      _presenceChannel = null;
-    }
+    _presenceSubscription?.cancel();
     SupabaseBroadcastService().activeChatUser = null;
     _messageSubscription?.cancel();
     _textController.dispose();
