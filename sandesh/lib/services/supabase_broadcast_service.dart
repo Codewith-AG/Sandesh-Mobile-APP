@@ -10,6 +10,7 @@ import '../models/user_profile_model.dart';
 import 'local_db_service.dart';
 import 'media_upload_service.dart';
 import 'package:gal/gal.dart';
+import 'call_service.dart';
 
 class SupabaseBroadcastService with WidgetsBindingObserver {
   static final SupabaseBroadcastService _instance =
@@ -227,6 +228,12 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
         timestamp: payload['timestamp'] as int,
       );
 
+      // ── Call signaling — do NOT save to DB, route to CallService ────────
+      if (message.messageType.isCallSignal) {
+        CallService().handleCallMessage(message);
+        return; // skip DB insert, auto-download, notifications
+      }
+
       // Save to local vault
       await LocalDbService().insertMessage(message);
 
@@ -319,7 +326,24 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     }
   }
 
-  // ──────────────────────────── Profile Sync ────────────────────────────
+  /// Sends a call signaling message (callInvite / callAccepted / callRejected / callEnded).
+  /// Does NOT save to local DB — call signals are ephemeral.
+  Future<void> sendCallSignal(Message message) async {
+    try {
+      await _client.from('messages').insert({
+        'id': message.id,
+        'sender_username': message.senderUsername,
+        'receiver_username': message.receiverUsername,
+        'text': message.text,
+        'message_type': message.messageType.value,
+        'timestamp': message.timestamp,
+      });
+      debugPrint('Call signal ${message.messageType.value} sent to ${message.receiverUsername}');
+    } catch (e) {
+      debugPrint('sendCallSignal error: $e');
+    }
+  }
+
 
   /// Upserts the user profile to the Supabase `profiles` table.
   /// Uses the Supabase auth user ID as the conflict key.

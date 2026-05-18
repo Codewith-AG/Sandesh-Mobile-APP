@@ -182,6 +182,12 @@ class LocalDbService {
           case MessageType.document:
             lastMessageText = '📄 ${lastMsg.fileName ?? 'Document'}';
             break;
+          case MessageType.callInvite:
+          case MessageType.callAccepted:
+          case MessageType.callRejected:
+          case MessageType.callEnded:
+            lastMessageText = '📞 Call';
+            break;
           case MessageType.text:
             lastMessageText = lastMsg.text;
             break;

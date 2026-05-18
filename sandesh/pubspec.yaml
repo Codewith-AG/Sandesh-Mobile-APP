@@ -59,6 +59,7 @@ dependencies:
   dio: ^5.7.0
   path_provider: ^2.1.5
   gal: ^2.3.2
+  agora_rtc_engine: ^6.5.4
 
 dev_dependencies:
   flutter_test:

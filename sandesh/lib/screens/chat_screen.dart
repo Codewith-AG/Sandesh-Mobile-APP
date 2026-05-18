@@ -14,6 +14,8 @@ import '../theme/app_theme.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'profile_screen.dart';
 import 'media_viewer_screen.dart';
+import 'call_screen.dart';
+import '../services/call_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String myUsername;
@@ -592,8 +594,55 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       actions: [
-        IconButton(icon: const Icon(Icons.videocam_outlined, color: AppTheme.primaryPurple, size: 24), onPressed: () {}),
-        IconButton(icon: const Icon(Icons.call_outlined, color: AppTheme.primaryPurple, size: 22), onPressed: () {}),
+        // Audio call button
+        IconButton(
+          icon: const Icon(Icons.call_outlined, color: AppTheme.primaryPurple, size: 22),
+          tooltip: 'Audio Call',
+          onPressed: () {
+            CallService().initiateCall(
+              receiverUsername: widget.receiverUsername,
+              callType: 'audio',
+            ).then((ok) {
+              if (!ok && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Could not start call. Check mic permission.'),
+                ));
+              } else if (ok && mounted) {
+                // Navigate caller to CallScreen once token + signal sent
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => _buildCallScreen('audio'),
+                  ),
+                );
+              }
+            });
+          },
+        ),
+        // Video call button
+        IconButton(
+          icon: const Icon(Icons.videocam_outlined, color: AppTheme.primaryPurple, size: 24),
+          tooltip: 'Video Call',
+          onPressed: () {
+            CallService().initiateCall(
+              receiverUsername: widget.receiverUsername,
+              callType: 'video',
+            ).then((ok) {
+              if (!ok && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Could not start call. Check camera/mic permission.'),
+                ));
+              } else if (ok && mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => _buildCallScreen('video'),
+                  ),
+                );
+              }
+            });
+          },
+        ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textMedium, size: 22),
           onSelected: (value) {
@@ -644,6 +693,31 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         child: Text(label, style: GoogleFonts.urbanist(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textLight)),
       ),
+    );
+  }
+
+  Widget _buildCallScreen(String callType) {
+    // Channel name matching what CallService generates
+    final sorted = [widget.myUsername.toLowerCase(), widget.receiverUsername.toLowerCase()]..sort();
+    final channelName = 'call_${sorted[0]}_${sorted[1]}';
+    return FutureBuilder<String?>(
+      future: CallService().fetchTokenForChannel(channelName),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF0D0D1A),
+            body: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))),
+          );
+        }
+        return CallScreen(
+          myUsername: widget.myUsername,
+          peerUsername: widget.receiverUsername,
+          channelName: channelName,
+          token: snapshot.data ?? '',
+          callType: callType,
+          isOutgoing: true,
+        );
+      },
     );
   }
 

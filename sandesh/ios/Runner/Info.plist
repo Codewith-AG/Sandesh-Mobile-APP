@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Sandesh uses your camera for video calls.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Sandesh uses your microphone for audio and video calls.</string>
 </dict>
 </plist>

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,9 +9,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/local_db_service.dart';
-import 'models/message_model.dart';
+import 'models/message_model.dart' hide MessageType;
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
+import 'screens/incoming_call_screen.dart';
+import 'navigation/navigator_key.dart';
+import 'services/call_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -102,16 +106,27 @@ class SandeshApp extends StatefulWidget {
 }
 
 class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
+  StreamSubscription<CallEvent>? _incomingCallSub;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // Set online on initial startup
     _updatePresence(true);
+    // Listen for incoming calls from ANY screen — show IncomingCallScreen globally
+    _incomingCallSub = CallService().incomingCallStream.listen((event) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute<void>(
+          builder: (_) => IncomingCallScreen(event: event),
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
+    _incomingCallSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -145,6 +160,7 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
     return MaterialApp(
       title: 'Sandesh',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       theme: AppTheme.lightTheme,
       localizationsDelegates: [
         ...PhoneFieldLocalization.delegates,

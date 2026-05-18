@@ -9,6 +9,7 @@ import '../models/contact_model.dart';
 import '../models/message_model.dart';
 import '../services/local_db_service.dart';
 import '../services/supabase_broadcast_service.dart';
+import '../services/call_service.dart';
 import '../theme/app_theme.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
@@ -74,6 +75,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Initialize broadcast service with our username
     SupabaseBroadcastService().initialize(_myUsername);
+    // Initialize Agora calling engine
+    CallService().initialize(_myUsername);
 
     // Auto-discover contacts from Supabase users table
     await SupabaseBroadcastService().discoverContacts();
