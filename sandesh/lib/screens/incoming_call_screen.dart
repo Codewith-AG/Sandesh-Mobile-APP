@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/call_service.dart';
+import 'call_screen.dart';
 
 class IncomingCallScreen extends StatefulWidget {
   final CallEvent event;
@@ -50,8 +52,60 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   Future<void> _accept() async {
     if (_handling) return;
     setState(() => _handling = true);
-    await CallService().acceptCall(widget.event);
-    // Navigation handled inside acceptCall via navigator key — no pop needed here
+
+    // ── Step 1: Request only the permissions we need for this call type ────
+    final isVideo = widget.event.callType == 'video';
+    final perms = isVideo
+        ? [Permission.microphone, Permission.camera]
+        : [Permission.microphone];
+    final statuses = await perms.request();
+    final allGranted =
+        statuses.values.every((s) => s == PermissionStatus.granted);
+    if (!allGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(isVideo
+              ? 'Microphone and Camera permissions are required for a video call.'
+              : 'Microphone permission is required for an audio call.'),
+        ));
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    // ── Step 2: Ask CallService to send accept signal + fetch Agora token ──
+    final token = await CallService().acceptCall(widget.event);
+    if (!mounted) return;
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Failed to get a call token. Try again.'),
+      ));
+      // Make sure we don't leave the service stuck in isInCall=true
+      CallService().markCallEnded();
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // ── Step 3: Resolve my own username for CallScreen ──────────────────────
+    final prefs = await SharedPreferences.getInstance();
+    final myUsername = (prefs.getString('username') ??
+            widget.event.receiverUsername)
+        .toLowerCase();
+
+    // ── Step 4: Replace IncomingCallScreen with CallScreen ─────────────────
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => CallScreen(
+          myUsername: myUsername,
+          peerUsername: widget.event.callerUsername,
+          channelName: widget.event.channelName,
+          token: token,
+          callType: widget.event.callType,
+          isOutgoing: false,
+        ),
+      ),
+    );
   }
 
   Future<void> _reject() async {

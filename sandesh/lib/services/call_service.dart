@@ -51,6 +51,11 @@ class CallService {
   bool _isInCall = false;
   bool get isInCall => _isInCall;
 
+  /// Channel names we have recently announced as incoming. Used to dedup
+  /// the case where the same call_invite arrives twice (e.g. once via FCM
+  /// notification tap, again via Supabase Realtime when the app catches up).
+  final Map<String, DateTime> _recentInvites = {};
+
   // ── Streams ─────────────────────────────────────────────────────────────────
 
   /// Emits incoming call invites. [main.dart] listens to this and shows
@@ -178,12 +183,34 @@ class CallService {
         );
         return;
       }
+      // Dedup invites that arrive twice (FCM + Realtime catch-up). Keep a
+      // 60-second window per channel name.
+      _purgeOldInvites();
+      if (_recentInvites.containsKey(event.channelName)) return;
+      _recentInvites[event.channelName] = DateTime.now();
       // Let main.dart / root listener show IncomingCallScreen
       if (!_incomingCtrl.isClosed) _incomingCtrl.add(event);
     } else {
-      // callAccepted / callRejected / callEnded
+      // callAccepted / callRejected / callEnded — also clear dedup so a future
+      // invite on the same channel name (rare, but possible) is allowed through.
+      _recentInvites.remove(event.channelName);
       if (!_signalCtrl.isClosed) _signalCtrl.add(event);
     }
+  }
+
+  void _purgeOldInvites() {
+    final cutoff = DateTime.now().subtract(const Duration(seconds: 60));
+    _recentInvites.removeWhere((_, t) => t.isBefore(cutoff));
+  }
+
+  /// Used by the FCM open/initial-message handlers so the incoming-call UI is
+  /// shown through the same dedup-protected stream as the Realtime path.
+  void notifyIncomingFromFcm(CallEvent event) {
+    if (_isInCall) return;
+    _purgeOldInvites();
+    if (_recentInvites.containsKey(event.channelName)) return;
+    _recentInvites[event.channelName] = DateTime.now();
+    if (!_incomingCtrl.isClosed) _incomingCtrl.add(event);
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -191,6 +218,12 @@ class CallService {
   // ════════════════════════════════════════════════════════════════════════════
 
   Future<String?> acceptCall(CallEvent event) async {
+    // Engine must be ready before the receiver tries to join the channel.
+    final engineError = await _ensureEngineReady();
+    if (engineError != null) {
+      debugPrint('acceptCall: $engineError');
+      return null;
+    }
     _isInCall = true;
     await _sendSignal(
       type: MessageType.callAccepted,

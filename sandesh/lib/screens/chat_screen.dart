@@ -600,13 +600,12 @@ class _ChatScreenState extends State<ChatScreen> {
           icon: const Icon(Icons.call_outlined, color: AppTheme.primaryPurple, size: 22),
           tooltip: 'Audio Call',
           onPressed: () async {
-            // Step 1: Request permissions first and strictly await the result
-            final statuses = await [Permission.camera, Permission.microphone].request();
-            if (statuses[Permission.camera] != PermissionStatus.granted ||
-                statuses[Permission.microphone] != PermissionStatus.granted) {
+            // Step 1: Audio call only needs microphone permission
+            final statuses = await [Permission.microphone].request();
+            if (statuses[Permission.microphone] != PermissionStatus.granted) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Camera and Microphone permissions are required to make a call.'),
+                  content: Text('Microphone permission is required to make an audio call.'),
                 ));
               }
               return;

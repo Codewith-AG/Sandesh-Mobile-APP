@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:async';
+import 'dart:convert';
 import '../models/message_model.dart'; // includes MessageType & MessageTypeX
 import '../models/contact_model.dart';
 import '../models/user_profile_model.dart';
@@ -159,11 +160,6 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
             .eq('username', _myUsername);
         debugPrint('FCM token saved: $fcmToken');
       }
-      
-      // Listen for foreground messages (optional, already handled by Realtime)
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('FCM foreground message: ${message.data}');
-      });
     } catch (e) {
       debugPrint('Failed to sync FCM token: $e');
     }
@@ -259,7 +255,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       // Show local notification if not actively chatting with sender
       if (activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
         _showLocalNotification(
-            message.senderUsername, message.text ?? 'Sent an attachment');
+          title: message.senderUsername,
+          body: message.text ?? 'Sent an attachment',
+          senderUsername: message.senderUsername,
+        );
       }
 
       // Notify UI globally — use microtask so listeners are guaranteed to be ready
@@ -273,7 +272,11 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _showLocalNotification(String title, String body) async {
+  Future<void> _showLocalNotification({
+    required String title,
+    required String body,
+    required String senderUsername,
+  }) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'messages_channel',
@@ -285,12 +288,19 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
     try {
-      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-      await flutterLocalNotificationsPlugin.show(
-        id: DateTime.now().millisecond,
-        title: title,
-        body: body,
-        notificationDetails: platformChannelSpecifics,
+      // Use the same global plugin instance as main.dart so the tap callback
+      // wired up there fires when the user taps this notification.
+      final plugin = FlutterLocalNotificationsPlugin();
+      final payload = jsonEncode({
+        'type': 'message',
+        'sender_username': senderUsername,
+      });
+      await plugin.show(
+        DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
+        title,
+        body,
+        platformChannelSpecifics,
+        payload: payload,
       );
     } catch (e) {
       debugPrint('Error showing notification: $e');

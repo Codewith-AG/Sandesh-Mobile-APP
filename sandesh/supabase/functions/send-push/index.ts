@@ -88,6 +88,17 @@ async function getGoogleAccessToken(): Promise<string> {
   return tokenJson.access_token;
 }
 
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function safeJsonParse(s: unknown): Record<string, unknown> {
+  if (typeof s !== "string" || s.trim() === "") return {};
+  try {
+    return JSON.parse(s);
+  } catch {
+    return {};
+  }
+}
+
 // ─── Main handler ──────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -96,12 +107,34 @@ serve(async (req) => {
 
     // Supabase Webhook sends the row inside payload.record
     const record = payload.record ?? payload;
-    const { id, sender_username, receiver_username, text, timestamp } = record;
+    const {
+      id,
+      sender_username,
+      receiver_username,
+      text,
+      timestamp,
+      message_type,
+    } = record;
 
-    console.log(`[send-push] New message from ${sender_username} → ${receiver_username}`);
+    console.log(
+      `[send-push] New ${message_type ?? "text"} from ${sender_username} → ${receiver_username}`
+    );
 
     if (!receiver_username) {
       return new Response("Missing receiver_username", { status: 400 });
+    }
+
+    // Skip intermediate call signals — only the invite needs a push.
+    // Accepted / rejected / ended are delivered via Supabase Realtime when the
+    // peer's app is in the foreground (which is the only state in which the
+    // UI cares about them anyway).
+    if (
+      message_type === "call_accepted" ||
+      message_type === "call_rejected" ||
+      message_type === "call_ended"
+    ) {
+      console.log(`[send-push] Skipping FCM for ${message_type}`);
+      return new Response("skipped", { status: 200 });
     }
 
     // Connect to Supabase using service-role key (available automatically in Edge Functions)
@@ -127,14 +160,52 @@ serve(async (req) => {
       return new Response("No FCM token registered", { status: 200 });
     }
 
-    // Get a short-lived Google OAuth2 access token
-    const accessToken = await getGoogleAccessToken();
-    const projectId = Deno.env.get("FIREBASE_PROJECT_ID")!;
+    // ── Build notification + data payload based on the message type ─────────
+    const isCallInvite = message_type === "call_invite";
 
-    // Null-safe body — never send the string "null" to FCM
-    const messageBody = (text != null && String(text).trim() !== "" && String(text) !== "null")
-      ? String(text)
-      : "📎 Sent an attachment";
+    let notificationTitle: string;
+    let notificationBody: string;
+    let dataPayload: Record<string, string>;
+
+    if (isCallInvite) {
+      // text holds JSON: {"channelName":"call_a_b","callType":"audio|video"}
+      const signal = safeJsonParse(text);
+      const callType = String(signal.callType ?? "audio");
+      const channelName = String(signal.channelName ?? "");
+
+      notificationTitle = `Incoming ${callType} call`;
+      notificationBody = `${sender_username} is calling…`;
+      dataPayload = {
+        id: String(id ?? ""),
+        type: "call",
+        message_type: "call_invite",
+        callerUsername: String(sender_username ?? ""),
+        receiverUsername: String(receiver_username ?? ""),
+        sender_username: String(sender_username ?? ""),
+        receiver_username: String(receiver_username ?? ""),
+        callType,
+        channelName,
+        timestamp: String(timestamp ?? Date.now()),
+      };
+    } else {
+      // Normal chat message — text/image/video/document
+      const safeBody =
+        text != null && String(text).trim() !== "" && String(text) !== "null"
+          ? String(text)
+          : "📎 Sent an attachment";
+
+      notificationTitle = String(sender_username ?? "New Message");
+      notificationBody = safeBody;
+      dataPayload = {
+        id: String(id ?? ""),
+        type: "message",
+        message_type: String(message_type ?? "text"),
+        sender_username: String(sender_username ?? ""),
+        receiver_username: String(receiver_username ?? ""),
+        text: safeBody,
+        timestamp: String(timestamp ?? Date.now()),
+      };
+    }
 
     // Build the FCM HTTP v1 payload
     const fcmPayload = {
@@ -143,18 +214,12 @@ serve(async (req) => {
 
         // Visible system notification (shown even when app is killed/background)
         notification: {
-          title: String(sender_username ?? "New Message"),
-          body: messageBody,
+          title: notificationTitle,
+          body: notificationBody,
         },
 
-        // Data payload — processed by Flutter _firebaseMessagingBackgroundHandler
-        data: {
-          id: String(id ?? ""),
-          sender_username: String(sender_username ?? ""),
-          receiver_username: String(receiver_username ?? ""),
-          text: messageBody,
-          timestamp: String(timestamp ?? Date.now()),
-        },
+        // Data payload — processed by Flutter onMessage* handlers
+        data: dataPayload,
 
         // Android: high priority wakes the device even when terminated
         android: {
@@ -165,6 +230,8 @@ serve(async (req) => {
             click_action: "FLUTTER_NOTIFICATION_CLICK",
             notification_priority: "PRIORITY_MAX",
             visibility: "PUBLIC",
+            // Call invites are sticky / ongoing so the user sees them while ringing
+            ...(isCallInvite ? { tag: dataPayload.channelName } : {}),
           },
         },
 
@@ -177,6 +244,8 @@ serve(async (req) => {
     };
 
     // Send to FCM HTTP v1 API
+    const projectId = Deno.env.get("FIREBASE_PROJECT_ID")!;
+    const accessToken = await getGoogleAccessToken();
     const fcmRes = await fetch(
       `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
       {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,6 +13,7 @@ import 'services/local_db_service.dart';
 import 'models/message_model.dart' hide MessageType;
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
+import 'screens/chat_screen.dart';
 import 'screens/incoming_call_screen.dart';
 import 'navigation/navigator_key.dart';
 import 'services/call_service.dart';
@@ -28,6 +30,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 
   final data = message.data;
+  // Call signals — do NOT save to DB. The OS shows the notification automatically.
+  if (data['type'] == 'call' || data['message_type'] == 'call_invite') return;
+
   // The notification is already shown by the OS via the `notification` object
   // in the FCM payload. Here we just save the message to the local DB.
   if (data['id'] != null && data['id']!.isNotEmpty) {
@@ -69,14 +74,17 @@ void main() async {
   // Initialize Local SQLite Database
   await LocalDbService().database;
 
-  // Initialize Local Notifications
+  // Initialize Local Notifications. The onDidReceiveNotificationResponse callback
+  // routes the user to the right chat / call screen when they tap a notification
+  // that was shown by the app (foreground or via background-handler).
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
   );
   await flutterLocalNotificationsPlugin.initialize(
-    settings: initializationSettings,
+    initializationSettings,
+    onDidReceiveNotificationResponse: _onLocalNotificationTap,
   );
 
   await flutterLocalNotificationsPlugin
@@ -95,9 +103,68 @@ void main() async {
   if (!notifStatus.isGranted) {
     await Permission.notification.request();
   }
+  // Firebase's own request — works on both iOS and Android 13+
+  await FirebaseMessaging.instance.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
 
   runApp(const SandeshApp());
 }
+
+// Routes a local-notification tap to the correct screen.
+Future<void> _onLocalNotificationTap(NotificationResponse response) async {
+  final payload = response.payload;
+  if (payload == null || payload.isEmpty) return;
+  try {
+    final data = jsonDecode(payload) as Map<String, dynamic>;
+    await _routeFromNotificationData(data.map((k, v) => MapEntry(k, v.toString())));
+  } catch (e) {
+    debugPrint('Local notification payload parse error: $e');
+  }
+}
+
+// Single routing function used by FCM open handlers and local notification taps.
+// Decides whether the data represents a call invite or a normal chat message.
+Future<void> _routeFromNotificationData(Map<String, String> data) async {
+  final type = data['type'] ?? '';
+  final messageType = data['message_type'] ?? '';
+
+  // ── Incoming call invite ───────────────────────────────────────────────────
+  if (type == 'call' || messageType == 'call_invite') {
+    final event = CallEvent(
+      type: 'call_invite',
+      callerUsername:
+          data['callerUsername'] ?? data['sender_username'] ?? '',
+      receiverUsername:
+          data['receiverUsername'] ?? data['receiver_username'] ?? '',
+      channelName: data['channelName'] ?? '',
+      callType: data['callType'] ?? 'audio',
+    );
+    if (event.channelName.isEmpty || event.callerUsername.isEmpty) return;
+    // Route through CallService so dedup logic guards against duplicate
+    // IncomingCallScreens (FCM tap + Realtime catch-up).
+    CallService().notifyIncomingFromFcm(event);
+    return;
+  }
+
+  // ── Chat message — open the conversation with the sender ──────────────────
+  final sender = data['sender_username'] ?? '';
+  if (sender.isEmpty) return;
+  final prefs = await SharedPreferences.getInstance();
+  final myUsername = prefs.getString('username') ?? '';
+  if (myUsername.isEmpty) return;
+  navigatorKey.currentState?.push(
+    MaterialPageRoute<void>(
+      builder: (_) => ChatScreen(
+        myUsername: myUsername,
+        receiverUsername: sender,
+      ),
+    ),
+  );
+}
+
 class SandeshApp extends StatefulWidget {
   const SandeshApp({super.key});
 
@@ -107,6 +174,9 @@ class SandeshApp extends StatefulWidget {
 
 class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
   StreamSubscription<CallEvent>? _incomingCallSub;
+  StreamSubscription<RemoteMessage>? _foregroundFcmSub;
+  StreamSubscription<RemoteMessage>? _openedAppFcmSub;
+  StreamSubscription<String>? _tokenRefreshSub;
 
   @override
   void initState() {
@@ -116,17 +186,94 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
     _updatePresence(true);
     // Listen for incoming calls from ANY screen — show IncomingCallScreen globally
     _incomingCallSub = CallService().incomingCallStream.listen((event) {
+      if (CallService().isInCall) return;
       navigatorKey.currentState?.push(
         MaterialPageRoute<void>(
           builder: (_) => IncomingCallScreen(event: event),
         ),
       );
     });
+
+    // ── FCM handlers ────────────────────────────────────────────────────────
+    _initFcmHandlers();
+  }
+
+  Future<void> _initFcmHandlers() async {
+    // Killed-app launch via notification tap — must wait until SplashScreen has
+    // finished its pushReplacement to HomeScreen/LoginScreen (~2.5s + transition).
+    // Otherwise SplashScreen's pushReplacement would pop our IncomingCallScreen
+    // off the top of the stack.
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) {
+      Future.delayed(const Duration(milliseconds: 3500), () {
+        if (!mounted) return;
+        _routeFromFcm(initial);
+      });
+    }
+
+    // Background → notification tap brings app to foreground
+    _openedAppFcmSub =
+        FirebaseMessaging.onMessageOpenedApp.listen(_routeFromFcm);
+
+    // Foreground push — Android does NOT show notifications automatically when
+    // the app is in foreground, so handle these manually.
+    _foregroundFcmSub = FirebaseMessaging.onMessage.listen(_handleForegroundFcm);
+
+    // Token rotation — re-save when FCM rotates the token
+    _tokenRefreshSub =
+        FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final myUsername = prefs.getString('username');
+        if (myUsername != null && myUsername.isNotEmpty) {
+          await Supabase.instance.client
+              .from('profiles')
+              .update({'fcm_token': token})
+              .eq('username', myUsername.toLowerCase());
+          debugPrint('FCM token refreshed and saved');
+        }
+      } catch (e) {
+        debugPrint('Token refresh save failed: $e');
+      }
+    });
+  }
+
+  void _routeFromFcm(RemoteMessage message) {
+    final data = message.data;
+    _routeFromNotificationData(data.map((k, v) => MapEntry(k, v.toString())));
+  }
+
+  void _handleForegroundFcm(RemoteMessage message) {
+    final data = message.data;
+
+    // ── Call invite — let CallService dedup vs the Realtime path ──────────
+    if (data['type'] == 'call' || data['message_type'] == 'call_invite') {
+      final event = CallEvent(
+        type: 'call_invite',
+        callerUsername:
+            data['callerUsername'] ?? data['sender_username'] ?? '',
+        receiverUsername:
+            data['receiverUsername'] ?? data['receiver_username'] ?? '',
+        channelName: data['channelName'] ?? '',
+        callType: data['callType'] ?? 'audio',
+      );
+      if (event.channelName.isEmpty || event.callerUsername.isEmpty) return;
+      CallService().notifyIncomingFromFcm(event);
+      return;
+    }
+
+    // ── Chat message — when in foreground, Supabase Realtime is the primary
+    //    delivery path. The realtime listener already shows a local
+    //    notification when the user isn't on the sender's chat screen, so we
+    //    skip showing a duplicate here to avoid two pop-ups for one message.
   }
 
   @override
   void dispose() {
     _incomingCallSub?.cancel();
+    _foregroundFcmSub?.cancel();
+    _openedAppFcmSub?.cancel();
+    _tokenRefreshSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

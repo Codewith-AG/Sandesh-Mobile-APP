@@ -61,6 +61,8 @@ class _CallScreenState extends State<CallScreen> {
     final appId = dotenv.env['AGORA_APP_ID'] ?? '';
     if (appId.isEmpty) return;
 
+    final isVideo = widget.callType == 'video';
+
     // Register callbacks
     engine.registerEventHandler(
       RtcEngineEventHandler(
@@ -78,20 +80,34 @@ class _CallScreenState extends State<CallScreen> {
         },
         onUserOffline: (conn, uid, reason) {
           if (mounted) setState(() => _remoteUid = null);
+          // Remote peer left the channel — end this side too
+          _leaveAndPop();
         },
       ),
     );
 
-    await engine.enableVideo();
-    await engine.startPreview();
+    // Audio is always required for both call types
+    await engine.enableAudio();
+
+    if (isVideo) {
+      await engine.enableVideo();
+      await engine.startPreview();
+    } else {
+      // Audio call: explicitly disable video so the camera is never used
+      await engine.disableVideo();
+    }
 
     await engine.joinChannel(
       token: widget.token,
       channelId: widget.channelName,
       uid: 0,
-      options: const ChannelMediaOptions(
+      options: ChannelMediaOptions(
         clientRoleType: ClientRoleType.clientRoleBroadcaster,
         channelProfile: ChannelProfileType.channelProfileCommunication,
+        publishMicrophoneTrack: true,
+        publishCameraTrack: isVideo,
+        autoSubscribeAudio: true,
+        autoSubscribeVideo: isVideo,
       ),
     );
   }
