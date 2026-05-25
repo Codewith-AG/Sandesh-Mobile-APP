@@ -10,6 +10,7 @@ class CallScreen extends StatefulWidget {
   final String peerUsername;
   final String channelName;
   final String token;
+  final int agoraUid; // server-issued; token is bound to this uid
   final String callType; // 'audio' | 'video'
   final bool isOutgoing;
 
@@ -19,6 +20,7 @@ class CallScreen extends StatefulWidget {
     required this.peerUsername,
     required this.channelName,
     required this.token,
+    required this.agoraUid,
     required this.callType,
     required this.isOutgoing,
   });
@@ -100,7 +102,7 @@ class _CallScreenState extends State<CallScreen> {
     await engine.joinChannel(
       token: widget.token,
       channelId: widget.channelName,
-      uid: 0,
+      uid: widget.agoraUid,
       options: ChannelMediaOptions(
         clientRoleType: ClientRoleType.clientRoleBroadcaster,
         channelProfile: ChannelProfileType.channelProfileCommunication,

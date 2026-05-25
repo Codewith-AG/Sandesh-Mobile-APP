@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -6,7 +9,20 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Load release signing config from android/key.properties (kept OUT of git).
+// File format:
+//   storeFile=/absolute/path/to/sandesh-release.keystore
+//   storePassword=...
+//   keyAlias=sandesh
+//   keyPassword=...
+val keystorePropsFile = rootProject.file("key.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) load(FileInputStream(keystorePropsFile))
+}
+
 android {
+    // TODO PRODUCTION: rename this to your own package (e.g. com.codewithag.sandesh)
+    // and rebuild google-services.json + the Google Sign-In OAuth client.
     namespace = "com.example.sandesh"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
@@ -22,10 +38,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // TODO PRODUCTION: must NOT remain com.example.* on the Play Store.
         applicationId = "com.example.sandesh"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 30
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -33,11 +47,29 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystoreProps.isNotEmpty()) {
+                storeFile = keystoreProps["storeFile"]?.toString()?.let { file(it) }
+                storePassword = keystoreProps["storePassword"]?.toString()
+                keyAlias = keystoreProps["keyAlias"]?.toString()
+                keyPassword = keystoreProps["keyPassword"]?.toString()
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Use the release keystore if key.properties is present; otherwise fall
+            // back to debug so `flutter run --release` keeps working in dev. The
+            // Play Store will reject debug-signed APKs anyway.
+            signingConfig = if (keystoreProps.isNotEmpty()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

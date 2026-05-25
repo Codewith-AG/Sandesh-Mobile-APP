@@ -372,77 +372,70 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
   // ──────────────────────────── Contact Discovery ────────────────────────────
 
-  /// Queries the Supabase `profiles` table and auto-adds any registered users
-  /// as local contacts (excluding self).
+  /// Refreshes avatar/bio for contacts the user already has.
+  ///
+  /// SECURITY NOTE: Previously this method pulled the entire `profiles` table
+  /// including phone numbers. That allowed any logged-in user to scrape every
+  /// registered phone number in the system. We now restrict to (a) only the
+  /// rows the user already knows about and (b) public columns only
+  /// (no `phone_e164`).
   Future<int> discoverContacts() async {
-    int newContacts = 0;
+    int updated = 0;
     try {
+      final localContacts = await LocalDbService().getContacts();
+      if (localContacts.isEmpty) return 0;
+      final usernames = localContacts.map((c) => c.username.toLowerCase()).toList();
+
       final response = await _client
           .from('profiles')
-          .select('username, phone_e164, bio, avatar_url')
-          .neq('username', _myUsername);
+          .select('username, bio, avatar_url')
+          .inFilter('username', usernames);
 
       final users = response as List<dynamic>;
-
       for (final user in users) {
         final username = (user['username'] as String).toLowerCase();
-        if (username == _myUsername) continue;
         final avatarUrl = (user['avatar_url'] ?? '') as String;
-        final exists = await LocalDbService().contactExists(username);
-        if (!exists) {
-          await LocalDbService().insertContact(Contact(
-            username: username,
-            phone: (user['phone_e164'] ?? '') as String,
-            hashedPhone: '',
-            bio: (user['bio'] ?? '') as String,
-            avatarUrl: avatarUrl,
-          ));
-          newContacts++;
-        } else if (avatarUrl.isNotEmpty) {
-          // Always update avatar_url so URL changes (re-uploads) propagate
+        if (avatarUrl.isNotEmpty) {
           await LocalDbService().updateContactAvatar(username, avatarUrl);
+          updated++;
         }
       }
-
-      debugPrint('Discovered $newContacts new contacts from Supabase');
     } catch (e) {
-      debugPrint('Contact discovery failed: $e');
+      debugPrint('Contact refresh failed: $e');
     }
-    return newContacts;
+    return updated;
   }
 
-  /// Fetches device contacts, normalizes their numbers to E.164, and matches
-  /// them against the Supabase `profiles.phone_e164` column.
-  /// Returns the number of new contacts found.
+  /// Matches the user's device contacts against Supabase by phone number.
+  ///
+  /// SECURITY: We do NOT query `profiles` directly — that would leak the whole
+  /// phone book to any authenticated user. Instead we call the SECURITY DEFINER
+  /// RPC `find_contacts_by_phones`, which only returns rows whose phone the
+  /// caller already knows. Phone numbers in the response are the same ones the
+  /// caller submitted, so no new information is disclosed.
   Future<int> syncPhoneContacts(List<String> rawPhoneNumbers) async {
     int newContacts = 0;
     try {
       // Normalize all device phone numbers to E.164
-      final e164Numbers = <String>[];
-      final e164ToRaw = <String, String>{};
-
+      final e164Numbers = <String>{};
       for (final raw in rawPhoneNumbers) {
         final e164 = normalizeToE164(raw);
-        if (e164 != null && !e164Numbers.contains(e164)) {
-          e164Numbers.add(e164);
-          e164ToRaw[e164] = raw;
-        }
+        if (e164 != null) e164Numbers.add(e164);
       }
-
       if (e164Numbers.isEmpty) return 0;
 
       debugPrint(
-          'Syncing ${e164Numbers.length} normalized E.164 phone numbers with Supabase...');
+          'Matching ${e164Numbers.length} normalized phone numbers via RPC...');
 
-      // Query Supabase for matching E.164 phone numbers directly
-      final response = await _client
-          .from('profiles')
-          .select('username, phone_e164, bio, avatar_url')
-          .inFilter('phone_e164', e164Numbers)
-          .neq('username', _myUsername);
+      // SECURITY DEFINER RPC defined in security_policies.sql.
+      // Signature: find_contacts_by_phones(phone_list text[])
+      //   RETURNS TABLE (username text, phone_e164 text, bio text, avatar_url text)
+      final response = await _client.rpc(
+        'find_contacts_by_phones',
+        params: {'phone_list': e164Numbers.toList()},
+      );
 
-      final users = response as List<dynamic>;
-
+      final users = (response as List<dynamic>?) ?? const [];
       for (final user in users) {
         final username = (user['username'] as String).toLowerCase();
         if (username == _myUsername) continue;

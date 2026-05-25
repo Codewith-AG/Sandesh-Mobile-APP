@@ -45,3 +45,12 @@ app.*.map.json
 /android/app/release
 env
 .env
+
+# Android release signing — NEVER commit these
+android/key.properties
+*.keystore
+*.jks
+
+# Firebase service-account JSON (Admin SDK) — NEVER commit
+serviceAccountKey*.json
+firebase-adminsdk*.json

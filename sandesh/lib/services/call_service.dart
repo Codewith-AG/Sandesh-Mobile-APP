@@ -32,6 +32,15 @@ class CallEvent {
   bool get isEnded => type == 'call_ended';
 }
 
+/// Result of a token fetch — both the Agora token and the per-user Agora uid
+/// that the token was generated for. The client MUST use this uid when calling
+/// `joinChannel`, otherwise Agora will reject the token.
+class CallToken {
+  final String token;
+  final int uid;
+  const CallToken({required this.token, required this.uid});
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // CallService — Singleton
 // ════════════════════════════════════════════════════════════════════════════
@@ -160,8 +169,8 @@ class CallService {
     return null; // success
   }
 
-  /// Returns the channel name and token for the caller to use in CallScreen.
-  Future<String?> fetchTokenForChannel(String channelName) =>
+  /// Returns the token + per-user uid for the caller to use in CallScreen.
+  Future<CallToken?> fetchTokenForChannel(String channelName) =>
       _fetchToken(channelName);
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -217,7 +226,7 @@ class CallService {
   // Accept / Reject / End — called by UI screens
   // ════════════════════════════════════════════════════════════════════════════
 
-  Future<String?> acceptCall(CallEvent event) async {
+  Future<CallToken?> acceptCall(CallEvent event) async {
     // Engine must be ready before the receiver tries to join the channel.
     final engineError = await _ensureEngineReady();
     if (engineError != null) {
@@ -266,15 +275,18 @@ class CallService {
   // Private helpers
   // ════════════════════════════════════════════════════════════════════════════
 
-  Future<String?> _fetchToken(String channelName) async {
+  Future<CallToken?> _fetchToken(String channelName) async {
     try {
       final res = await Supabase.instance.client.functions
-          .invoke('agora-token', body: {'channelName': channelName, 'uid': 0});
-      final token = res.data['token'] as String?;
+          .invoke('agora-token', body: {'channelName': channelName});
+      final data = res.data as Map<String, dynamic>?;
+      final token = data?['token'] as String?;
+      final uid = (data?['uid'] as num?)?.toInt() ?? 0;
       if (token == null || token.isEmpty) {
-        debugPrint('_fetchToken: server returned null/empty token. Response: ${res.data}');
+        debugPrint('_fetchToken: server returned null/empty token');
+        return null;
       }
-      return token;
+      return CallToken(token: token, uid: uid);
     } catch (e) {
       debugPrint('_fetchToken error: $e');
       return null;

@@ -74,9 +74,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     }
 
     // ── Step 2: Ask CallService to send accept signal + fetch Agora token ──
-    final token = await CallService().acceptCall(widget.event);
+    final callToken = await CallService().acceptCall(widget.event);
     if (!mounted) return;
-    if (token == null || token.isEmpty) {
+    if (callToken == null || callToken.token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Failed to get a call token. Try again.'),
       ));
@@ -100,7 +100,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
           myUsername: myUsername,
           peerUsername: widget.event.callerUsername,
           channelName: widget.event.channelName,
-          token: token,
+          token: callToken.token,
+          agoraUid: callToken.uid,
           callType: widget.event.callType,
           isOutgoing: false,
         ),

@@ -727,20 +727,33 @@ class _ChatScreenState extends State<ChatScreen> {
     // Channel name matching what CallService generates
     final sorted = [widget.myUsername.toLowerCase(), widget.receiverUsername.toLowerCase()]..sort();
     final channelName = 'call_${sorted[0]}_${sorted[1]}';
-    return FutureBuilder<String?>(
+    return FutureBuilder<CallToken?>(
       future: CallService().fetchTokenForChannel(channelName),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
             backgroundColor: Color(0xFF0D0D1A),
             body: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))),
+          );
+        }
+        final ct = snapshot.data;
+        if (ct == null) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF0D0D1A),
+            body: Center(
+              child: Text(
+                'Could not start the call. Please try again.',
+                style: GoogleFonts.urbanist(color: Colors.white),
+              ),
+            ),
           );
         }
         return CallScreen(
           myUsername: widget.myUsername,
           peerUsername: widget.receiverUsername,
           channelName: channelName,
-          token: snapshot.data ?? '',
+          token: ct.token,
+          agoraUid: ct.uid,
           callType: callType,
           isOutgoing: true,
         );

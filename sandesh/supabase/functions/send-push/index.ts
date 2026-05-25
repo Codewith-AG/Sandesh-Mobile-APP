@@ -101,11 +101,35 @@ function safeJsonParse(s: unknown): Record<string, unknown> {
 
 // ─── Main handler ──────────────────────────────────────────────────────────────
 
+// Constant-time string comparison so a network attacker cannot brute-force the
+// webhook secret by timing the response.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 serve(async (req) => {
   try {
-    const payload = await req.json();
+    // ── 1. POST-only ─────────────────────────────────────────────────────
+    if (req.method !== "POST") {
+      return new Response("Method not allowed", { status: 405 });
+    }
 
-    // Supabase Webhook sends the row inside payload.record
+    // ── 2. Webhook secret check ──────────────────────────────────────────
+    // The Supabase Database Webhook must be configured to send the header
+    //   x-webhook-secret: <value of SEND_PUSH_WEBHOOK_SECRET>
+    // This prevents arbitrary callers from triggering pushes (spam, abuse).
+    const expectedSecret = Deno.env.get("SEND_PUSH_WEBHOOK_SECRET");
+    const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+    if (!expectedSecret || !safeEqual(providedSecret, expectedSecret)) {
+      console.warn("[send-push] Unauthorized webhook call");
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    // ── 3. Parse + validate payload ──────────────────────────────────────
+    const payload = await req.json().catch(() => ({}));
     const record = payload.record ?? payload;
     const {
       id,
@@ -114,15 +138,33 @@ serve(async (req) => {
       text,
       timestamp,
       message_type,
-    } = record;
+    } = record ?? {};
 
-    console.log(
-      `[send-push] New ${message_type ?? "text"} from ${sender_username} → ${receiver_username}`
-    );
-
-    if (!receiver_username) {
-      return new Response("Missing receiver_username", { status: 400 });
+    // Schema validation — only known fields, basic type checks.
+    if (
+      typeof receiver_username !== "string" ||
+      receiver_username.length === 0 ||
+      receiver_username.length > 64
+    ) {
+      return new Response("Bad request", { status: 400 });
     }
+    if (
+      sender_username !== undefined &&
+      (typeof sender_username !== "string" || sender_username.length > 64)
+    ) {
+      return new Response("Bad request", { status: 400 });
+    }
+    if (
+      message_type !== undefined &&
+      typeof message_type !== "string"
+    ) {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    // Sanitized log: never echo message body or FCM tokens.
+    console.log(
+      `[send-push] type=${message_type ?? "text"} id=${id ?? "?"} to=${receiver_username}`,
+    );
 
     // Skip intermediate call signals — only the invite needs a push.
     // Accepted / rejected / ended are delivered via Supabase Realtime when the
@@ -156,7 +198,7 @@ serve(async (req) => {
     }
 
     if (!profile?.fcm_token) {
-      console.log(`[send-push] No FCM token for ${receiver_username} — skipping`);
+      console.log(`[send-push] No FCM token registered for receiver — skipping`);
       return new Response("No FCM token registered", { status: 200 });
     }
 
@@ -265,13 +307,15 @@ serve(async (req) => {
       return new Response(JSON.stringify(fcmJson), { status: fcmRes.status });
     }
 
-    console.log(`[send-push] FCM delivered: ${fcmJson.name}`);
-    return new Response(JSON.stringify({ success: true, name: fcmJson.name }), {
+    console.log(`[send-push] FCM delivered`);
+    return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("[send-push] Unhandled error:", err);
-    return new Response(String(err), { status: 500 });
+    // Never include the raw error body in the response — it could leak
+    // service-role usage or secret fragments via stack traces.
+    console.error("[send-push] Unhandled error:", (err as Error).message);
+    return new Response("Internal error", { status: 500 });
   }
 });

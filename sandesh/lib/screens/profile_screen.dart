@@ -53,16 +53,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final peer = widget.peerUsername!;
       final client = Supabase.instance.client;
       try {
+        // SECURITY: never request `phone_e164` for someone else's profile.
+        // That value should only be visible to the owner.
         final data = await client
             .from('profiles')
-            .select('username, phone_e164, bio, avatar_url')
+            .select('username, bio, avatar_url')
             .eq('username', peer)
             .maybeSingle();
 
         if (data != null) {
+          // Fall back to the locally-stored phone (only present if this peer
+          // matched against our device contacts during phone-sync).
+          final contacts = await LocalDbService().getContacts();
+          String localPhone = '';
+          try {
+            localPhone = contacts
+                .firstWhere(
+                    (c) => c.username.toLowerCase() == peer.toLowerCase())
+                .phone;
+          } catch (_) {}
+
           final profile = UserProfile(
             username: (data['username'] as String?) ?? peer,
-            phone: (data['phone_e164'] as String?) ?? '',
+            phone: localPhone,
             hashedPhone: '',
             bio: (data['bio'] as String?) ?? '',
             avatarUrl: (data['avatar_url'] as String?) ?? '',
