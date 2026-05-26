@@ -421,7 +421,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.onlineGreen.withValues(alpha: 0.1),
+                                      color: Colors.green.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Row(
