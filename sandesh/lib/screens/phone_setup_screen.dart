@@ -65,9 +65,9 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
         SnackBar(
           content: Text(
             'Please enter a valid phone number',
-            style: GoogleFonts.urbanist(fontWeight: FontWeight.w500),
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
           ),
-          backgroundColor: AppTheme.errorRed,
+          backgroundColor: AppTheme.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
@@ -120,9 +120,9 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
           SnackBar(
             content: Text(
               'Error: ${e.toString()}',
-              style: GoogleFonts.urbanist(fontWeight: FontWeight.w500),
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
             ),
-            backgroundColor: AppTheme.errorRed,
+            backgroundColor: AppTheme.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -162,7 +162,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.primaryPurple.withValues(alpha: 0.22),
+                      AppTheme.primary.withValues(alpha: 0.22),
                       Colors.transparent,
                     ],
                   ),
@@ -179,7 +179,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.accentPurple.withValues(alpha: 0.18),
+                      AppTheme.primary.withValues(alpha: 0.18),
                       Colors.transparent,
                     ],
                   ),

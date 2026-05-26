@@ -349,8 +349,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.inter()),
-      backgroundColor: AppTheme.errorRed,
+      content: Text(msg, style: GoogleFonts.outfit()),
+      backgroundColor: AppTheme.error,
       behavior: SnackBarBehavior.floating,
     ));
   }
