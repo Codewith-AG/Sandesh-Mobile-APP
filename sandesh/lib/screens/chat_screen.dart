@@ -296,14 +296,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   ElevatedButton.icon(
                     onPressed: () => Navigator.pop(ctx, false),
                     icon: const Icon(Icons.close, color: Colors.white),
-                    label: Text('Cancel', style: GoogleFonts.urbanist(color: Colors.white, fontWeight: FontWeight.w600)),
+                    label: Text('Cancel', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600)),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.black54, shape: const StadiumBorder()),
                   ),
                   ElevatedButton.icon(
                     onPressed: () => Navigator.pop(ctx, true),
                     icon: const Icon(Icons.send_rounded, color: Colors.white),
-                    label: Text('Send', style: GoogleFonts.urbanist(color: Colors.white, fontWeight: FontWeight.w700)),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryPurple, shape: const StadiumBorder()),
+                    label: Text('Send', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, shape: const StadiumBorder()),
                   ),
                 ],
               ),
@@ -326,20 +326,21 @@ class _ChatScreenState extends State<ChatScreen> {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Send Video?', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
+        backgroundColor: AppTheme.surfaceContainerLowest,
+        title: Text('Send Video?', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
         content: Row(
           children: [
-            const Icon(Icons.videocam_outlined, size: 40),
+            Icon(Icons.videocam_outlined, size: 40, color: AppTheme.primary),
             const SizedBox(width: 12),
-            Expanded(child: Text('The video will be compressed and sent.', style: GoogleFonts.urbanist())),
+            Expanded(child: Text('The video will be compressed and sent.', style: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant))),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.outline))),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryPurple),
-            child: Text('Send', style: GoogleFonts.urbanist(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            child: Text('Send', style: GoogleFonts.outfit(color: AppTheme.onPrimary, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -446,10 +447,11 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Clear Chat', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to delete all messages? This cannot be undone locally.', style: GoogleFonts.urbanist()),
+        backgroundColor: AppTheme.surfaceContainerLowest,
+        title: Text('Clear Chat', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
+        content: Text('Are you sure you want to delete all messages? This cannot be undone locally.', style: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.outline))),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -460,8 +462,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 });
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
-            child: Text('Clear', style: GoogleFonts.urbanist(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: Text('Clear', style: GoogleFonts.outfit(color: AppTheme.onError)),
           ),
         ],
       ),
@@ -472,21 +474,22 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Block User', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to block this user?', style: GoogleFonts.urbanist()),
+        backgroundColor: AppTheme.surfaceContainerLowest,
+        title: Text('Block User', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
+        content: Text('Are you sure you want to block this user?', style: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.outline))),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('User blocked.', style: GoogleFonts.urbanist()), backgroundColor: AppTheme.primaryPurple),
+                  SnackBar(content: Text('User blocked.', style: GoogleFonts.outfit()), backgroundColor: AppTheme.primary),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
-            child: Text('Block', style: GoogleFonts.urbanist(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: Text('Block', style: GoogleFonts.outfit(color: AppTheme.onError)),
           ),
         ],
       ),
@@ -497,7 +500,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final items = _buildMessageListWithDates();
     return Scaffold(
-      backgroundColor: AppTheme.chatBackground,
+      backgroundColor: AppTheme.background,
       appBar: _buildAppBar(),
       body: SafeArea(
         child: Column(
@@ -505,9 +508,9 @@ class _ChatScreenState extends State<ChatScreen> {
             if (_isSendingMedia)
               LinearProgressIndicator(
                 value: _uploadProgress > 0 ? _uploadProgress : null,
-                backgroundColor: const Color(0xFFE8E8EC),
-                color: AppTheme.primaryPurple,
-                minHeight: 3,
+                backgroundColor: AppTheme.surfaceContainer,
+                color: AppTheme.primary,
+                minHeight: 4,
               ),
             Expanded(
               child: ListView.builder(
@@ -531,18 +534,18 @@ class _ChatScreenState extends State<ChatScreen> {
                     height: 250,
                     checkPlatformCompatibility: true,
                     emojiViewConfig: EmojiViewConfig(
-                      backgroundColor: AppTheme.chatBackground,
+                      backgroundColor: AppTheme.background,
                       columns: 7, emojiSizeMax: 32,
                     ),
                     categoryViewConfig: const CategoryViewConfig(
-                      backgroundColor: AppTheme.chatBackground,
-                      indicatorColor: AppTheme.primaryPurple,
-                      iconColorSelected: AppTheme.primaryPurple,
+                      backgroundColor: AppTheme.background,
+                      indicatorColor: AppTheme.primary,
+                      iconColorSelected: AppTheme.primary,
                     ),
                     bottomActionBarConfig: const BottomActionBarConfig(
-                      backgroundColor: AppTheme.chatBackground,
-                      buttonColor: AppTheme.chatBackground,
-                      buttonIconColor: AppTheme.primaryPurple,
+                      backgroundColor: AppTheme.background,
+                      buttonColor: AppTheme.background,
+                      buttonIconColor: AppTheme.primary,
                     ),
                   ),
                 ),
@@ -555,7 +558,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.surfaceWhite,
+      backgroundColor: AppTheme.surfaceContainerLowest,
       titleSpacing: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios_new, size: 20),
@@ -578,15 +581,15 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.receiverUsername,
-                    style: GoogleFonts.urbanist(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textDark)),
+                    style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
                 Row(children: [
                   if (_isPeerOnline) ...[
                     Container(width: 8, height: 8,
-                        decoration: const BoxDecoration(color: AppTheme.onlineGreen, shape: BoxShape.circle)),
+                        decoration: BoxDecoration(color: Colors.green.shade400, shape: BoxShape.circle)),
                     const SizedBox(width: 4),
-                    Text('Online', style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.onlineGreen, fontWeight: FontWeight.w500)),
+                    Text('Online', style: GoogleFonts.outfit(fontSize: 13, color: Colors.green.shade500, fontWeight: FontWeight.w500)),
                   ] else ...[
-                    Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.urbanist(fontSize: 12, color: AppTheme.textLight, fontWeight: FontWeight.w500)),
+                    Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.onSurfaceVariant, fontWeight: FontWeight.w400)),
                   ],
                 ]),
               ],
@@ -595,12 +598,10 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       actions: [
-        // Audio call button
         IconButton(
-          icon: const Icon(Icons.call_outlined, color: AppTheme.primaryPurple, size: 22),
+          icon: const Icon(Icons.call_outlined, color: AppTheme.primary, size: 24),
           tooltip: 'Audio Call',
           onPressed: () async {
-            // Step 1: Audio call only needs microphone permission
             final statuses = await [Permission.microphone].request();
             if (statuses[Permission.microphone] != PermissionStatus.granted) {
               if (mounted) {
@@ -610,7 +611,6 @@ class _ChatScreenState extends State<ChatScreen> {
               }
               return;
             }
-            // Step 2: Initiate call — returns null on success, or an error string
             final error = await CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'audio',
@@ -622,7 +622,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 duration: const Duration(seconds: 6),
               ));
             } else {
-              // Step 3: Navigate to CallScreen only on confirmed success
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -632,12 +631,10 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
         ),
-        // Video call button
         IconButton(
-          icon: const Icon(Icons.videocam_outlined, color: AppTheme.primaryPurple, size: 24),
+          icon: const Icon(Icons.videocam_outlined, color: AppTheme.primary, size: 26),
           tooltip: 'Video Call',
           onPressed: () async {
-            // Step 1: Request permissions first and strictly await the result
             final statuses = await [Permission.camera, Permission.microphone].request();
             if (statuses[Permission.camera] != PermissionStatus.granted ||
                 statuses[Permission.microphone] != PermissionStatus.granted) {
@@ -648,7 +645,6 @@ class _ChatScreenState extends State<ChatScreen> {
               }
               return;
             }
-            // Step 2: Initiate call — returns null on success, or an error string
             final error = await CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'video',
@@ -660,7 +656,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 duration: const Duration(seconds: 6),
               ));
             } else {
-              // Step 3: Navigate to CallScreen only on confirmed success
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -671,7 +666,7 @@ class _ChatScreenState extends State<ChatScreen> {
           },
         ),
         PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textMedium, size: 22),
+          icon: const Icon(Icons.more_vert_rounded, color: AppTheme.onSurfaceVariant, size: 24),
           onSelected: (value) {
             if (value == 'clear') {
               _showClearChatConfirm();
@@ -680,8 +675,8 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
           itemBuilder: (context) => [
-            PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.urbanist())),
-            PopupMenuItem(value: 'block', child: Text('Block User', style: GoogleFonts.urbanist())),
+            PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.outfit())),
+            PopupMenuItem(value: 'block', child: Text('Block User', style: GoogleFonts.outfit())),
           ],
         ),
         const SizedBox(width: 4),
@@ -693,17 +688,17 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_receiverAvatarUrl.startsWith('http')) {
       return CircleAvatar(
         radius: 20,
-        backgroundColor: AppTheme.lightPurple,
+        backgroundColor: AppTheme.surfaceContainerHigh,
         backgroundImage: NetworkImage(_receiverAvatarUrl),
         onBackgroundImageError: (_, __) {},
       );
     }
     return CircleAvatar(
       radius: 20,
-      backgroundColor: AppTheme.lightPurple,
+      backgroundColor: AppTheme.surfaceContainerHigh,
       child: Text(
         widget.receiverUsername.isNotEmpty ? widget.receiverUsername[0].toUpperCase() : '?',
-        style: GoogleFonts.urbanist(color: AppTheme.primaryPurple, fontWeight: FontWeight.w700, fontSize: 17),
+        style: GoogleFonts.outfit(color: AppTheme.primary, fontWeight: FontWeight.w700, fontSize: 18),
       ),
     );
   }
@@ -714,17 +709,16 @@ class _ChatScreenState extends State<ChatScreen> {
         margin: const EdgeInsets.symmetric(vertical: 16),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceWhite,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 1))],
+          color: AppTheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppTheme.surfaceVariant),
         ),
-        child: Text(label, style: GoogleFonts.urbanist(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textLight)),
+        child: Text(label, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.onSurfaceVariant)),
       ),
     );
   }
 
   Widget _buildCallScreen(String callType) {
-    // Channel name matching what CallService generates
     final sorted = [widget.myUsername.toLowerCase(), widget.receiverUsername.toLowerCase()]..sort();
     final channelName = 'call_${sorted[0]}_${sorted[1]}';
     return FutureBuilder<CallToken?>(
@@ -732,18 +726,18 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
-            backgroundColor: Color(0xFF0D0D1A),
-            body: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))),
+            backgroundColor: AppTheme.background,
+            body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
           );
         }
         final ct = snapshot.data;
         if (ct == null) {
           return Scaffold(
-            backgroundColor: const Color(0xFF0D0D1A),
+            backgroundColor: AppTheme.background,
             body: Center(
               child: Text(
                 'Could not start the call. Please try again.',
-                style: GoogleFonts.urbanist(color: Colors.white),
+                style: GoogleFonts.outfit(color: AppTheme.onSurface),
               ),
             ),
           );
@@ -784,7 +778,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
+        margin: const EdgeInsets.only(bottom: 8),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
         child: content,
       ),
@@ -793,21 +787,20 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildTextContent(Message message, bool isMe, String timeString) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       decoration: BoxDecoration(
-        color: isMe ? AppTheme.chatBubbleSender : AppTheme.chatBubbleReceiver,
+        color: isMe ? AppTheme.primary : AppTheme.surfaceContainer,
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
-          bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
+          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
+          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
         ),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(message.text ?? '', style: GoogleFonts.urbanist(
-              color: isMe ? Colors.white : AppTheme.textDark, fontSize: 15, height: 1.4)),
-          const SizedBox(height: 4),
+          Text(message.text ?? '', style: GoogleFonts.outfit(
+              color: isMe ? AppTheme.onPrimary : AppTheme.onSurface, fontSize: 16, height: 1.4)),
+          const SizedBox(height: 6),
           _buildTimestamp(timeString, isMe),
         ],
       ),
@@ -815,24 +808,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildImageContent(Message message, bool isMe, String timeString) {
-    // Priority: local file > network URL > placeholder
     final localPath = message.localPath;
     final networkUrl = message.mediaUrl;
     final heroTag = 'media_${message.id}';
 
     Widget imageWidget;
     if (localPath != null && File(localPath).existsSync()) {
-      // Downloaded to device — render from local file (works offline)
       imageWidget = Image.file(
         File(localPath),
         width: 220, height: 220, fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => Container(
             width: 220, height: 220,
-            color: const Color(0xFFE8E8EC),
-            child: const Icon(Icons.broken_image_outlined)),
+            color: AppTheme.surfaceContainerHigh,
+            child: Icon(Icons.broken_image_outlined, color: AppTheme.onSurfaceVariant)),
       );
     } else if (networkUrl != null && networkUrl.startsWith('http')) {
-      // Still on network (sender bubble or download pending)
       imageWidget = Image.network(
         networkUrl,
         width: 220, height: 220, fit: BoxFit.cover,
@@ -840,7 +830,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ? child
             : Container(
                 width: 220, height: 220,
-                color: const Color(0xFFE8E8EC),
+                color: AppTheme.surfaceContainerHigh,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -848,31 +838,28 @@ class _ChatScreenState extends State<ChatScreen> {
                       value: progress.expectedTotalBytes != null
                           ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
                           : null,
-                      strokeWidth: 2, color: AppTheme.primaryPurple,
+                      strokeWidth: 2, color: AppTheme.primary,
                     ),
-                    const SizedBox(height: 8),
-                    Text('Loading…', style: GoogleFonts.urbanist(fontSize: 11, color: AppTheme.textLight)),
                   ],
                 ),
               ),
         errorBuilder: (_, __, ___) => Container(
             width: 220, height: 100,
-            color: const Color(0xFFE8E8EC),
-            child: const Icon(Icons.broken_image_outlined)),
+            color: AppTheme.surfaceContainerHigh,
+            child: Icon(Icons.broken_image_outlined, color: AppTheme.onSurfaceVariant)),
       );
     } else {
-      // No path available yet
       imageWidget = Container(
         width: 220, height: 220,
-        color: const Color(0xFFE8E8EC),
+        color: AppTheme.surfaceContainerHigh,
         child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
 
     return ClipRRect(
       borderRadius: BorderRadius.only(
-        topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
-        bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
+        topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
+        bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
       ),
       child: GestureDetector(
         onTap: () {
@@ -890,7 +877,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Stack(
           children: [
             Hero(tag: heroTag, child: imageWidget),
-            Positioned(bottom: 6, right: 8, child: _buildTimestampOverlay(timeString, isMe)),
+            Positioned(bottom: 8, right: 10, child: _buildTimestampOverlay(timeString, isMe)),
           ],
         ),
       ),
@@ -901,10 +888,10 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       width: 220,
       decoration: BoxDecoration(
-        color: isMe ? AppTheme.chatBubbleSender : AppTheme.chatBubbleReceiver,
+        color: isMe ? AppTheme.primary : AppTheme.surfaceContainer,
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
-          bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
+          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
+          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
         ),
       ),
       child: Padding(
@@ -915,21 +902,21 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               height: 100,
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.black.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: const Center(
                 child: Icon(Icons.play_circle_filled_rounded, size: 48, color: Colors.white),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.videocam_outlined, size: 14, color: isMe ? Colors.white70 : AppTheme.textLight),
-                const SizedBox(width: 4),
-                Text('Video', style: GoogleFonts.urbanist(
-                    fontSize: 13, color: isMe ? Colors.white : AppTheme.textDark)),
+                Icon(Icons.videocam_outlined, size: 16, color: isMe ? AppTheme.onPrimary : AppTheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text('Video', style: GoogleFonts.outfit(
+                    fontSize: 14, color: isMe ? AppTheme.onPrimary : AppTheme.onSurface, fontWeight: FontWeight.w500)),
                 const Spacer(),
                 _buildTimestamp(timeString, isMe),
               ],
@@ -942,12 +929,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildDocumentContent(Message message, bool isMe, String timeString) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       decoration: BoxDecoration(
-        color: isMe ? AppTheme.chatBubbleSender : AppTheme.chatBubbleReceiver,
+        color: isMe ? AppTheme.primary : AppTheme.surfaceContainer,
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
-          bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
+          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
+          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
         ),
       ),
       child: Column(
@@ -957,25 +944,25 @@ class _ChatScreenState extends State<ChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (isMe ? Colors.white : AppTheme.primaryPurple).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  color: (isMe ? AppTheme.onPrimary : AppTheme.primary).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(Icons.insert_drive_file_outlined,
-                    color: isMe ? Colors.white : AppTheme.primaryPurple, size: 24),
+                    color: isMe ? AppTheme.onPrimary : AppTheme.primary, size: 24),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Flexible(
                 child: Text(message.fileName ?? 'Document',
                     maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.urbanist(
-                        fontSize: 13, fontWeight: FontWeight.w600,
-                        color: isMe ? Colors.white : AppTheme.textDark)),
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w600,
+                        color: isMe ? AppTheme.onPrimary : AppTheme.onSurface)),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           _buildTimestamp(timeString, isMe),
         ],
       ),
@@ -986,12 +973,12 @@ class _ChatScreenState extends State<ChatScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(timeString, style: GoogleFonts.urbanist(
-            color: isMe ? Colors.white.withValues(alpha: 0.7) : AppTheme.textLight,
+        Text(timeString, style: GoogleFonts.outfit(
+            color: isMe ? AppTheme.onPrimary.withValues(alpha: 0.8) : AppTheme.onSurfaceVariant,
             fontSize: 11, fontWeight: FontWeight.w500)),
         if (isMe) ...[
           const SizedBox(width: 4),
-          Icon(Icons.done_all, size: 14, color: Colors.white.withValues(alpha: 0.7)),
+          Icon(Icons.done_all, size: 14, color: AppTheme.onPrimary.withValues(alpha: 0.8)),
         ],
       ],
     );
@@ -999,18 +986,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildTimestampOverlay(String timeString, bool isMe) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.black.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(timeString, style: GoogleFonts.urbanist(color: Colors.white, fontSize: 10)),
+          Text(timeString, style: GoogleFonts.outfit(color: Colors.white, fontSize: 11)),
           if (isMe) ...[
-            const SizedBox(width: 3),
-            const Icon(Icons.done_all, size: 12, color: Colors.white),
+            const SizedBox(width: 4),
+            const Icon(Icons.done_all, size: 14, color: Colors.white),
           ],
         ],
       ),
@@ -1019,10 +1006,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildInputBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceWhite,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, -2))],
+        color: AppTheme.surfaceContainerLowest,
+        border: Border(top: BorderSide(color: AppTheme.surfaceVariant, width: 1)),
       ),
       child: SafeArea(
         top: false,
@@ -1032,20 +1019,24 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: Container(
                 constraints: const BoxConstraints(maxHeight: 120),
-                decoration: BoxDecoration(color: AppTheme.lightGrey, borderRadius: BorderRadius.circular(24)),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppTheme.surfaceVariant),
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     IconButton(
                       icon: Icon(_showEmojiPicker ? Icons.keyboard_outlined : Icons.emoji_emotions_outlined,
-                          color: AppTheme.textLight, size: 24),
+                          color: AppTheme.onSurfaceVariant, size: 24),
                       onPressed: () => setState(() {
                         _showEmojiPicker = !_showEmojiPicker;
                         if (_showEmojiPicker) FocusManager.instance.primaryFocus?.unfocus();
                         else _focusNode.requestFocus();
                       }),
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                     ),
                     Expanded(
                       child: TextField(
@@ -1053,41 +1044,39 @@ class _ChatScreenState extends State<ChatScreen> {
                         focusNode: _focusNode,
                         maxLines: null,
                         textInputAction: TextInputAction.newline,
-                        style: GoogleFonts.urbanist(fontSize: 15),
+                        style: GoogleFonts.outfit(fontSize: 16, color: AppTheme.onSurface),
                         onTap: () { if (_showEmojiPicker) setState(() => _showEmojiPicker = false); },
                         decoration: InputDecoration(
-                          hintText: 'Type your message...',
-                          hintStyle: GoogleFonts.urbanist(color: AppTheme.textLight, fontSize: 15),
+                          hintText: 'Type a message...',
+                          hintStyle: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant, fontSize: 16),
                           border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
                           isDense: true,
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.attach_file_rounded, color: AppTheme.textLight, size: 22),
+                      icon: const Icon(Icons.attach_file_rounded, color: AppTheme.onSurfaceVariant, size: 24),
                       onPressed: _isSendingMedia ? null : _showAttachmentSheet,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 44),
+                      constraints: const BoxConstraints(minWidth: 44, minHeight: 48),
                     ),
                     const SizedBox(width: 4),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Container(
-              width: 44, height: 44,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                    colors: [AppTheme.primaryPurple, AppTheme.accentPurple],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight),
+              width: 48, height: 48,
+              decoration: BoxDecoration(
+                color: AppTheme.primary,
                 shape: BoxShape.circle,
               ),
               child: IconButton(
                 icon: _isSendingMedia
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppTheme.onPrimary, strokeWidth: 2))
+                    : const Icon(Icons.send_rounded, color: AppTheme.onPrimary, size: 22),
                 onPressed: _isSendingMedia ? null : _sendMessage,
                 padding: EdgeInsets.zero,
               ),

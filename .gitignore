@@ -1,0 +1,27 @@
+# Root-level .gitignore for Sandesh-Mobile-APP
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+
+# Environments and Sensitive Keys
+.env
+*.keystore
+*.jks
+
+# Flutter subproject build and cache outputs
+sandesh/build/
+sandesh/.dart_tool/
+sandesh/.pub/
+sandesh/.pub-cache/
+sandesh/.flutter-plugins
+sandesh/.flutter-plugins-dependencies
+
+# Supabase temporary files
+supabase/.temp/
+sandesh/supabase/.temp/

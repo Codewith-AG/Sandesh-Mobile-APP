@@ -156,8 +156,8 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: MediaQuery.of(context).viewInsets.bottom + 24,
           ),
           decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            color: AppTheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -165,49 +165,44 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Center(
                 child: Container(
-                  width: 40,
-                  height: 4,
+                  width: 48,
+                  height: 6,
                   decoration: BoxDecoration(
-                    color: AppTheme.mediumGrey,
-                    borderRadius: BorderRadius.circular(2),
+                    color: AppTheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Text(
                 'Start New Chat',
-                style: GoogleFonts.urbanist(
-                  fontSize: 22,
+                style: GoogleFonts.outfit(
+                  fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textDark,
+                  color: AppTheme.onSurface,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 'Enter the username of the person you want to chat with',
-                style: GoogleFonts.urbanist(
-                  fontSize: 14,
-                  color: AppTheme.textLight,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  color: AppTheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               TextFormField(
                 controller: controller,
                 autofocus: true,
-                style: GoogleFonts.urbanist(fontSize: 15),
+                style: GoogleFonts.outfit(fontSize: 16, color: AppTheme.onSurface),
                 decoration: InputDecoration(
                   hintText: 'Enter username',
-                  filled: true,
-                  fillColor: AppTheme.lightGrey,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
+                  // Styling is handled by AppTheme.inputDecorationTheme
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               SizedBox(
-                height: 52,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: () async {
                     final username = controller.text.trim().toLowerCase();
@@ -235,18 +230,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ).then((_) => _loadContacts());
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryPurple,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
                   child: Text(
                     'Start Chat',
-                    style: GoogleFonts.urbanist(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.onPrimary,
                     ),
                   ),
                 ),
@@ -280,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: Padding(
-          padding: const EdgeInsets.only(left: 16),
+          padding: const EdgeInsets.only(left: 20),
           child: GestureDetector(
             onTap: () {
               Navigator.push(
@@ -291,18 +280,18 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _myAvatarUrl.startsWith('http')
                 ? CircleAvatar(
                     radius: 20,
-                    backgroundColor: AppTheme.lightPurple,
+                    backgroundColor: AppTheme.surfaceContainerHigh,
                     backgroundImage: NetworkImage(_myAvatarUrl),
                     onBackgroundImageError: (_, __) {},
                   )
                 : CircleAvatar(
-                    backgroundColor: AppTheme.lightPurple,
+                    backgroundColor: AppTheme.surfaceContainerHigh,
                     child: Text(
                       _myUsername.isNotEmpty ? _myUsername[0].toUpperCase() : '?',
-                      style: GoogleFonts.urbanist(
-                        color: AppTheme.primaryPurple,
+                      style: GoogleFonts.outfit(
+                        color: AppTheme.primary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 18,
+                        fontSize: 20,
                       ),
                     ),
                   ),
@@ -310,19 +299,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         title: Text(
           'Sandesh',
-          style: GoogleFonts.urbanist(
+          style: GoogleFonts.outfit(
             fontWeight: FontWeight.w800,
-            fontSize: 24,
-            color: AppTheme.textDark,
+            fontSize: 28,
+            color: AppTheme.onSurface,
+            letterSpacing: -0.01,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_rounded, color: AppTheme.textMedium),
+            icon: const Icon(Icons.search_rounded, color: AppTheme.onSurfaceVariant),
             onPressed: () {},
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textMedium),
+            icon: const Icon(Icons.more_vert_rounded, color: AppTheme.onSurfaceVariant),
             onSelected: (value) async {
               if (value == 'profile') {
                 Navigator.push(
@@ -333,15 +323,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    title: Text('Logout', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
-                    content: Text('Are you sure you want to logout? Your chat history will be preserved locally.', style: GoogleFonts.urbanist()),
+                    backgroundColor: AppTheme.surfaceContainerLowest,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    title: Text('Logout', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
+                    content: Text('Are you sure you want to logout? Your chat history will be preserved locally.', style: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant)),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight))),
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.outline))),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
-                        child: Text('Logout', style: GoogleFonts.urbanist(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+                        child: Text('Logout', style: GoogleFonts.outfit(color: AppTheme.onError)),
                       ),
                     ],
                   ),
@@ -364,28 +355,26 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(value: 'profile', child: Text('My Profile', style: GoogleFonts.urbanist())),
-              PopupMenuItem(value: 'logout', child: Text('Log Out', style: GoogleFonts.urbanist(color: AppTheme.errorRed))),
+              PopupMenuItem(value: 'profile', child: Text('My Profile', style: GoogleFonts.outfit())),
+              PopupMenuItem(value: 'logout', child: Text('Log Out', style: GoogleFonts.outfit(color: AppTheme.error))),
             ],
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
         ],
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primaryPurple))
+              child: CircularProgressIndicator(color: AppTheme.primary))
           : _contacts.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: _refreshContacts,
-                  color: AppTheme.primaryPurple,
+                  color: AppTheme.primary,
+                  backgroundColor: AppTheme.surfaceContainerLowest,
                   child: ListView.separated(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     itemCount: _contacts.length,
-                    separatorBuilder: (_, __) => const Padding(
-                      padding: EdgeInsets.only(left: 80),
-                      child: Divider(height: 1, color: AppTheme.lightGrey),
-                    ),
+                    separatorBuilder: (_, __) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       final contact = _contacts[index];
                       return _buildContactTile(contact);
@@ -395,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _addContactDialog,
         elevation: 3,
-        child: const Icon(Icons.chat_bubble_outline, size: 24),
+        child: const Icon(Icons.edit_square, size: 24),
       ),
     );
   }
@@ -406,33 +395,33 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 100,
-            height: 100,
+            width: 120,
+            height: 120,
             decoration: BoxDecoration(
-              color: AppTheme.lightPurple,
+              color: AppTheme.surfaceContainerHigh,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.chat_bubble_outline_rounded,
-              size: 48,
-              color: AppTheme.primaryPurple,
+              size: 56,
+              color: AppTheme.primary,
             ),
           ),
           const SizedBox(height: 24),
           Text(
             'No conversations yet',
-            style: GoogleFonts.urbanist(
-              fontSize: 20,
+            style: GoogleFonts.outfit(
+              fontSize: 24,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textDark,
+              color: AppTheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Tap the button below to start chatting',
-            style: GoogleFonts.urbanist(
-              fontSize: 14,
-              color: AppTheme.textLight,
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              color: AppTheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -445,15 +434,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final url = contact.avatarUrl;
 
     if (url.startsWith('http')) {
-      // URL from Supabase Storage — display as network image
       avatarWidget = CircleAvatar(
         radius: 28,
-        backgroundColor: AppTheme.lightPurple,
+        backgroundColor: AppTheme.surfaceContainerHigh,
         backgroundImage: NetworkImage(url),
         onBackgroundImageError: (_, __) {},
       );
     } else if (url.isNotEmpty) {
-      // Legacy base64 path (backward compat)
       try {
         final bytes = base64Decode(url);
         avatarWidget = CircleAvatar(
@@ -467,75 +454,100 @@ class _HomeScreenState extends State<HomeScreen> {
       avatarWidget = _buildFallbackAvatar(contact);
     }
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      leading: avatarWidget,
-      title: Text(
-        contact.username,
-        style: GoogleFonts.urbanist(
-          fontWeight: FontWeight.w700,
-          fontSize: 16,
-          color: AppTheme.textDark,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        hoverColor: AppTheme.surfaceContainer,
+        splashColor: AppTheme.surfaceContainerHigh,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(
+                myUsername: _myUsername,
+                receiverUsername: contact.username,
+              ),
+            ),
+          ).then((_) => _loadContacts());
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              avatarWidget,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            contact.username,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                              color: AppTheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        if (contact.lastMessageTime != null)
+                          Text(
+                            _formatTime(contact.lastMessageTime),
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.outline,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      contact.lastMessage ?? 'Tap to start chatting',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        color: AppTheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (contact.phone.isNotEmpty)
-            Text(
-              contact.phone,
-              style: GoogleFonts.urbanist(
-                fontSize: 12,
-                color: AppTheme.primaryPurple,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          const SizedBox(height: 2),
-          Text(
-            contact.lastMessage ?? 'Tap to start chatting',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.urbanist(
-              fontSize: 13,
-              color: AppTheme.textLight,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-      trailing: contact.lastMessageTime != null
-          ? Text(
-              _formatTime(contact.lastMessageTime),
-              style: GoogleFonts.urbanist(
-                fontSize: 12,
-                color: AppTheme.textLight,
-              ),
-            )
-          : null,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              myUsername: _myUsername,
-              receiverUsername: contact.username,
-            ),
-          ),
-        ).then((_) => _loadContacts());
-      },
     );
   }
 
   Widget _buildFallbackAvatar(Contact contact) {
-    return CircleAvatar(
-      radius: 28,
-      backgroundColor: AppTheme.lightPurple,
-      child: Text(
-        contact.username.isNotEmpty ? contact.username[0].toUpperCase() : '?',
-        style: GoogleFonts.urbanist(
-          color: AppTheme.primaryPurple,
-          fontWeight: FontWeight.w700,
-          fontSize: 20,
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        color: AppTheme.primaryContainer.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          contact.username.isNotEmpty ? contact.username[0].toUpperCase() : '?',
+          style: GoogleFonts.outfit(
+            color: AppTheme.primary,
+            fontWeight: FontWeight.w700,
+            fontSize: 24,
+          ),
         ),
       ),
     );

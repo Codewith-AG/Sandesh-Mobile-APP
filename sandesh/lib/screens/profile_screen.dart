@@ -153,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Photo selected — tap Save Profile to upload',
-                  style: GoogleFonts.urbanist(fontWeight: FontWeight.w500)),
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -208,8 +208,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Profile saved!',
-                style: GoogleFonts.urbanist(fontWeight: FontWeight.w600)),
-            backgroundColor: const Color(0xFF2D7D46),
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -219,8 +219,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving profile: $e'),
-            backgroundColor: AppTheme.errorRed,
+            content: Text('Error saving profile: $e', style: GoogleFonts.outfit()),
+            backgroundColor: AppTheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -234,21 +234,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceContainerLowest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Logout', style: GoogleFonts.urbanist(fontWeight: FontWeight.w700)),
+        title: Text('Logout', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
         content: Text(
           'Are you sure you want to logout? Your chat history will be preserved locally.',
-          style: GoogleFonts.urbanist(),
+          style: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: GoogleFonts.urbanist(color: AppTheme.textLight)),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.outline)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
-            child: Text('Logout', style: GoogleFonts.urbanist(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            child: Text('Logout', style: GoogleFonts.outfit(color: AppTheme.onError)),
           ),
         ],
       ),
@@ -325,15 +326,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildLetterAvatar() {
     return CircleAvatar(
       radius: 56,
-      backgroundColor: const Color(0xFFF0F0F5),
+      backgroundColor: AppTheme.surfaceContainerHigh,
       child: Text(
         (_profile?.username.isNotEmpty == true)
             ? _profile!.username[0].toUpperCase()
             : '?',
-        style: GoogleFonts.inter(
+        style: GoogleFonts.outfit(
           fontSize: 40,
           fontWeight: FontWeight.w600,
-          color: const Color(0xFF5A5A72),
+          color: AppTheme.primary,
         ),
       ),
     );
@@ -342,9 +343,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppTheme.surfaceContainerLowest,
         elevation: 0,
         title: Text(
           _isReadOnly
@@ -352,10 +353,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? _usernameController.text
                   : (widget.peerUsername ?? 'Profile'))
               : 'Profile',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.outfit(
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF0D0D0D))),
-        iconTheme: const IconThemeData(color: Color(0xFF0D0D0D)),
+              color: AppTheme.onSurface)),
+        iconTheme: const IconThemeData(color: AppTheme.onSurface),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -368,8 +369,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (_isUploadingAvatar) ...[
                     const SizedBox(height: 8),
                     Text('Uploading avatar...',
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: const Color(0xFF8A8A9A))),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12, color: AppTheme.onSurfaceVariant)),
                   ],
                   const SizedBox(height: 32),
 
@@ -410,24 +411,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                  color: Colors.white,
+                                  color: AppTheme.onPrimary,
                                   strokeWidth: 2,
                                 ),
                               )
                             : const Icon(Icons.check_circle_outline,
-                                color: Colors.white),
+                                color: AppTheme.onPrimary),
                         label: Text(
                           _isUploadingAvatar ? 'Uploading...' : 'Save Profile',
-                          style: GoogleFonts.inter(
+                          style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: AppTheme.onPrimary,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1A1A2E),
+                          backgroundColor: AppTheme.primary,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                         ),
                       ),
@@ -436,11 +437,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     TextButton.icon(
                       onPressed: _logout,
-                      icon: const Icon(Icons.logout, color: AppTheme.errorRed),
+                      icon: const Icon(Icons.logout, color: AppTheme.error),
                       label: Text(
                         'Logout',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.errorRed,
+                        style: GoogleFonts.outfit(
+                          color: AppTheme.error,
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
@@ -468,10 +469,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
             label,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF8A8A9A),
+              color: AppTheme.onSurfaceVariant,
               letterSpacing: 0.4,
             ),
           ),
@@ -480,21 +481,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           controller: controller,
           readOnly: readOnly,
           maxLines: maxLines,
-          style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF0D0D0D)),
+          style: GoogleFonts.outfit(fontSize: 15, color: AppTheme.onSurface),
           decoration: InputDecoration(
             hintText: hintText,
-            prefixIcon: Icon(icon, color: const Color(0xFF8A8A9A), size: 20),
+            hintStyle: GoogleFonts.outfit(color: AppTheme.outline),
+            prefixIcon: Icon(icon, color: AppTheme.onSurfaceVariant, size: 20),
             filled: true,
             fillColor: readOnly
-                ? const Color(0xFFF6F6F9)
-                : const Color(0xFFF0F0F5),
+                ? AppTheme.surfaceContainerLowest
+                : AppTheme.surfaceContainer,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF1A1A2E), width: 1.5),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
             ),
           ),
         ),

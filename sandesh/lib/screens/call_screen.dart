@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/call_service.dart';
+import '../theme/app_theme.dart';
 
 class CallScreen extends StatefulWidget {
   final String myUsername;
@@ -246,19 +247,32 @@ class _CallScreenState extends State<CallScreen> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF1A0533), Color(0xFF0D0D1A)],
+          colors: [AppTheme.primary, AppTheme.background],
         ),
       ),
       child: Center(
-        child: CircleAvatar(
-          radius: 72,
-          backgroundColor: const Color(0xFF7C3AED),
-          child: Text(
-            initial,
-            style: GoogleFonts.inter(
-              fontSize: 56,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+        child: Container(
+          width: 144,
+          height: 144,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceContainerHigh,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.2),
+                blurRadius: 32,
+                spreadRadius: 8,
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              initial,
+              style: GoogleFonts.outfit(
+                fontSize: 64,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.primary,
+              ),
             ),
           ),
         ),
@@ -299,8 +313,8 @@ class _CallScreenState extends State<CallScreen> {
             const SizedBox(height: 8),
             Text(
               widget.peerUsername,
-              style: GoogleFonts.inter(
-                fontSize: 22,
+              style: GoogleFonts.outfit(
+                fontSize: 24,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
@@ -312,9 +326,9 @@ class _CallScreenState extends State<CallScreen> {
                   : _isOutgoing
                       ? 'Calling...'
                       : 'Connecting...',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: Colors.white60,
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                color: Colors.white70,
               ),
             ),
           ],
@@ -429,9 +443,10 @@ class _ControlBtn extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              color: Colors.white60,
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.white70,
             ),
           ),
         ],

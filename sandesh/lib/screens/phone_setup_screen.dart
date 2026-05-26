@@ -139,11 +139,11 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
     final size = MediaQuery.of(context).size;
 
     // Adaptive colors
-    final bgColor = isDark ? const Color(0xFF0D0B1A) : AppTheme.backgroundWhite;
-    final cardColor = isDark ? const Color(0xFF1C1830) : AppTheme.surfaceWhite;
-    final textColor = isDark ? Colors.white : AppTheme.textDark;
-    final subtitleColor = isDark ? Colors.white54 : AppTheme.textLight;
-    final fieldFill = isDark ? const Color(0xFF2A2540) : AppTheme.lightGrey;
+    final bgColor = AppTheme.background;
+    final cardColor = AppTheme.surfaceContainerLowest;
+    final textColor = AppTheme.onSurface;
+    final subtitleColor = AppTheme.onSurfaceVariant;
+    final fieldFill = AppTheme.surfaceContainerLow;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
@@ -206,15 +206,11 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppTheme.primaryPurple, AppTheme.accentPurple],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              color: AppTheme.primary,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppTheme.primaryPurple.withValues(alpha: 0.35),
+                                  color: AppTheme.primary.withValues(alpha: 0.35),
                                   blurRadius: 20,
                                   offset: const Offset(0, 6),
                                 ),
@@ -233,7 +229,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                         Text(
                           'Hi, ${widget.googleName.split(' ').first}! 👋',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.urbanist(
+                          style: GoogleFonts.outfit(
                             fontSize: 30,
                             fontWeight: FontWeight.w800,
                             color: textColor,
@@ -243,7 +239,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                         Text(
                           'One last step — add your phone number\nso your contacts can find you.',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.urbanist(
+                          style: GoogleFonts.outfit(
                             fontSize: 15,
                             color: subtitleColor,
                             height: 1.6,
@@ -256,16 +252,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                           padding: const EdgeInsets.all(28),
                           decoration: BoxDecoration(
                             color: cardColor,
-                            borderRadius: BorderRadius.circular(28),
+                            borderRadius: BorderRadius.circular(32),
                             border: Border.all(
-                              color: isDark
-                                  ? AppTheme.primaryPurple.withValues(alpha: 0.2)
-                                  : AppTheme.lightGrey,
+                              color: AppTheme.surfaceVariant,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.primaryPurple
-                                    .withValues(alpha: isDark ? 0.1 : 0.07),
+                                color: AppTheme.primary
+                                    .withValues(alpha: 0.07),
                                 blurRadius: 32,
                                 offset: const Offset(0, 8),
                               ),
@@ -282,16 +276,16 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                     horizontal: 16, vertical: 14),
                                   decoration: BoxDecoration(
                                     color: fieldFill,
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(24),
                                   ),
                                   child: Row(
                                     children: [
-                                      const CircleAvatar(
+                                      CircleAvatar(
                                         radius: 18,
-                                        backgroundColor: AppTheme.primaryPurple,
+                                        backgroundColor: AppTheme.primary,
                                         child: Icon(
                                           Icons.person_outline,
-                                          color: Colors.white,
+                                          color: AppTheme.onPrimary,
                                           size: 18,
                                         ),
                                       ),
@@ -302,7 +296,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                           children: [
                                             Text(
                                               'Your Name',
-                                              style: GoogleFonts.urbanist(
+                                              style: GoogleFonts.outfit(
                                                 fontSize: 11,
                                                 color: subtitleColor,
                                                 fontWeight: FontWeight.w500,
@@ -311,7 +305,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                             const SizedBox(height: 2),
                                             Text(
                                               widget.googleName,
-                                              style: GoogleFonts.urbanist(
+                                              style: GoogleFonts.outfit(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w600,
                                                 color: textColor,
@@ -324,15 +318,15 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.primaryPurple
+                                          color: AppTheme.primary
                                               .withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
                                           'Google',
-                                          style: GoogleFonts.urbanist(
+                                          style: GoogleFonts.outfit(
                                             fontSize: 11,
-                                            color: AppTheme.primaryPurple,
+                                            color: AppTheme.primary,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
@@ -345,7 +339,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                 // Phone field label
                                 Text(
                                   'Phone Number',
-                                  style: GoogleFonts.urbanist(
+                                  style: GoogleFonts.outfit(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: subtitleColor,
@@ -361,24 +355,24 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                       filled: true,
                                       fillColor: fieldFill,
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(24),
                                         borderSide: BorderSide.none,
                                       ),
                                       enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(24),
                                         borderSide: BorderSide.none,
                                       ),
                                       focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(24),
                                         borderSide: const BorderSide(
-                                          color: AppTheme.primaryPurple,
+                                          color: AppTheme.primary,
                                           width: 1.5,
                                         ),
                                       ),
                                       errorBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(24),
                                         borderSide: const BorderSide(
-                                          color: AppTheme.errorRed,
+                                          color: AppTheme.error,
                                           width: 1.5,
                                         ),
                                       ),
@@ -392,14 +386,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                     controller: _phoneController,
                                     countrySelectorNavigator:
                                         const CountrySelectorNavigator.dialog(),
-                                    style: GoogleFonts.urbanist(
+                                    style: GoogleFonts.outfit(
                                       fontSize: 15,
                                       color: textColor,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     decoration: InputDecoration(
                                       hintText: '98765 43210',
-                                      hintStyle: GoogleFonts.urbanist(
+                                      hintStyle: GoogleFonts.outfit(
                                         color: subtitleColor,
                                         fontSize: 15,
                                       ),
@@ -434,15 +428,15 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                       children: [
                                         const Icon(
                                           Icons.check_circle_rounded,
-                                          color: AppTheme.onlineGreen,
+                                          color: Colors.green,
                                           size: 16,
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
                                           'Formatted: $_e164Phone',
-                                          style: GoogleFonts.urbanist(
+                                          style: GoogleFonts.outfit(
                                             fontSize: 13,
-                                            color: AppTheme.onlineGreen,
+                                            color: Colors.green,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -464,28 +458,18 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                       shadowColor: Colors.transparent,
                                       padding: EdgeInsets.zero,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
+                                        borderRadius: BorderRadius.circular(999),
                                       ),
                                     ),
                                     child: Ink(
                                       decoration: BoxDecoration(
-                                        gradient: _isLoading
-                                            ? null
-                                            : const LinearGradient(
-                                                colors: [
-                                                  AppTheme.primaryPurple,
-                                                  AppTheme.accentPurple,
-                                                ],
-                                                begin: Alignment.centerLeft,
-                                                end: Alignment.centerRight,
-                                              ),
-                                        color: _isLoading ? AppTheme.mediumGrey : null,
-                                        borderRadius: BorderRadius.circular(18),
+                                        color: _isLoading ? AppTheme.surfaceContainerHigh : AppTheme.primary,
+                                        borderRadius: BorderRadius.circular(999),
                                         boxShadow: _isLoading
                                             ? null
                                             : [
                                                 BoxShadow(
-                                                  color: AppTheme.primaryPurple
+                                                  color: AppTheme.primary
                                                       .withValues(alpha: 0.38),
                                                   blurRadius: 16,
                                                   offset: const Offset(0, 6),
@@ -509,7 +493,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                                 children: [
                                                   Text(
                                                     'Set Up My Account',
-                                                    style: GoogleFonts.urbanist(
+                                                    style: GoogleFonts.outfit(
                                                       fontSize: 16,
                                                       fontWeight: FontWeight.w700,
                                                       color: Colors.white,
@@ -544,7 +528,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                             const SizedBox(width: 6),
                             Text(
                               'Your number is only used to find your contacts',
-                              style: GoogleFonts.urbanist(
+                              style: GoogleFonts.outfit(
                                 fontSize: 12,
                                 color: subtitleColor,
                               ),

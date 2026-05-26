@@ -296,10 +296,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
         'sender_username': senderUsername,
       });
       await plugin.show(
-        DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
-        title,
-        body,
-        platformChannelSpecifics,
+        id: DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
+        title: title,
+        body: body,
+        notificationDetails: platformChannelSpecifics,
         payload: payload,
       );
     } catch (e) {

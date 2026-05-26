@@ -1,0 +1,57 @@
+# Antigravity/Gemini Ignore File
+# This file prevents the Antigravity agent from indexing or reading specified files/folders,
+# helping to reduce token consumption and keep context focused on Android development.
+
+# --- Non-Android Flutter Platforms ---
+# Since you are focused on Android app development, we ignore other platform implementations:
+sandesh/ios/
+sandesh/linux/
+sandesh/macos/
+sandesh/windows/
+sandesh/web/
+
+# --- Build and Cache Directories ---
+# Ignore large compiler and package manager caches/build outputs:
+sandesh/build/
+sandesh/.dart_tool/
+sandesh/.pub/
+sandesh/.pub-cache/
+
+# --- IDE and Editor Configurations ---
+# Avoid reading metadata from editors:
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+
+# --- Large/Binary/Media Files ---
+# These files cannot be parsed as text and should be ignored to save tokens:
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.pdf
+*.mp4
+*.wav
+*.mp3
+*.ttf
+*.otf
+*.zip
+*.tar.gz
+*.rar
+
+# --- Android Files and Security Keys ---
+# Explicitly allowing Android source files, XML configs, and security files
+# so that the AI can configure signing and build setups for you:
+!sandesh/android/
+!*.xml
+!*.keystore
+!*.jks
+!*.properties
+!google-services.json
