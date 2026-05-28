@@ -255,3 +255,4 @@ CREATE INDEX IF NOT EXISTS idx_profiles_phone_e164
 -- c) Try a forbidden insert (should fail when you're logged in as someone else):
 --   INSERT INTO public.messages (id, sender_username, receiver_username, message_type, "timestamp")
 --   VALUES ('test', 'NOT_MY_USERNAME', 'someone', 'text', extract(epoch from now())*1000);
+

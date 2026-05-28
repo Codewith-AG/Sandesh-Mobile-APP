@@ -7,6 +7,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/message_model.dart';
 import 'supabase_broadcast_service.dart';
 
+/// Wraps a CallToken result with an optional error message.
+/// When [token] is null, [error] explains why.
+class _TokenResult {
+  final CallToken? token;
+  final String? error;
+  const _TokenResult({this.token, this.error});
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Data model for a call signaling event
 // ════════════════════════════════════════════════════════════════════════════
@@ -135,12 +143,12 @@ class CallService {
     final ch = _makeChannelName(_myUsername, receiverUsername);
 
     // Fetch token from Supabase Edge Function
-    final tokenResult = await _fetchToken(ch);
-    if (tokenResult == null) {
-      return 'Could not get a call token from the server. '
-          'Ensure the "agora-token" Edge Function is deployed and '
-          'AGORA_APP_ID / AGORA_APP_CERTIFICATE secrets are set.';
+    final result = await _fetchToken(ch);
+    if (result.token == null) {
+      // Show the actual server error so we know what's really failing
+      return 'Call failed: ${result.error ?? "Unknown error from agora-token function"}';
     }
+    final tokenResult = result.token!;
 
     _isInCall = true;
 
@@ -170,8 +178,10 @@ class CallService {
   }
 
   /// Returns the token + per-user uid for the caller to use in CallScreen.
-  Future<CallToken?> fetchTokenForChannel(String channelName) =>
-      _fetchToken(channelName);
+  Future<CallToken?> fetchTokenForChannel(String channelName) async {
+    final result = await _fetchToken(channelName);
+    return result.token;
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // Handling incoming messages from SupabaseBroadcastService
@@ -275,27 +285,51 @@ class CallService {
   // Private helpers
   // ════════════════════════════════════════════════════════════════════════════
 
-  Future<CallToken?> _fetchToken(String channelName) async {
+  Future<_TokenResult> _fetchToken(String channelName) async {
+    debugPrint('_fetchToken: invoking agora-token for channel=$channelName');
     try {
       final res = await Supabase.instance.client.functions
           .invoke('agora-token', body: {'channelName': channelName});
       final data = res.data as Map<String, dynamic>?;
+      debugPrint('_fetchToken: server response = $data');
+
+      // Server returned an error body
+      if (data?['error'] != null) {
+        final msg = 'Server error: ${data!["error"]}';
+        debugPrint('_fetchToken: $msg');
+        return _TokenResult(error: msg);
+      }
+
       final token = data?['token'] as String?;
       final uid = (data?['uid'] as num?)?.toInt() ?? 0;
       if (token == null || token.isEmpty) {
-        debugPrint('_fetchToken: server returned null/empty token');
-        return null;
+        const msg = 'Server returned empty token';
+        debugPrint('_fetchToken: $msg');
+        return _TokenResult(error: msg);
       }
-      return CallToken(token: token, uid: uid);
+      debugPrint('_fetchToken: token received successfully (uid=$uid)');
+      return _TokenResult(token: CallToken(token: token, uid: uid));
+    } on FunctionException catch (e) {
+      // Supabase throws FunctionException for 4xx/5xx responses
+      final detail = e.details?.toString() ?? 'no details';
+      final msg = 'Function error (status=${e.status}): $detail';
+      debugPrint('_fetchToken FunctionException: $msg');
+      return _TokenResult(error: msg);
     } catch (e) {
-      debugPrint('_fetchToken error: $e');
-      return null;
+      final msg = 'Network/unexpected error: $e';
+      debugPrint('_fetchToken error: $msg');
+      return _TokenResult(error: msg);
     }
   }
 
   static String _makeChannelName(String a, String b) {
-    final sorted = [a.toLowerCase(), b.toLowerCase()]..sort();
-    return 'call_${sorted[0]}_${sorted[1]}';
+    // Strip spaces and any special characters — usernames like "Sandesh Sharma"
+    // would produce "sandesh sharma" which contains a space. The Edge Function
+    // regex only allows [a-z0-9._-] so spaces must be removed before joining.
+    final sanitize = (String s) =>
+        s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final clean = [sanitize(a), sanitize(b)]..sort();
+    return 'call_${clean[0]}_${clean[1]}';
   }
 
   CallEvent? _parseEvent(Message msg) {

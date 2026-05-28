@@ -86,7 +86,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// filtered to rows where `receiver_username = _myUsername`, then
   /// immediately syncs any messages that arrived while the app was offline.
   void initialize(String myUsername) {
-    _myUsername = myUsername.toLowerCase();
+    _myUsername = myUsername; // Keep original casing — used as-is for DB queries
     
     // Add lifecycle observer for presence tracking
     WidgetsBinding.instance.addObserver(this);
@@ -154,11 +154,19 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     try {
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null) {
+        // Use auth user ID (not username) — immune to case mismatches, always unique
+        final authUser = _client.auth.currentUser;
+        if (authUser == null) {
+          debugPrint('FCM token sync skipped: no auth user');
+          return;
+        }
         await _client
             .from('profiles')
             .update({'fcm_token': fcmToken})
-            .eq('username', _myUsername);
-        debugPrint('FCM token saved: $fcmToken');
+            .eq('id', authUser.id);  // ← auth ID never has case issues
+        debugPrint('FCM token saved for user ${authUser.id}: $fcmToken');
+      } else {
+        debugPrint('FCM token is null — Firebase may not be configured correctly');
       }
     } catch (e) {
       debugPrint('Failed to sync FCM token: $e');
@@ -209,7 +217,8 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       final senderUsername = payload['sender_username'] as String;
 
       // Ignore messages sent by self — we already saved them locally in sendMessage()
-      if (senderUsername.toLowerCase() == _myUsername) return;
+      // Case-insensitive comparison so it works regardless of name capitalization
+      if (senderUsername.toLowerCase() == _myUsername.toLowerCase()) return;
 
       final message = Message(
         id: payload['id'] as String,
