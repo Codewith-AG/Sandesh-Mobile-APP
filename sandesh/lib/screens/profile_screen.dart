@@ -217,10 +217,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final cs = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error saving profile: $e', style: GoogleFonts.outfit()),
-            backgroundColor: AppTheme.error,
+            backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -233,26 +234,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceContainerLowest,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Logout', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
-        content: Text(
-          'Are you sure you want to logout? Your chat history will be preserved locally.',
-          style: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.outline)),
+      builder: (ctx) {
+        final dcs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          backgroundColor: dcs.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Logout',
+              style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w700, color: dcs.onSurface)),
+          content: Text(
+            'Are you sure you want to logout? Your chat history will be preserved locally.',
+            style: GoogleFonts.outfit(color: dcs.onSurfaceVariant),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-            child: Text('Logout', style: GoogleFonts.outfit(color: AppTheme.onError)),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel',
+                  style: GoogleFonts.outfit(color: dcs.outline)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: dcs.error),
+              child: Text('Logout',
+                  style: GoogleFonts.outfit(color: dcs.onError)),
+            ),
+          ],
+        );
+      },
     );
 
     if (confirm == true && mounted) {
@@ -271,7 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _buildAvatar() {
+  Widget _buildAvatar(ColorScheme cs) {
     Widget avatarContent;
 
     if (_pendingAvatarFile != null) {
@@ -281,10 +289,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundImage: FileImage(_pendingAvatarFile!),
       );
     } else if (_isUploadingAvatar) {
-      avatarContent = const CircleAvatar(
+      avatarContent = CircleAvatar(
         radius: 56,
-        backgroundColor: Color(0xFFF0F0F5),
-        child: CircularProgressIndicator(strokeWidth: 2),
+        backgroundColor: cs.surfaceContainerHighest,
+        child: const CircularProgressIndicator(strokeWidth: 2),
       );
     } else if (_profile?.avatarUrl.isNotEmpty == true &&
         _profile!.avatarUrl.startsWith('http')) {
@@ -296,7 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: null,
       );
     } else {
-      avatarContent = _buildLetterAvatar();
+      avatarContent = _buildLetterAvatar(cs);
     }
 
     return GestureDetector(
@@ -311,11 +319,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A2E),
+                  color: cs.primary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
+                  border: Border.all(color: cs.surface, width: 2),
                 ),
-                child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                child: Icon(Icons.camera_alt, size: 18, color: cs.onPrimary),
               ),
             ),
         ],
@@ -323,10 +331,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLetterAvatar() {
+  Widget _buildLetterAvatar(ColorScheme cs) {
     return CircleAvatar(
       radius: 56,
-      backgroundColor: AppTheme.surfaceContainerHigh,
+      backgroundColor: cs.surfaceContainerHigh,
       child: Text(
         (_profile?.username.isNotEmpty == true)
             ? _profile!.username[0].toUpperCase()
@@ -334,7 +342,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         style: GoogleFonts.outfit(
           fontSize: 40,
           fontWeight: FontWeight.w600,
-          color: AppTheme.primary,
+          color: cs.primary,
         ),
       ),
     );
@@ -342,10 +350,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceContainerLowest,
+        backgroundColor: cs.surface,
         elevation: 0,
         title: Text(
           _isReadOnly
@@ -355,8 +364,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               : 'Profile',
           style: GoogleFonts.outfit(
               fontWeight: FontWeight.w700,
-              color: AppTheme.onSurface)),
-        iconTheme: const IconThemeData(color: AppTheme.onSurface),
+              color: cs.onSurface)),
+        iconTheme: IconThemeData(color: cs.onSurface),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -365,16 +374,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 12),
-                  _buildAvatar(),
+                  _buildAvatar(cs),
                   if (_isUploadingAvatar) ...[
                     const SizedBox(height: 8),
                     Text('Uploading avatar...',
                         style: GoogleFonts.outfit(
-                            fontSize: 12, color: AppTheme.onSurfaceVariant)),
+                            fontSize: 12, color: cs.onSurfaceVariant)),
                   ],
                   const SizedBox(height: 32),
 
                   _buildField(
+                    cs: cs,
                     controller: _usernameController,
                     label: 'Username',
                     icon: Icons.person_outline,
@@ -383,6 +393,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 16),
 
                   _buildField(
+                    cs: cs,
                     controller: _phoneController,
                     label: 'Phone',
                     icon: Icons.phone_outlined,
@@ -391,6 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 16),
 
                   _buildField(
+                    cs: cs,
                     controller: _bioController,
                     label: 'Bio',
                     icon: Icons.edit_note_outlined,
@@ -407,26 +419,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _isSaving ? null : _saveProfile,
                         icon: _isSaving
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                  color: AppTheme.onPrimary,
+                                  color: cs.onPrimary,
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.check_circle_outline,
-                                color: AppTheme.onPrimary),
+                            : Icon(Icons.check_circle_outline,
+                                color: cs.onPrimary),
                         label: Text(
                           _isUploadingAvatar ? 'Uploading...' : 'Save Profile',
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: AppTheme.onPrimary,
+                            color: cs.onPrimary,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
+                          backgroundColor: cs.primary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(999),
                           ),
@@ -437,11 +449,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     TextButton.icon(
                       onPressed: _logout,
-                      icon: const Icon(Icons.logout, color: AppTheme.error),
+                      icon: Icon(Icons.logout, color: cs.error),
                       label: Text(
                         'Logout',
                         style: GoogleFonts.outfit(
-                          color: AppTheme.error,
+                          color: cs.error,
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
@@ -455,6 +467,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildField({
+    required ColorScheme cs,
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -472,7 +485,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppTheme.onSurfaceVariant,
+              color: cs.onSurfaceVariant,
               letterSpacing: 0.4,
             ),
           ),
@@ -481,22 +494,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           controller: controller,
           readOnly: readOnly,
           maxLines: maxLines,
-          style: GoogleFonts.outfit(fontSize: 15, color: AppTheme.onSurface),
+          style: GoogleFonts.outfit(fontSize: 15, color: cs.onSurface),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: GoogleFonts.outfit(color: AppTheme.outline),
-            prefixIcon: Icon(icon, color: AppTheme.onSurfaceVariant, size: 20),
+            hintStyle: GoogleFonts.outfit(color: cs.outline),
+            prefixIcon: Icon(icon, color: cs.onSurfaceVariant, size: 20),
             filled: true,
             fillColor: readOnly
-                ? AppTheme.surfaceContainerLowest
-                : AppTheme.surfaceContainer,
+                ? cs.surfaceContainerLowest
+                : cs.surfaceContainer,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+              borderSide: BorderSide(color: cs.primary, width: 1.5),
             ),
           ),
         ),

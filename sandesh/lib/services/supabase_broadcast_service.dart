@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -84,16 +83,41 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
   // ──────────────────────────── Lifecycle ────────────────────────────
 
+  /// Whether this service has already been fully initialised once.
+  bool _initialized = false;
+
   /// Initialises the service for [myUsername].
   /// Sets up a single Postgres realtime listener on the `messages` table
   /// filtered to rows where `receiver_username = _myUsername`, then
   /// immediately syncs any messages that arrived while the app was offline.
+  ///
+  /// Safe to call multiple times — only re-subscribes if the username changes
+  /// or the channel has been torn down.
   void initialize(String myUsername) {
-    _myUsername = myUsername.toLowerCase(); // Always lowercase for consistent matching
-    
-    // Add lifecycle observer for presence tracking
+    final newUsername = myUsername.toLowerCase();
+
+    // If already initialised for the same user, just make sure we are online
+    // and the channel is still alive. Do NOT add another observer.
+    if (_initialized && _myUsername == newUsername && _inboxChannel != null) {
+      _startPresenceHeartbeat();
+      return;
+    }
+
+    // ── Tear down any previous subscription ──────────────────────────────
+    if (_initialized) {
+      WidgetsBinding.instance.removeObserver(this);
+      if (_inboxChannel != null) {
+        _client.removeChannel(_inboxChannel!);
+        _inboxChannel = null;
+      }
+    }
+
+    _myUsername = newUsername;
+    _initialized = true;
+
+    // Register lifecycle observer exactly once
     WidgetsBinding.instance.addObserver(this);
-    _updatePresence(true);
+    _startPresenceHeartbeat();
 
     // STEP 3: Replace broadcast listener with a Postgres INSERT listener.
     // One single channel per user — no per-room subscriptions needed.
@@ -106,7 +130,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'receiver_username',
-            value: _myUsername, // now always lowercase
+            value: _myUsername,
           ),
           callback: (payload) async {
             final row = payload.newRecord;
@@ -140,6 +164,8 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
           if (_myUsername.isNotEmpty) {
             _client.removeChannel(_inboxChannel!);
             _inboxChannel = null;
+            // Reset flag so initialize() fully re-subscribes
+            _initialized = false;
             initialize(_myUsername);
           }
         });
@@ -548,6 +574,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   // ──────────────────────────── Presence ────────────────────────────
 
   Timer? _presenceDebounce;
+  /// Periodic heartbeat keeps `is_online = true` refreshed every 30 s while the
+  /// app is in the foreground. Without this, a Supabase restart or transient
+  /// network blip could silently reset the flag and make the user look offline.
+  Timer? _presenceHeartbeat;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -556,14 +586,16 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       case AppLifecycleState.resumed:
         // Cancel any pending offline update and immediately go online
         _presenceDebounce?.cancel();
-        _updatePresence(true);
+        _startPresenceHeartbeat();
         break;
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
-        // Debounce: wait 5 seconds before marking offline to avoid flicker
-        // during quick app switches or notification shade pulls
+        // Stop heartbeat and debounce: wait 8 seconds before marking offline
+        // to avoid flicker during quick app switches or notification shade pulls
+        _presenceHeartbeat?.cancel();
+        _presenceHeartbeat = null;
         _presenceDebounce?.cancel();
-        _presenceDebounce = Timer(const Duration(seconds: 5), () {
+        _presenceDebounce = Timer(const Duration(seconds: 8), () {
           _updatePresence(false);
         });
         break;
@@ -594,9 +626,23 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     }
   }
 
+  /// Immediately marks the user online and starts a 30-second heartbeat that
+  /// keeps refreshing `is_online = true` while the app is in the foreground.
+  /// Cancels any running heartbeat first to avoid duplicates.
+  void _startPresenceHeartbeat() {
+    _presenceHeartbeat?.cancel();
+    _updatePresence(true); // Immediate update
+    _presenceHeartbeat = Timer.periodic(const Duration(seconds: 30), (_) {
+      _updatePresence(true);
+    });
+  }
+
   // ──────────────────────────── Cleanup ────────────────────────────
 
   void dispose() {
+    _presenceDebounce?.cancel();
+    _presenceHeartbeat?.cancel();
+    _presenceHeartbeat = null;
     WidgetsBinding.instance.removeObserver(this);
     if (_myUsername.isNotEmpty) {
       _updatePresence(false);
@@ -609,5 +655,6 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     if (!_messageStreamController.isClosed) {
       _messageStreamController.close();
     }
+    _initialized = false;
   }
 }

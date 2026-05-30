@@ -61,13 +61,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || !_phoneValid || _e164Phone == null) {
       if (!mounted) return;
+      final cs = Theme.of(context).colorScheme;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Please enter a valid phone number',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
           ),
-          backgroundColor: AppTheme.error,
+          backgroundColor: cs.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
@@ -116,13 +117,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
       }
     } catch (e) {
       if (mounted) {
+        final cs = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Error: ${e.toString()}',
               style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
             ),
-            backgroundColor: AppTheme.error,
+            backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -134,21 +136,15 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
 
   @override
   Widget build(BuildContext context) {
-    final brightness = MediaQuery.of(context).platformBrightness;
+    final cs = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     final isDark = brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
-
-    // Adaptive colors
-    final bgColor = AppTheme.background;
-    final cardColor = AppTheme.surfaceContainerLowest;
-    final textColor = AppTheme.onSurface;
-    final subtitleColor = AppTheme.onSurfaceVariant;
-    final fieldFill = AppTheme.surfaceContainerLow;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: bgColor,
+        backgroundColor: cs.surface,
         body: Stack(
           children: [
             // Background gradient orbs
@@ -162,7 +158,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.primary.withValues(alpha: 0.22),
+                      cs.primary.withValues(alpha: 0.22),
                       Colors.transparent,
                     ],
                   ),
@@ -179,7 +175,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.primary.withValues(alpha: 0.18),
+                      cs.primary.withValues(alpha: 0.18),
                       Colors.transparent,
                     ],
                   ),
@@ -206,20 +202,20 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
-                              color: AppTheme.primary,
+                              color: cs.primary,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppTheme.primary.withValues(alpha: 0.35),
+                                  color: cs.primary.withValues(alpha: 0.35),
                                   blurRadius: 20,
                                   offset: const Offset(0, 6),
                                 ),
                               ],
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.phone_iphone_rounded,
                               size: 38,
-                              color: Colors.white,
+                              color: cs.onPrimary,
                             ),
                           ),
                         ),
@@ -232,7 +228,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                           style: GoogleFonts.outfit(
                             fontSize: 30,
                             fontWeight: FontWeight.w800,
-                            color: textColor,
+                            color: cs.onSurface,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -241,7 +237,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
                             fontSize: 15,
-                            color: subtitleColor,
+                            color: cs.onSurfaceVariant,
                             height: 1.6,
                           ),
                         ),
@@ -251,15 +247,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                         Container(
                           padding: const EdgeInsets.all(28),
                           decoration: BoxDecoration(
-                            color: cardColor,
+                            color: cs.surfaceContainerLowest,
                             borderRadius: BorderRadius.circular(32),
                             border: Border.all(
-                              color: AppTheme.surfaceVariant,
+                              color: cs.surfaceContainerHighest,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.primary
-                                    .withValues(alpha: 0.07),
+                                color: cs.primary.withValues(alpha: 0.07),
                                 blurRadius: 32,
                                 offset: const Offset(0, 8),
                               ),
@@ -275,17 +270,17 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 14),
                                   decoration: BoxDecoration(
-                                    color: fieldFill,
+                                    color: cs.surfaceContainerLow,
                                     borderRadius: BorderRadius.circular(24),
                                   ),
                                   child: Row(
                                     children: [
                                       CircleAvatar(
                                         radius: 18,
-                                        backgroundColor: AppTheme.primary,
+                                        backgroundColor: cs.primary,
                                         child: Icon(
                                           Icons.person_outline,
-                                          color: AppTheme.onPrimary,
+                                          color: cs.onPrimary,
                                           size: 18,
                                         ),
                                       ),
@@ -298,7 +293,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                               'Your Name',
                                               style: GoogleFonts.outfit(
                                                 fontSize: 11,
-                                                color: subtitleColor,
+                                                color: cs.onSurfaceVariant,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
@@ -308,7 +303,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                               style: GoogleFonts.outfit(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w600,
-                                                color: textColor,
+                                                color: cs.onSurface,
                                               ),
                                             ),
                                           ],
@@ -318,15 +313,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.primary
-                                              .withValues(alpha: 0.12),
+                                          color: cs.primary.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
                                           'Google',
                                           style: GoogleFonts.outfit(
                                             fontSize: 11,
-                                            color: AppTheme.primary,
+                                            color: cs.primary,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
@@ -342,7 +336,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                   style: GoogleFonts.outfit(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: subtitleColor,
+                                    color: cs.onSurfaceVariant,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -353,7 +347,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                   data: Theme.of(context).copyWith(
                                     inputDecorationTheme: InputDecorationTheme(
                                       filled: true,
-                                      fillColor: fieldFill,
+                                      fillColor: cs.surfaceContainerLow,
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(24),
                                         borderSide: BorderSide.none,
@@ -364,15 +358,15 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(24),
-                                        borderSide: const BorderSide(
-                                          color: AppTheme.primary,
+                                        borderSide: BorderSide(
+                                          color: cs.primary,
                                           width: 1.5,
                                         ),
                                       ),
                                       errorBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(24),
-                                        borderSide: const BorderSide(
-                                          color: AppTheme.error,
+                                        borderSide: BorderSide(
+                                          color: cs.error,
                                           width: 1.5,
                                         ),
                                       ),
@@ -388,13 +382,13 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                         const CountrySelectorNavigator.dialog(),
                                     style: GoogleFonts.outfit(
                                       fontSize: 15,
-                                      color: textColor,
+                                      color: cs.onSurface,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     decoration: InputDecoration(
                                       hintText: '98765 43210',
                                       hintStyle: GoogleFonts.outfit(
-                                        color: subtitleColor,
+                                        color: cs.onSurfaceVariant,
                                         fontSize: 15,
                                       ),
                                     ),
@@ -463,13 +457,15 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                     ),
                                     child: Ink(
                                       decoration: BoxDecoration(
-                                        color: _isLoading ? AppTheme.surfaceContainerHigh : AppTheme.primary,
+                                        color: _isLoading
+                                            ? cs.surfaceContainerHigh
+                                            : cs.primary,
                                         borderRadius: BorderRadius.circular(999),
                                         boxShadow: _isLoading
                                             ? null
                                             : [
                                                 BoxShadow(
-                                                  color: AppTheme.primary
+                                                  color: cs.primary
                                                       .withValues(alpha: 0.38),
                                                   blurRadius: 16,
                                                   offset: const Offset(0, 6),
@@ -479,11 +475,11 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                       child: Container(
                                         alignment: Alignment.center,
                                         child: _isLoading
-                                            ? const SizedBox(
+                                            ? SizedBox(
                                                 width: 24,
                                                 height: 24,
                                                 child: CircularProgressIndicator(
-                                                  color: Colors.white,
+                                                  color: cs.onPrimary,
                                                   strokeWidth: 2.5,
                                                 ),
                                               )
@@ -496,13 +492,13 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                                     style: GoogleFonts.outfit(
                                                       fontSize: 16,
                                                       fontWeight: FontWeight.w700,
-                                                      color: Colors.white,
+                                                      color: cs.onPrimary,
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
-                                                  const Icon(
+                                                  Icon(
                                                     Icons.arrow_forward_rounded,
-                                                    color: Colors.white,
+                                                    color: cs.onPrimary,
                                                     size: 20,
                                                   ),
                                                 ],
@@ -523,14 +519,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                             Icon(
                               Icons.lock_outline_rounded,
                               size: 13,
-                              color: subtitleColor,
+                              color: cs.onSurfaceVariant,
                             ),
                             const SizedBox(width: 6),
                             Text(
                               'Your number is only used to find your contacts',
                               style: GoogleFonts.outfit(
                                 fontSize: 12,
-                                color: subtitleColor,
+                                color: cs.onSurfaceVariant,
                               ),
                             ),
                           ],

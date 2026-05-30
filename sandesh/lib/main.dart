@@ -117,6 +117,11 @@ void main() async {
     sound: true,
   );
 
+  // ── Eager FCM token sync — runs at every cold start so the token is always
+  //    fresh in Supabase before any peer tries to send a message. This is the
+  //    critical fix for the "no notification when app is killed" bug.
+  _eagerSyncFcmToken();
+
   runApp(const SandeshApp());
 }
 
@@ -129,6 +134,38 @@ Future<void> _onLocalNotificationTap(NotificationResponse response) async {
     await _routeFromNotificationData(data.map((k, v) => MapEntry(k, v.toString())));
   } catch (e) {
     debugPrint('Local notification payload parse error: $e');
+  }
+}
+
+/// Eagerly sync the FCM token to Supabase at every cold start.
+/// This runs fire-and-forget (not awaited) so it never delays app launch.
+/// It is the critical fix for messages not being delivered when the app was
+/// killed: FCM tokens rotate silently, so we must refresh on every start.
+Future<void> _eagerSyncFcmToken() async {
+  try {
+    final supabase = Supabase.instance.client;
+    final authUser = supabase.auth.currentUser;
+    if (authUser == null) return; // Not logged in — nothing to sync
+
+    // Retry up to 5 times with 2s gaps (FCM token is often null on cold start)
+    const maxAttempts = 5;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        await supabase
+            .from('profiles')
+            .update({'fcm_token': token})
+            .eq('id', authUser.id);
+        debugPrint('[main] Eager FCM token synced on attempt $attempt');
+        return;
+      }
+      if (attempt < maxAttempts) {
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+    debugPrint('[main] Eager FCM token sync: token still null after $maxAttempts attempts');
+  } catch (e) {
+    debugPrint('[main] Eager FCM token sync error: $e');
   }
 }
 

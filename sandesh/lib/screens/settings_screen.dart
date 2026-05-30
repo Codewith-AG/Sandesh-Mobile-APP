@@ -32,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text('Settings', style: GoogleFonts.outfit()),
@@ -41,16 +42,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           const SizedBox(height: 16),
           ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: AppTheme.primary,
-              child: Icon(Icons.person, color: AppTheme.onPrimary),
+            leading: CircleAvatar(
+              backgroundColor: cs.primary,
+              child: Icon(Icons.person, color: cs.onPrimary),
             ),
             title: Text('Profile',
                 style: GoogleFonts.outfit(
                     fontSize: 18, fontWeight: FontWeight.w500)),
             subtitle: Text('Change your name, about, or avatar',
                 style: GoogleFonts.outfit(
-                    color: AppTheme.onSurfaceVariant, fontSize: 14)),
+                    color: cs.onSurfaceVariant, fontSize: 14)),
             onTap: () {
               Navigator.push(
                 context,
@@ -67,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: GoogleFonts.outfit(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.primary,
+                color: cs.primary,
               ),
             ),
           ),
@@ -75,10 +76,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: Text('Dark Mode', style: GoogleFonts.outfit(fontSize: 16)),
             subtitle: Text('Enable dark theme across the app',
                 style: GoogleFonts.outfit(
-                    color: AppTheme.onSurfaceVariant, fontSize: 14)),
+                    color: cs.onSurfaceVariant, fontSize: 14)),
             value: _isDarkMode,
             onChanged: _toggleDarkMode,
-            activeColor: AppTheme.primary,
+            activeColor: cs.primary,
           ),
           // Add more settings here in the future
         ],

@@ -10,7 +10,7 @@ import '../models/message_model.dart';
 import '../services/local_db_service.dart';
 import '../services/supabase_broadcast_service.dart';
 import '../services/call_service.dart';
-import '../theme/app_theme.dart';
+// app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'chat_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
@@ -135,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await SupabaseBroadcastService().discoverContacts();
     await _syncDeviceContacts();
     await _loadContacts();
-    
+
     final profile = await LocalDbService().getProfile();
     if (profile != null && mounted) {
       setState(() {
@@ -151,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final cs = Theme.of(context).colorScheme;
         return Container(
           padding: EdgeInsets.only(
             left: 24,
@@ -158,9 +159,9 @@ class _HomeScreenState extends State<HomeScreen> {
             top: 24,
             bottom: MediaQuery.of(context).viewInsets.bottom + 24,
           ),
-          decoration: const BoxDecoration(
-            color: AppTheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLowest,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -171,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 48,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceVariant,
+                    color: cs.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: GoogleFonts.outfit(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.onSurface,
+                  color: cs.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
@@ -190,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Enter the phone number of the person you want to chat with',
                 style: GoogleFonts.outfit(
                   fontSize: 16,
-                  color: AppTheme.onSurfaceVariant,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 24),
@@ -198,8 +199,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 controller: controller,
                 autofocus: true,
                 keyboardType: TextInputType.phone,
-                style: GoogleFonts.outfit(fontSize: 16, color: AppTheme.onSurface),
-                decoration: InputDecoration(
+                style: GoogleFonts.outfit(fontSize: 16, color: cs.onSurface),
+                decoration: const InputDecoration(
                   hintText: 'Enter phone number (e.g. +91...)',
                   // Styling is handled by AppTheme.inputDecorationTheme
                 ),
@@ -239,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.onPrimary,
+                      color: cs.onPrimary,
                     ),
                   ),
                 ),
@@ -270,6 +271,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     final filteredContacts = _searchQuery.isEmpty
         ? _contacts
         : _contacts.where((c) {
@@ -292,16 +295,16 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _myAvatarUrl.startsWith('http')
                 ? CircleAvatar(
                     radius: 20,
-                    backgroundColor: AppTheme.surfaceContainerHigh,
+                    backgroundColor: cs.surfaceContainerHigh,
                     backgroundImage: NetworkImage(_myAvatarUrl),
                     onBackgroundImageError: (_, __) {},
                   )
                 : CircleAvatar(
-                    backgroundColor: AppTheme.surfaceContainerHigh,
+                    backgroundColor: cs.surfaceContainerHigh,
                     child: Text(
                       _myUsername.isNotEmpty ? _myUsername[0].toUpperCase() : '?',
                       style: GoogleFonts.outfit(
-                        color: AppTheme.primary,
+                        color: cs.primary,
                         fontWeight: FontWeight.w700,
                         fontSize: 20,
                       ),
@@ -313,11 +316,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                style: GoogleFonts.outfit(color: AppTheme.onSurface, fontSize: 16),
+                style: GoogleFonts.outfit(color: cs.onSurface, fontSize: 16),
                 decoration: InputDecoration(
                   hintText: 'Search chats...',
                   border: InputBorder.none,
-                  hintStyle: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant),
+                  hintStyle: GoogleFonts.outfit(color: cs.onSurfaceVariant),
                 ),
                 onChanged: (value) {
                   setState(() {
@@ -330,13 +333,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: GoogleFonts.outfit(
                   fontWeight: FontWeight.w800,
                   fontSize: 28,
-                  color: AppTheme.onSurface,
+                  color: cs.onSurface,
                   letterSpacing: -0.01,
                 ),
               ),
         actions: [
           IconButton(
-            icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded, color: AppTheme.onSurfaceVariant),
+            icon: Icon(
+              _isSearching ? Icons.close_rounded : Icons.search_rounded,
+              color: cs.onSurfaceVariant,
+            ),
             onPressed: () {
               setState(() {
                 if (_isSearching) {
@@ -350,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded, color: AppTheme.onSurfaceVariant),
+            icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
             onSelected: (value) async {
               if (value == 'settings') {
                 Navigator.push(
@@ -360,31 +366,55 @@ class _HomeScreenState extends State<HomeScreen> {
               } else if (value == 'logout') {
                 final confirm = await showDialog<bool>(
                   context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: AppTheme.surfaceContainerLowest,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    title: Text('Logout', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
-                    content: Text('Are you sure you want to logout? Your chat history will be preserved locally.', style: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant)),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.outline))),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-                        child: Text('Logout', style: GoogleFonts.outfit(color: AppTheme.onError)),
+                  builder: (ctx) {
+                    final dcs = Theme.of(ctx).colorScheme;
+                    return AlertDialog(
+                      backgroundColor: dcs.surfaceContainerLowest,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24)),
+                      title: Text(
+                        'Logout',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w700,
+                          color: dcs.onSurface,
+                        ),
                       ),
-                    ],
-                  ),
+                      content: Text(
+                        'Are you sure you want to logout? Your chat history will be preserved locally.',
+                        style: GoogleFonts.outfit(color: dcs.onSurfaceVariant),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.outfit(color: dcs.outline),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: dcs.error),
+                          child: Text(
+                            'Logout',
+                            style: GoogleFonts.outfit(color: dcs.onError),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 );
 
                 if (confirm == true && mounted) {
                   final prefs = await SharedPreferences.getInstance();
+                  final navigator = Navigator.of(context);
                   await prefs.clear();
                   SupabaseBroadcastService().dispose();
                   try {
                     await Supabase.instance.client.auth.signOut();
                   } catch (_) {}
                   if (mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
+                    navigator.pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
                     );
@@ -393,29 +423,39 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(value: 'settings', child: Text('Settings', style: GoogleFonts.outfit())),
-              PopupMenuItem(value: 'logout', child: Text('Log Out', style: GoogleFonts.outfit(color: AppTheme.error))),
+              PopupMenuItem(
+                value: 'settings',
+                child: Text('Settings', style: GoogleFonts.outfit()),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: Text(
+                  'Log Out',
+                  style: GoogleFonts.outfit(color: cs.error),
+                ),
+              ),
             ],
           ),
           const SizedBox(width: 12),
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary))
+          ? Center(
+              child: CircularProgressIndicator(color: cs.primary),
+            )
           : filteredContacts.isEmpty
-              ? _buildEmptyState()
+              ? _buildEmptyState(context)
               : RefreshIndicator(
                   onRefresh: _refreshContacts,
-                  color: AppTheme.primary,
-                  backgroundColor: AppTheme.surfaceContainerLowest,
+                  color: cs.primary,
+                  backgroundColor: cs.surfaceContainerLowest,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     itemCount: filteredContacts.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       final contact = filteredContacts[index];
-                      return _buildContactTile(contact);
+                      return _buildContactTile(context, contact);
                     },
                   ),
                 ),
@@ -427,7 +467,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -436,13 +477,13 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceContainerHigh,
+              color: cs.surfaceContainerHigh,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.chat_bubble_outline_rounded,
               size: 56,
-              color: AppTheme.primary,
+              color: cs.primary,
             ),
           ),
           const SizedBox(height: 24),
@@ -451,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: GoogleFonts.outfit(
               fontSize: 24,
               fontWeight: FontWeight.w700,
-              color: AppTheme.onSurface,
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -459,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
             'Tap the button below to start chatting',
             style: GoogleFonts.outfit(
               fontSize: 16,
-              color: AppTheme.onSurfaceVariant,
+              color: cs.onSurfaceVariant,
             ),
           ),
         ],
@@ -467,14 +508,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildContactTile(Contact contact) {
+  Widget _buildContactTile(BuildContext context, Contact contact) {
+    final cs = Theme.of(context).colorScheme;
     Widget avatarWidget;
     final url = contact.avatarUrl;
 
     if (url.startsWith('http')) {
       avatarWidget = CircleAvatar(
         radius: 28,
-        backgroundColor: AppTheme.surfaceContainerHigh,
+        backgroundColor: cs.surfaceContainerHigh,
         backgroundImage: NetworkImage(url),
         onBackgroundImageError: (_, __) {},
       );
@@ -486,10 +528,10 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundImage: MemoryImage(bytes),
         );
       } catch (_) {
-        avatarWidget = _buildFallbackAvatar(contact);
+        avatarWidget = _buildFallbackAvatar(context, contact);
       }
     } else {
-      avatarWidget = _buildFallbackAvatar(contact);
+      avatarWidget = _buildFallbackAvatar(context, contact);
     }
 
     return Container(
@@ -500,8 +542,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        hoverColor: AppTheme.surfaceContainer,
-        splashColor: AppTheme.surfaceContainerHigh,
+        hoverColor: cs.surfaceContainer,
+        splashColor: cs.surfaceContainerHigh,
         onTap: () {
           Navigator.push(
             context,
@@ -529,13 +571,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            contact.displayName.isNotEmpty ? contact.displayName : contact.username,
+                            contact.displayName.isNotEmpty
+                                ? contact.displayName
+                                : contact.username,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(
                               fontWeight: FontWeight.w700,
                               fontSize: 18,
-                              color: AppTheme.onSurface,
+                              color: cs.onSurface,
                             ),
                           ),
                         ),
@@ -545,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppTheme.outline,
+                              color: cs.outline,
                             ),
                           ),
                       ],
@@ -557,7 +601,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
                         fontSize: 15,
-                        color: AppTheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
@@ -571,19 +615,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFallbackAvatar(Contact contact) {
+  Widget _buildFallbackAvatar(BuildContext context, Contact contact) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        color: AppTheme.primaryContainer.withValues(alpha: 0.1),
+        color: cs.primaryContainer.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       child: Center(
         child: Text(
-          contact.username.isNotEmpty ? contact.username[0].toUpperCase() : '?',
+          contact.username.isNotEmpty
+              ? contact.username[0].toUpperCase()
+              : '?',
           style: GoogleFonts.outfit(
-            color: AppTheme.primary,
+            color: cs.primary,
             fontWeight: FontWeight.w700,
             fontSize: 24,
           ),

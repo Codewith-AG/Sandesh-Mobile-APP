@@ -87,13 +87,14 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (mounted) {
         if (!isUserCancelled) {
+          final cs = Theme.of(context).colorScheme;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 'Sign-in failed: ${msg.replaceAll('Exception:', '').trim()}',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
               ),
-              backgroundColor: AppTheme.error,
+              backgroundColor: cs.error,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -166,10 +167,11 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: cs.surface,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -187,25 +189,25 @@ class _LoginScreenState extends State<LoginScreen>
                     width: 88,
                     height: 88,
                     decoration: BoxDecoration(
-                      color: AppTheme.surfaceContainerLowest,
+                      color: cs.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(32),
                       border: Border.all(
-                        color: AppTheme.surfaceVariant,
+                        color: cs.surfaceContainerHighest,
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          color: cs.primary.withValues(alpha: 0.12),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.chat_bubble_rounded,
                         size: 42,
-                        color: AppTheme.primary,
+                        color: cs.primary,
                       ),
                     ),
                   ),
@@ -218,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen>
                     style: GoogleFonts.outfit(
                       fontSize: 40,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.onSurface,
+                      color: cs.onSurface,
                       letterSpacing: -0.02,
                     ),
                   ),
@@ -228,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen>
                     textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
                       fontSize: 16,
-                      color: AppTheme.onSurfaceVariant,
+                      color: cs.onSurfaceVariant,
                       fontWeight: FontWeight.w400,
                       height: 1.5,
                     ),
@@ -237,9 +239,9 @@ class _LoginScreenState extends State<LoginScreen>
                   const Spacer(),
 
                   // ── Feature pills row ──
-                  Row(
+                  const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       _FeaturePill(icon: Icons.lock_outline_rounded, label: 'Encrypted'),
                       SizedBox(width: 10),
                       _FeaturePill(icon: Icons.bolt_rounded, label: 'Instant'),
@@ -255,12 +257,14 @@ class _LoginScreenState extends State<LoginScreen>
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
                     decoration: BoxDecoration(
-                      color: AppTheme.surfaceContainerLowest,
+                      color: cs.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(32),
-                      border: Border.all(color: AppTheme.surfaceVariant.withValues(alpha: 0.5), width: 1.5),
+                      border: Border.all(
+                          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                          width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.primary.withValues(alpha: 0.08),
+                          color: cs.primary.withValues(alpha: 0.08),
                           blurRadius: 32,
                           offset: const Offset(0, 12),
                         ),
@@ -274,7 +278,7 @@ class _LoginScreenState extends State<LoginScreen>
                           style: GoogleFonts.outfit(
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
-                            color: AppTheme.onSurface,
+                            color: cs.onSurface,
                             letterSpacing: -0.01,
                           ),
                         ),
@@ -283,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen>
                           'Sign in with your Google account to continue.',
                           style: GoogleFonts.outfit(
                             fontSize: 14,
-                            color: AppTheme.onSurfaceVariant,
+                            color: cs.onSurfaceVariant,
                             height: 1.5,
                           ),
                         ),
@@ -304,14 +308,14 @@ class _LoginScreenState extends State<LoginScreen>
                             Icon(
                               Icons.verified_user_outlined,
                               size: 14,
-                              color: AppTheme.outline,
+                              color: cs.outline,
                             ),
                             const SizedBox(width: 6),
                             Text(
                               'End-to-end encrypted · Zero server storage',
                               style: GoogleFonts.outfit(
                                 fontSize: 12,
-                                color: AppTheme.outline,
+                                color: cs.outline,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -329,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen>
                     textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
                       fontSize: 12,
-                      color: AppTheme.outlineVariant,
+                      color: cs.outlineVariant,
                       fontWeight: FontWeight.w500,
                       height: 1.6,
                     ),
@@ -354,24 +358,25 @@ class _FeaturePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceContainerLow,
+        color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppTheme.surfaceVariant, width: 1.5),
+        border: Border.all(color: cs.surfaceContainerHighest, width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppTheme.primary),
+          Icon(icon, size: 14, color: cs.primary),
           const SizedBox(width: 6),
           Text(
             label,
             style: GoogleFonts.outfit(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppTheme.onSurface,
+              color: cs.onSurface,
             ),
           ),
         ],
@@ -424,6 +429,7 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ScaleTransition(
       scale: _scaleAnim,
       child: GestureDetector(
@@ -436,25 +442,25 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
         child: Container(
           height: 56,
           decoration: BoxDecoration(
-            color: AppTheme.surfaceContainerLowest,
+            color: cs.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: AppTheme.surfaceVariant, width: 1.5),
+            border: Border.all(color: cs.surfaceContainerHighest, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.05),
+                color: cs.primary.withValues(alpha: 0.05),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
           child: widget.isLoading
-              ? const Center(
+              ? Center(
                   child: SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                     ),
                   ),
                 )
@@ -468,7 +474,7 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.onSurface,
+                        color: cs.onSurface,
                         letterSpacing: 0.1,
                       ),
                     ),
