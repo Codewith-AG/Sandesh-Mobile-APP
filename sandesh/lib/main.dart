@@ -24,67 +24,19 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // MUST be the very first call in a background isolate —
-  // path_provider (used by SQLite) requires Flutter bindings to be ready.
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
   final data = message.data;
-  // Call signals — do NOT save to DB, do not show notification.
+  // Call signals — do NOT save to DB.
   if (data['type'] == 'call' || data['msg_type'] == 'call_invite') return;
 
-  // ── Step 1: Show a local notification (app is killed/background) ──────────
-  // Android does NOT auto-display a notification when the app is killed unless
-  // the FCM payload contains a server-side `notification` block. Since this app
-  // uses data-only payloads, we must show the notification ourselves here.
-  final sender = data['sender_username'] ?? 'New message';
-  final text   = data['text'];
-  final title  = sender;
-  final body   = (text != null && text.isNotEmpty) ? text : 'Sent an attachment';
+  // NOTE: We do NOT show a local notification here because the FCM payload
+  // already includes a `notification` block that Android displays automatically
+  // when the app is killed/background. Showing another one here would cause
+  // duplicate notifications.
 
-  try {
-    final plugin = FlutterLocalNotificationsPlugin();
-
-    // Initialise the plugin in this background isolate
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    await plugin.initialize(
-      settings: const InitializationSettings(android: androidInit),
-    );
-
-    // Ensure the notification channel exists (safe to call multiple times)
-    await plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          'messages_channel',
-          'Messages Notifications',
-          description: 'This channel is used for chat message notifications.',
-          importance: Importance.max,
-        ));
-
-    await plugin.show(
-      id: DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
-      title: title,
-      body: body,
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'messages_channel',
-          'Messages',
-          importance: Importance.max,
-          priority: Priority.high,
-          showWhen: true,
-        ),
-      ),
-      payload: jsonEncode({
-        'type': 'message',
-        'sender_username': sender,
-      }),
-    );
-  } catch (e) {
-    debugPrint('Background notification error: $e');
-  }
-
-  // ── Step 2: Save the message to the local DB ───────────────────────────────
+  // ── Save the message to the local DB so it appears when the app opens ──
   if (data['id'] != null && data['id']!.isNotEmpty) {
     try {
       await LocalDbService().database; // ensure DB is open
@@ -99,7 +51,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       );
       await LocalDbService().insertMessage(msg);
     } catch (e) {
-      // DB errors in background must never crash the handler
       debugPrint('Background handler DB error: $e');
     }
   }

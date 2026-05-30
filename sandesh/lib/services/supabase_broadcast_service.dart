@@ -25,6 +25,9 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// Tracks the user we are currently chatting with to prevent local notifications
   String? activeChatUser;
 
+  /// Suppresses local notifications during sync (messages already delivered by FCM)
+  bool _isSyncing = false;
+
   /// The single Postgres realtime channel that listens for all incoming messages
   RealtimeChannel? _inboxChannel;
 
@@ -196,6 +199,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// `messages` table, saves each one locally, then deletes it from the cloud.
   /// This handles the "store-and-forward" catch-up on every app launch.
   Future<void> syncPendingMessages() async {
+    _isSyncing = true;
     try {
       final rows = await _client
           .from('messages')
@@ -224,6 +228,8 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('syncPendingMessages error: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -278,8 +284,11 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
         ));
       }
 
-      // Show local notification if not actively chatting with sender
-      if (activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
+      // Show local notification ONLY if:
+      // 1. Not actively chatting with this sender
+      // 2. Not during sync (FCM already showed the notification)
+      if (!_isSyncing &&
+          activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
         _showLocalNotification(
           title: message.senderUsername,
           body: message.text ?? 'Sent an attachment',
@@ -538,18 +547,29 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
   // ──────────────────────────── Presence ────────────────────────────
 
+  Timer? _presenceDebounce;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_myUsername.isEmpty) return;
     switch (state) {
       case AppLifecycleState.resumed:
+        // Cancel any pending offline update and immediately go online
+        _presenceDebounce?.cancel();
         _updatePresence(true);
         break;
       case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
+        // Debounce: wait 5 seconds before marking offline to avoid flicker
+        // during quick app switches or notification shade pulls
+        _presenceDebounce?.cancel();
+        _presenceDebounce = Timer(const Duration(seconds: 5), () {
+          _updatePresence(false);
+        });
+        break;
+      case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
-        _updatePresence(false);
+        // Don't mark offline — these are transient states
         break;
     }
   }
