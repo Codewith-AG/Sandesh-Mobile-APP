@@ -56,8 +56,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  final prefs = await SharedPreferences.getInstance();
+  final isDark = prefs.getBool('isDarkMode') ?? false;
+  themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
 
   // Initialize Firebase and setup background handler
   await Firebase.initializeApp();
@@ -183,8 +189,6 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Set online on initial startup
-    _updatePresence(true);
     // Listen for incoming calls from ANY screen — show IncomingCallScreen globally
     _incomingCallSub = CallService().incomingCallStream.listen((event) {
       if (CallService().isInCall) return;
@@ -281,45 +285,33 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _updatePresence(true);
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.inactive) {
-      _updatePresence(false);
-    }
-  }
-
-  Future<void> _updatePresence(bool isOnline) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('username');
-      if (username != null && username.isNotEmpty) {
-        await Supabase.instance.client.from('profiles').update({
-          'is_online': isOnline,
-          'last_seen': DateTime.now().toUtc().toIso8601String(),
-        }).eq('username', username);
-      }
-    } catch (e) {
-      debugPrint('Lifecycle presence update error: $e');
-    }
+    // Presence is now handled by SupabaseBroadcastService
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sandesh',
-      debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey,
-      theme: AppTheme.lightTheme,
-      localizationsDelegates: [
-        ...PhoneFieldLocalization.delegates,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en'),
-      ],
-      home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, _) {
+        return MaterialApp(
+          title: 'Sandesh',
+          debugShowCheckedModeBanner: false,
+          navigatorKey: navigatorKey,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode,
+          localizationsDelegates: [
+            ...PhoneFieldLocalization.delegates,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'),
+          ],
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

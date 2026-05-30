@@ -43,6 +43,11 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Catch FCM notification taps -->
+            <intent-filter>
+                <action android:name="FLUTTER_NOTIFICATION_CLICK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <!-- Supabase OAuth redirect deep link for Google Sign-In -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>

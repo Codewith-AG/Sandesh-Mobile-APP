@@ -579,22 +579,28 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             _buildReceiverAvatar(),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.receiverDisplayName?.isNotEmpty == true ? widget.receiverDisplayName! : widget.receiverUsername,
-                    style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
-                Row(children: [
-                  if (_isPeerOnline) ...[
-                    Container(width: 8, height: 8,
-                        decoration: BoxDecoration(color: Colors.green.shade400, shape: BoxShape.circle)),
-                    const SizedBox(width: 4),
-                    Text('Online', style: GoogleFonts.outfit(fontSize: 13, color: Colors.green.shade500, fontWeight: FontWeight.w500)),
-                  ] else ...[
-                    Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.onSurfaceVariant, fontWeight: FontWeight.w400)),
-                  ],
-                ]),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.receiverDisplayName?.isNotEmpty == true ? widget.receiverDisplayName! : widget.receiverUsername,
+                    style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.onSurface),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Row(children: [
+                    if (_isPeerOnline) ...[
+                      Container(width: 8, height: 8,
+                          decoration: BoxDecoration(color: Colors.green.shade400, shape: BoxShape.circle)),
+                      const SizedBox(width: 4),
+                      Text('Online', style: GoogleFonts.outfit(fontSize: 13, color: Colors.green.shade500, fontWeight: FontWeight.w500)),
+                    ] else ...[
+                      Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.onSurfaceVariant, fontWeight: FontWeight.w400)),
+                    ],
+                  ]),
+                ],
+              ),
             ),
           ],
         ),

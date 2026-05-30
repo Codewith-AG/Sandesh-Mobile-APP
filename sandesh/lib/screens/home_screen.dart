@@ -13,6 +13,7 @@ import '../services/call_service.dart';
 import '../theme/app_theme.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
+import 'settings_screen.dart';
 import 'login_screen.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -351,10 +352,10 @@ class _HomeScreenState extends State<HomeScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppTheme.onSurfaceVariant),
             onSelected: (value) async {
-              if (value == 'profile') {
+              if (value == 'settings') {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 ).then((_) => _refreshContacts());
               } else if (value == 'logout') {
                 final confirm = await showDialog<bool>(
@@ -392,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(value: 'profile', child: Text('My Profile', style: GoogleFonts.outfit())),
+              PopupMenuItem(value: 'settings', child: Text('Settings', style: GoogleFonts.outfit())),
               PopupMenuItem(value: 'logout', child: Text('Log Out', style: GoogleFonts.outfit(color: AppTheme.error))),
             ],
           ),
