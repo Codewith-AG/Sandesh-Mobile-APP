@@ -86,7 +86,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// filtered to rows where `receiver_username = _myUsername`, then
   /// immediately syncs any messages that arrived while the app was offline.
   void initialize(String myUsername) {
-    _myUsername = myUsername; // Keep original casing — used as-is for DB queries
+    _myUsername = myUsername.toLowerCase(); // Always lowercase for consistent matching
     
     // Add lifecycle observer for presence tracking
     WidgetsBinding.instance.addObserver(this);
@@ -103,7 +103,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'receiver_username',
-            value: _myUsername,
+            value: _myUsername, // now always lowercase
           ),
           callback: (payload) async {
             final row = payload.newRecord;
@@ -151,26 +151,43 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   }
 
   Future<void> _syncFcmToken() async {
-    try {
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken != null) {
-        // Use auth user ID (not username) — immune to case mismatches, always unique
+    // Firebase sometimes returns null on the very first launch because it
+    // hasn't registered with Google's FCM servers yet. We retry a few times
+    // with a short delay so the token is always saved correctly.
+    const maxAttempts = 5;
+    const retryDelay = Duration(seconds: 2);
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
         final authUser = _client.auth.currentUser;
         if (authUser == null) {
           debugPrint('FCM token sync skipped: no auth user');
           return;
         }
-        await _client
-            .from('profiles')
-            .update({'fcm_token': fcmToken})
-            .eq('id', authUser.id);  // ← auth ID never has case issues
-        debugPrint('FCM token saved for user ${authUser.id}: $fcmToken');
-      } else {
-        debugPrint('FCM token is null — Firebase may not be configured correctly');
+
+        final fcmToken = await FirebaseMessaging.instance.getToken();
+
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          await _client
+              .from('profiles')
+              .update({'fcm_token': fcmToken})
+              .eq('id', authUser.id); // ← auth ID never has case issues
+          debugPrint('FCM token saved (attempt $attempt) for ${authUser.id}: $fcmToken');
+          return; // success — stop retrying
+        } else {
+          debugPrint('FCM token is null on attempt $attempt — retrying in ${retryDelay.inSeconds}s...');
+        }
+      } catch (e) {
+        debugPrint('FCM token sync error on attempt $attempt: $e');
       }
-    } catch (e) {
-      debugPrint('Failed to sync FCM token: $e');
+
+      if (attempt < maxAttempts) {
+        await Future.delayed(retryDelay);
+      }
     }
+
+    debugPrint('FCM token still null after $maxAttempts attempts. '
+        'Check that google-services.json is correct and the device has Google Play Services.');
   }
 
   // ──────────────────────────── STEP 1: Offline Sync ────────────────────────────
@@ -321,25 +338,28 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// Sends a message using the Store-and-Forward pattern:
   /// 1. Saves locally for instant UI feedback.
   /// 2. INSERTs into Supabase `messages` table for durable delivery.
-  /// The receiver's Postgres listener (or `syncPendingMessages`) will pick it
-  /// up, save it locally, and DELETE it from the cloud immediately.
+  ///
+  /// The FCM push notification is sent AUTOMATICALLY by the Supabase
+  /// Database Webhook → send-push Edge Function when the INSERT fires.
+  /// Flutter does NOT need to call the Edge Function directly.
   Future<void> sendMessage(Message message) async {
     // Save locally immediately so the UI updates instantly
     await LocalDbService().insertMessage(message);
 
-    // INSERT into Supabase — durable, offline-safe delivery
+    // INSERT into Supabase — durable, offline-safe delivery.
+    // Using lowercase usernames so the realtime filter and webhook always match.
     try {
       await _client.from('messages').insert({
         'id': message.id,
-        'sender_username': message.senderUsername,
-        'receiver_username': message.receiverUsername,
+        'sender_username': message.senderUsername.toLowerCase(),
+        'receiver_username': message.receiverUsername.toLowerCase(),
         'text': message.text,
         'media_url': message.mediaUrl,
         'file_name': message.fileName,
         'message_type': message.messageType.value,
         'timestamp': message.timestamp,
       });
-      debugPrint('Message ${message.id} inserted into Supabase for delivery');
+      debugPrint('Message ${message.id} inserted — webhook will trigger FCM push');
     } catch (e) {
       debugPrint('Error inserting message into Supabase: $e');
     }
@@ -422,26 +442,28 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// RPC `find_contacts_by_phones`, which only returns rows whose phone the
   /// caller already knows. Phone numbers in the response are the same ones the
   /// caller submitted, so no new information is disclosed.
-  Future<int> syncPhoneContacts(List<String> rawPhoneNumbers) async {
+  Future<int> syncPhoneContacts(Map<String, String> phoneToName) async {
     int newContacts = 0;
     try {
-      // Normalize all device phone numbers to E.164
-      final e164Numbers = <String>{};
-      for (final raw in rawPhoneNumbers) {
-        final e164 = normalizeToE164(raw);
-        if (e164 != null) e164Numbers.add(e164);
+      // Normalize all device phone numbers to E.164 and build a reverse map
+      final e164ToName = <String, String>{};
+      for (final entry in phoneToName.entries) {
+        final e164 = normalizeToE164(entry.key);
+        if (e164 != null) {
+          e164ToName[e164] = entry.value;
+        }
       }
-      if (e164Numbers.isEmpty) return 0;
+      if (e164ToName.isEmpty) return 0;
 
       debugPrint(
-          'Matching ${e164Numbers.length} normalized phone numbers via RPC...');
+          'Matching ${e164ToName.length} normalized phone numbers via RPC...');
 
       // SECURITY DEFINER RPC defined in security_policies.sql.
       // Signature: find_contacts_by_phones(phone_list text[])
       //   RETURNS TABLE (username text, phone_e164 text, bio text, avatar_url text)
       final response = await _client.rpc(
         'find_contacts_by_phones',
-        params: {'phone_list': e164Numbers.toList()},
+        params: {'phone_list': e164ToName.keys.toList()},
       );
 
       final users = (response as List<dynamic>?) ?? const [];
@@ -449,6 +471,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
         final username = (user['username'] as String).toLowerCase();
         if (username == _myUsername) continue;
         final phoneE164 = (user['phone_e164'] ?? '') as String;
+        final displayName = e164ToName[phoneE164] ?? '';
 
         final exists = await LocalDbService().contactExists(username);
         if (!exists) {
@@ -456,6 +479,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
             username: username,
             phone: phoneE164,
             hashedPhone: '',
+            displayName: displayName,
             bio: (user['bio'] ?? '') as String,
             avatarUrl: (user['avatar_url'] ?? '') as String,
           ));
@@ -532,10 +556,19 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
   Future<void> _updatePresence(bool isOnline) async {
     try {
-      await _client.from('profiles').update({
-        'is_online': isOnline,
-        'last_seen': DateTime.now().toUtc().toIso8601String(),
-      }).eq('username', _myUsername);
+      // Use lowercase id-based update to avoid any case mismatch
+      final authUser = _client.auth.currentUser;
+      if (authUser != null) {
+        await _client.from('profiles').update({
+          'is_online': isOnline,
+          'last_seen': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', authUser.id);
+      } else {
+        await _client.from('profiles').update({
+          'is_online': isOnline,
+          'last_seen': DateTime.now().toUtc().toIso8601String(),
+        }).eq('username', _myUsername.toLowerCase());
+      }
     } catch (e) {
       debugPrint('Failed to update presence: $e');
     }

@@ -21,11 +21,13 @@ import 'package:permission_handler/permission_handler.dart';
 class ChatScreen extends StatefulWidget {
   final String myUsername;
   final String receiverUsername;
+  final String? receiverDisplayName;
 
   const ChatScreen({
     super.key,
     required this.myUsername,
     required this.receiverUsername,
+    this.receiverDisplayName,
   });
 
   @override
@@ -90,14 +92,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _listenToPeerPresence() {
     final client = Supabase.instance.client;
-    final peer = widget.receiverUsername.toLowerCase();
+    final peer = widget.receiverUsername;
 
     // NOTE: We use the `.stream()` API instead of `.channel()` because it is much
     // more reliable and automatically handles fetching initial state plus all realtime
     // updates under the hood.
     _presenceSubscription = client
         .from('profiles')
-        .stream(primaryKey: ['username'])
+        .stream(primaryKey: ['id'])
         .eq('username', peer)
         .listen((data) {
       if (data.isNotEmpty && mounted) {
@@ -580,7 +582,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.receiverUsername,
+                Text(widget.receiverDisplayName?.isNotEmpty == true ? widget.receiverDisplayName! : widget.receiverUsername,
                     style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
                 Row(children: [
                   if (_isPeerOnline) ...[

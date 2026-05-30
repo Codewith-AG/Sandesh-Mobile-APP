@@ -250,7 +250,8 @@ class CallService {
       channelName: event.channelName,
       callType: event.callType,
     );
-    return _fetchToken(event.channelName);
+    final result = await _fetchToken(event.channelName);
+    return result.token;
   }
 
   Future<void> rejectCall(CallEvent event) async {

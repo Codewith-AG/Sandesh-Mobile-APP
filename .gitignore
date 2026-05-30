@@ -25,3 +25,7 @@ sandesh/.flutter-plugins-dependencies
 # Supabase temporary files
 supabase/.temp/
 sandesh/supabase/.temp/
+
+# Tool files
+.antigravitycli/
+

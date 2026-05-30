@@ -40,7 +40,7 @@ android {
     defaultConfig {
         // TODO PRODUCTION: must NOT remain com.example.* on the Play Store.
         applicationId = "com.example.sandesh"
-        minSdk = 30
+        minSdk = 31
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

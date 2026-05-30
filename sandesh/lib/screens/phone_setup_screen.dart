@@ -83,7 +83,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
       if (user == null) throw Exception('No authenticated user found');
 
       final profile = UserProfile(
-        username: widget.googleName,
+        username: _e164Phone!,
         phone: _e164Phone!,
         phoneE164: _e164Phone!,
       );
@@ -99,7 +99,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
 
       // Cache in SharedPreferences for quick access
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('username', widget.googleName);
+      await prefs.setString('username', _e164Phone!);
       await prefs.setString('phone_e164', _e164Phone!);
 
       if (mounted) {

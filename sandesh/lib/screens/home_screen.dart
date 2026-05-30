@@ -105,14 +105,14 @@ class _HomeScreenState extends State<HomeScreen> {
       final contacts = await fc.FlutterContacts.getAll(
         properties: {fc.ContactProperty.phone},
       );
-      final rawPhones = <String>[];
+      final phoneToName = <String, String>{};
       for (final contact in contacts) {
         for (final phone in contact.phones) {
-          rawPhones.add(phone.number);
+          phoneToName[phone.number] = contact.displayName ?? 'Unknown';
         }
       }
-      if (rawPhones.isNotEmpty) {
-        await SupabaseBroadcastService().syncPhoneContacts(rawPhones);
+      if (phoneToName.isNotEmpty) {
+        await SupabaseBroadcastService().syncPhoneContacts(phoneToName);
       }
     }
   }
@@ -471,6 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (_) => ChatScreen(
                 myUsername: _myUsername,
                 receiverUsername: contact.username,
+                receiverDisplayName: contact.displayName,
               ),
             ),
           ).then((_) => _loadContacts());
@@ -490,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            contact.username,
+                            contact.displayName.isNotEmpty ? contact.displayName : contact.username,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(

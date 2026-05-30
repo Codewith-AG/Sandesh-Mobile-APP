@@ -30,11 +30,61 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 
   final data = message.data;
-  // Call signals — do NOT save to DB. The OS shows the notification automatically.
-  if (data['type'] == 'call' || data['message_type'] == 'call_invite') return;
+  // Call signals — do NOT save to DB, do not show notification.
+  if (data['type'] == 'call' || data['msg_type'] == 'call_invite') return;
 
-  // The notification is already shown by the OS via the `notification` object
-  // in the FCM payload. Here we just save the message to the local DB.
+  // ── Step 1: Show a local notification (app is killed/background) ──────────
+  // Android does NOT auto-display a notification when the app is killed unless
+  // the FCM payload contains a server-side `notification` block. Since this app
+  // uses data-only payloads, we must show the notification ourselves here.
+  final sender = data['sender_username'] ?? 'New message';
+  final text   = data['text'];
+  final title  = sender;
+  final body   = (text != null && text.isNotEmpty) ? text : 'Sent an attachment';
+
+  try {
+    final plugin = FlutterLocalNotificationsPlugin();
+
+    // Initialise the plugin in this background isolate
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await plugin.initialize(
+      settings: const InitializationSettings(android: androidInit),
+    );
+
+    // Ensure the notification channel exists (safe to call multiple times)
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(const AndroidNotificationChannel(
+          'messages_channel',
+          'Messages Notifications',
+          description: 'This channel is used for chat message notifications.',
+          importance: Importance.max,
+        ));
+
+    await plugin.show(
+      id: DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'messages_channel',
+          'Messages',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: true,
+        ),
+      ),
+      payload: jsonEncode({
+        'type': 'message',
+        'sender_username': sender,
+      }),
+    );
+  } catch (e) {
+    debugPrint('Background notification error: $e');
+  }
+
+  // ── Step 2: Save the message to the local DB ───────────────────────────────
   if (data['id'] != null && data['id']!.isNotEmpty) {
     try {
       await LocalDbService().database; // ensure DB is open
@@ -129,7 +179,7 @@ Future<void> _onLocalNotificationTap(NotificationResponse response) async {
 // Decides whether the data represents a call invite or a normal chat message.
 Future<void> _routeFromNotificationData(Map<String, String> data) async {
   final type = data['type'] ?? '';
-  final messageType = data['message_type'] ?? '';
+  final messageType = data['msg_type'] ?? data['message_type'] ?? '';
 
   // ── Incoming call invite ───────────────────────────────────────────────────
   if (type == 'call' || messageType == 'call_invite') {
@@ -247,7 +297,7 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
     final data = message.data;
 
     // ── Call invite — let CallService dedup vs the Realtime path ──────────
-    if (data['type'] == 'call' || data['message_type'] == 'call_invite') {
+    if (data['type'] == 'call' || data['msg_type'] == 'call_invite') {
       final event = CallEvent(
         type: 'call_invite',
         callerUsername:
