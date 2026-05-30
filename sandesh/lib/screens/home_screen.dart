@@ -30,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Contact> _contacts = [];
   bool _isLoading = true;
   StreamSubscription<Message>? _messageSubscription;
+  bool _isSearching = false;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -184,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Enter the username of the person you want to chat with',
+                'Enter the phone number of the person you want to chat with',
                 style: GoogleFonts.outfit(
                   fontSize: 16,
                   color: AppTheme.onSurfaceVariant,
@@ -194,9 +197,10 @@ class _HomeScreenState extends State<HomeScreen> {
               TextFormField(
                 controller: controller,
                 autofocus: true,
+                keyboardType: TextInputType.phone,
                 style: GoogleFonts.outfit(fontSize: 16, color: AppTheme.onSurface),
                 decoration: InputDecoration(
-                  hintText: 'Enter username',
+                  hintText: 'Enter phone number (e.g. +91...)',
                   // Styling is handled by AppTheme.inputDecorationTheme
                 ),
               ),
@@ -205,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () async {
-                    final username = controller.text.trim().toLowerCase();
+                    final username = controller.text.trim();
                     if (username.isNotEmpty && username != _myUsername) {
                       final exists =
                           await LocalDbService().contactExists(username);
@@ -266,6 +270,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredContacts = _searchQuery.isEmpty
+        ? _contacts
+        : _contacts.where((c) {
+            final query = _searchQuery.toLowerCase();
+            return c.displayName.toLowerCase().contains(query) ||
+                c.username.toLowerCase().contains(query);
+          }).toList();
+
     return Scaffold(
       appBar: AppBar(
         leading: Padding(
@@ -297,19 +309,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
           ),
         ),
-        title: Text(
-          'Sandesh',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.w800,
-            fontSize: 28,
-            color: AppTheme.onSurface,
-            letterSpacing: -0.01,
-          ),
-        ),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: GoogleFonts.outfit(color: AppTheme.onSurface, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'Search chats...',
+                  border: InputBorder.none,
+                  hintStyle: GoogleFonts.outfit(color: AppTheme.onSurfaceVariant),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+              )
+            : Text(
+                'Sandesh',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 28,
+                  color: AppTheme.onSurface,
+                  letterSpacing: -0.01,
+                ),
+              ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_rounded, color: AppTheme.onSurfaceVariant),
-            onPressed: () {},
+            icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded, color: AppTheme.onSurfaceVariant),
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _searchQuery = '';
+                } else {
+                  _isSearching = true;
+                }
+              });
+            },
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppTheme.onSurfaceVariant),
@@ -365,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.primary))
-          : _contacts.isEmpty
+          : filteredContacts.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: _refreshContacts,
@@ -373,10 +411,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: AppTheme.surfaceContainerLowest,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    itemCount: _contacts.length,
+                    itemCount: filteredContacts.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
-                      final contact = _contacts[index];
+                      final contact = filteredContacts[index];
                       return _buildContactTile(contact);
                     },
                   ),

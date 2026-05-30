@@ -220,7 +220,7 @@ serve(async (req) => {
       dataPayload = {
         id: String(id ?? ""),
         type: "call",
-        message_type: "call_invite",
+        msg_type: "call_invite",
         callerUsername: String(sender_username ?? ""),
         receiverUsername: String(receiver_username ?? ""),
         sender_username: String(sender_username ?? ""),
@@ -241,7 +241,7 @@ serve(async (req) => {
       dataPayload = {
         id: String(id ?? ""),
         type: "message",
-        message_type: String(message_type ?? "text"),
+        msg_type: String(message_type ?? "text"),
         sender_username: String(sender_username ?? ""),
         receiver_username: String(receiver_username ?? ""),
         text: safeBody,
