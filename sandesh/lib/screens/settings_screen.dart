@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/app_theme.dart';
+// app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import '../main.dart';
 import 'profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -79,7 +79,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: cs.onSurfaceVariant, fontSize: 14)),
             value: _isDarkMode,
             onChanged: _toggleDarkMode,
-            activeColor: cs.primary,
+            activeThumbColor: cs.primary,
+            activeTrackColor: cs.primaryContainer,
           ),
           // Add more settings here in the future
         ],

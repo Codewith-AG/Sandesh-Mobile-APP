@@ -4,7 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../theme/app_theme.dart';
+// app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'home_screen.dart';
 import 'phone_setup_screen.dart';
 

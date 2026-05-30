@@ -55,7 +55,7 @@ class AppTheme {
         displayColor: onSurface,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: surfaceContainerLowest.withOpacity(0.8),
+        backgroundColor: surfaceContainerLowest.withValues(alpha: 0.8),
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -159,7 +159,7 @@ class AppTheme {
         displayColor: Colors.white,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: darkBackground.withOpacity(0.8),
+        backgroundColor: darkBackground.withValues(alpha: 0.8),
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,

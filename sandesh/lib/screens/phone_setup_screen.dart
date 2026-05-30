@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_profile_model.dart';
 import '../services/local_db_service.dart';
-import '../theme/app_theme.dart';
+// app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'home_screen.dart';
 
 class PhoneSetupScreen extends StatefulWidget {

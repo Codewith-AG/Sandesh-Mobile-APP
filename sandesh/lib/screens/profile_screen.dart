@@ -8,7 +8,7 @@ import '../models/user_profile_model.dart';
 import '../services/local_db_service.dart';
 import '../services/supabase_broadcast_service.dart';
 import '../services/media_upload_service.dart';
-import '../theme/app_theme.dart';
+// app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
