@@ -406,8 +406,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
 
                 if (confirm == true && mounted) {
+                  final navigator = Navigator.of(context); // capture before any await
                   final prefs = await SharedPreferences.getInstance();
-                  final navigator = Navigator.of(context);
                   await prefs.clear();
                   SupabaseBroadcastService().dispose();
                   try {
