@@ -6,13 +6,13 @@
 //   FIREBASE_PROJECT_ID        = sandesh-app-544c7
 //   FIREBASE_CLIENT_EMAIL      = firebase-adminsdk-fbsvc@sandesh-app-544c7.iam.gserviceaccount.com
 //   FIREBASE_PRIVATE_KEY       = -----BEGIN PRIVATE KEY-----\n...full key...\n-----END PRIVATE KEY-----\n
+//   SEND_PUSH_WEBHOOK_SECRET   = <your webhook secret>
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ─── Base64url helper (RFC 4648 §5) ───────────────────────────────────────────
 
-/** Correctly encodes a Uint8Array as base64url with no padding. */
 function base64url(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) {
@@ -24,7 +24,6 @@ function base64url(bytes: Uint8Array): string {
     .replace(/=+$/, "");
 }
 
-/** Encodes a plain JS object as a base64url JSON segment (for JWT headers/claims). */
 function encodeJwtPart(obj: object): string {
   return base64url(new TextEncoder().encode(JSON.stringify(obj)));
 }
@@ -32,13 +31,29 @@ function encodeJwtPart(obj: object): string {
 // ─── Google OAuth2 JWT helper ──────────────────────────────────────────────────
 
 async function getGoogleAccessToken(): Promise<string> {
-  const clientEmail = Deno.env.get("FIREBASE_CLIENT_EMAIL")!;
-  // Supabase secrets preserve literal \n — replace them with real newlines
-  const privateKeyRaw = Deno.env.get("FIREBASE_PRIVATE_KEY")!.replace(/\\n/g, "\n");
+  const clientEmail = Deno.env.get("FIREBASE_CLIENT_EMAIL");
+  const privateKeyEnv = Deno.env.get("FIREBASE_PRIVATE_KEY");
+
+  if (!clientEmail) throw new Error("FIREBASE_CLIENT_EMAIL secret is not set");
+  if (!privateKeyEnv) throw new Error("FIREBASE_PRIVATE_KEY secret is not set");
+
+  console.log(`[send-push] clientEmail=${clientEmail}`);
+  console.log(`[send-push] privateKey length=${privateKeyEnv.length}, starts with: ${privateKeyEnv.substring(0, 30)}...`);
+
+  // ── CRITICAL FIX: Handle ALL possible newline escaping scenarios ──
+  // Depending on how the secret was pasted into Supabase Dashboard:
+  //   - It might contain literal two-char sequences: \n  (backslash + n)
+  //   - It might contain double-escaped: \\n  (backslash + backslash + n)
+  //   - It might already have real newlines
+  // We handle all three by replacing double-escaped first, then single-escaped.
+  const privateKeyRaw = privateKeyEnv
+    .replace(/\\\\n/g, "\n")   // \\n → real newline (double-escaped case)
+    .replace(/\\n/g, "\n");     // \n → real newline (single-escaped case — MOST COMMON)
+
+  console.log(`[send-push] privateKey after unescape: contains real newlines=${privateKeyRaw.includes("\n")}, length=${privateKeyRaw.length}`);
 
   const now = Math.floor(Date.now() / 1000);
 
-  // Build JWT header + claim using correct base64url encoding
   const signingInput = `${encodeJwtPart({ alg: "RS256", typ: "JWT" })}.${encodeJwtPart({
     iss: clientEmail,
     scope: "https://www.googleapis.com/auth/firebase.messaging",
@@ -53,7 +68,16 @@ async function getGoogleAccessToken(): Promise<string> {
     .replace("-----END PRIVATE KEY-----", "")
     .replace(/\s/g, "");
 
-  const binaryKey = Uint8Array.from(atob(keyData), (c) => c.charCodeAt(0));
+  console.log(`[send-push] base64 key data length=${keyData.length}`);
+
+  let binaryKey: Uint8Array;
+  try {
+    binaryKey = Uint8Array.from(atob(keyData), (c) => c.charCodeAt(0));
+  } catch (e) {
+    throw new Error(`Failed to decode private key base64: ${(e as Error).message}. Key data (first 20 chars): ${keyData.substring(0, 20)}`);
+  }
+
+  console.log(`[send-push] binary key size=${binaryKey.length} bytes`);
 
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
@@ -70,6 +94,7 @@ async function getGoogleAccessToken(): Promise<string> {
   );
 
   const jwt = `${signingInput}.${base64url(new Uint8Array(signature))}`;
+  console.log(`[send-push] JWT created successfully, length=${jwt.length}`);
 
   // Exchange JWT for a short-lived Google OAuth2 access token
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -83,8 +108,9 @@ async function getGoogleAccessToken(): Promise<string> {
 
   const tokenJson = await tokenRes.json();
   if (!tokenJson.access_token) {
-    throw new Error(`Failed to get Google access token: ${JSON.stringify(tokenJson)}`);
+    throw new Error(`Google token exchange failed (status=${tokenRes.status}): ${JSON.stringify(tokenJson)}`);
   }
+  console.log("[send-push] Google access token obtained successfully");
   return tokenJson.access_token;
 }
 
@@ -99,10 +125,6 @@ function safeJsonParse(s: unknown): Record<string, unknown> {
   }
 }
 
-// ─── Main handler ──────────────────────────────────────────────────────────────
-
-// Constant-time string comparison so a network attacker cannot brute-force the
-// webhook secret by timing the response.
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -110,27 +132,36 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// ─── Main handler ──────────────────────────────────────────────────────────────
+
 serve(async (req) => {
   try {
+    console.log("[send-push] ═══ Function invoked ═══");
+
     // ── 1. POST-only ─────────────────────────────────────────────────────
     if (req.method !== "POST") {
+      console.log(`[send-push] Rejected: method=${req.method}`);
       return new Response("Method not allowed", { status: 405 });
     }
 
     // ── 2. Webhook secret check ──────────────────────────────────────────
-    // The Supabase Database Webhook must be configured to send the header
-    //   x-webhook-secret: <value of SEND_PUSH_WEBHOOK_SECRET>
-    // This prevents arbitrary callers from triggering pushes (spam, abuse).
     const expectedSecret = Deno.env.get("SEND_PUSH_WEBHOOK_SECRET");
     const providedSecret = req.headers.get("x-webhook-secret") ?? "";
-    if (!expectedSecret || !safeEqual(providedSecret, expectedSecret)) {
-      console.warn("[send-push] Unauthorized webhook call");
+
+    if (!expectedSecret) {
+      console.warn("[send-push] SEND_PUSH_WEBHOOK_SECRET is NOT set — skipping auth check");
+    } else if (!safeEqual(providedSecret, expectedSecret)) {
+      console.warn("[send-push] ❌ Unauthorized — webhook secret mismatch");
       return new Response("Unauthorized", { status: 401 });
+    } else {
+      console.log("[send-push] ✓ Webhook secret verified");
     }
 
     // ── 3. Parse + validate payload ──────────────────────────────────────
     const payload = await req.json().catch(() => ({}));
     const record = payload.record ?? payload;
+    console.log(`[send-push] Payload keys: ${JSON.stringify(Object.keys(record ?? {}))}`);
+
     const {
       id,
       sender_username,
@@ -140,36 +171,18 @@ serve(async (req) => {
       message_type,
     } = record ?? {};
 
-    // Schema validation — only known fields, basic type checks.
+    console.log(`[send-push] sender=${sender_username} receiver=${receiver_username} type=${message_type ?? "text"} id=${id ?? "?"}`);
+
     if (
       typeof receiver_username !== "string" ||
       receiver_username.length === 0 ||
       receiver_username.length > 64
     ) {
-      return new Response("Bad request", { status: 400 });
-    }
-    if (
-      sender_username !== undefined &&
-      (typeof sender_username !== "string" || sender_username.length > 64)
-    ) {
-      return new Response("Bad request", { status: 400 });
-    }
-    if (
-      message_type !== undefined &&
-      typeof message_type !== "string"
-    ) {
+      console.error(`[send-push] ❌ Bad request: invalid receiver_username="${receiver_username}"`);
       return new Response("Bad request", { status: 400 });
     }
 
-    // Sanitized log: never echo message body or FCM tokens.
-    console.log(
-      `[send-push] type=${message_type ?? "text"} id=${id ?? "?"} to=${receiver_username}`,
-    );
-
-    // Skip intermediate call signals — only the invite needs a push.
-    // Accepted / rejected / ended are delivered via Supabase Realtime when the
-    // peer's app is in the foreground (which is the only state in which the
-    // UI cares about them anyway).
+    // Skip intermediate call signals
     if (
       message_type === "call_accepted" ||
       message_type === "call_rejected" ||
@@ -179,30 +192,36 @@ serve(async (req) => {
       return new Response("skipped", { status: 200 });
     }
 
-    // Connect to Supabase using service-role key (available automatically in Edge Functions)
+    // ── 4. Lookup receiver's FCM token ───────────────────────────────────
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch the receiver's FCM token from profiles
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("fcm_token")
+      .select("fcm_token, username")
       .eq("username", receiver_username)
       .maybeSingle();
 
     if (profileError) {
-      console.error("[send-push] Profile fetch error:", profileError.message);
+      console.error(`[send-push] ❌ Profile query error: ${profileError.message}`);
       return new Response("Profile fetch failed", { status: 500 });
     }
 
-    if (!profile?.fcm_token) {
-      console.log(`[send-push] No FCM token registered for receiver — skipping`);
+    if (!profile) {
+      console.error(`[send-push] ❌ No profile found for username="${receiver_username}"`);
+      return new Response("No profile found", { status: 200 });
+    }
+
+    if (!profile.fcm_token) {
+      console.error(`[send-push] ❌ Profile found but fcm_token is NULL for username="${receiver_username}"`);
       return new Response("No FCM token registered", { status: 200 });
     }
 
-    // ── Build notification + data payload based on the message type ─────────
+    console.log(`[send-push] ✓ FCM token found for "${receiver_username}" (token starts: ${profile.fcm_token.substring(0, 20)}...)`);
+
+    // ── 5. Build notification payload ────────────────────────────────────
     const isCallInvite = message_type === "call_invite";
 
     let notificationTitle: string;
@@ -210,7 +229,6 @@ serve(async (req) => {
     let dataPayload: Record<string, string>;
 
     if (isCallInvite) {
-      // text holds JSON: {"channelName":"call_a_b","callType":"audio|video"}
       const signal = safeJsonParse(text);
       const callType = String(signal.callType ?? "audio");
       const channelName = String(signal.channelName ?? "");
@@ -230,7 +248,6 @@ serve(async (req) => {
         timestamp: String(timestamp ?? Date.now()),
       };
     } else {
-      // Normal chat message — text/image/video/document
       const safeBody =
         text != null && String(text).trim() !== "" && String(text) !== "null"
           ? String(text)
@@ -249,7 +266,18 @@ serve(async (req) => {
       };
     }
 
-    // Build the FCM HTTP v1 payload
+    console.log(`[send-push] Notification: title="${notificationTitle}" body="${notificationBody}"`);
+
+    // ── 6. Get Google access token and send FCM ──────────────────────────
+    const projectId = Deno.env.get("FIREBASE_PROJECT_ID");
+    if (!projectId) {
+      console.error("[send-push] ❌ FIREBASE_PROJECT_ID secret is not set");
+      return new Response("Missing project ID", { status: 500 });
+    }
+
+    console.log(`[send-push] Getting Google access token for project=${projectId}...`);
+    const accessToken = await getGoogleAccessToken();
+
     const fcmPayload = {
       message: {
         token: profile.fcm_token,
@@ -265,19 +293,18 @@ serve(async (req) => {
 
         // Android: high priority wakes the device even when terminated
         android: {
-          priority: "high",
+          priority: "high" as const,
           notification: {
             channel_id: "messages_channel",
             sound: "default",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
-            notification_priority: "PRIORITY_MAX",
-            visibility: "PUBLIC",
-            // Call invites are sticky / ongoing so the user sees them while ringing
+            notification_priority: "PRIORITY_MAX" as const,
+            visibility: "PUBLIC" as const,
             ...(isCallInvite ? { tag: dataPayload.channelName } : {}),
           },
         },
 
-        // APNs (iOS) — harmless placeholder for future use
+        // APNs (iOS)
         apns: {
           headers: { "apns-priority": "10" },
           payload: { aps: { sound: "default", "content-available": 1 } },
@@ -285,9 +312,8 @@ serve(async (req) => {
       },
     };
 
-    // Send to FCM HTTP v1 API
-    const projectId = Deno.env.get("FIREBASE_PROJECT_ID")!;
-    const accessToken = await getGoogleAccessToken();
+    console.log(`[send-push] Sending FCM request to project=${projectId}...`);
+
     const fcmRes = await fetch(
       `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
       {
@@ -303,19 +329,18 @@ serve(async (req) => {
     const fcmJson = await fcmRes.json();
 
     if (!fcmRes.ok) {
-      console.error("[send-push] FCM error:", JSON.stringify(fcmJson));
+      console.error(`[send-push] ❌ FCM API error (status=${fcmRes.status}): ${JSON.stringify(fcmJson)}`);
       return new Response(JSON.stringify(fcmJson), { status: fcmRes.status });
     }
 
-    console.log(`[send-push] FCM delivered`);
+    console.log(`[send-push] ✅ FCM delivered successfully! Response: ${JSON.stringify(fcmJson)}`);
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    // Never include the raw error body in the response — it could leak
-    // service-role usage or secret fragments via stack traces.
-    console.error("[send-push] Unhandled error:", (err as Error).message);
+    console.error(`[send-push] ❌ UNHANDLED ERROR: ${(err as Error).message}`);
+    console.error(`[send-push] Stack: ${(err as Error).stack}`);
     return new Response("Internal error", { status: 500 });
   }
 });

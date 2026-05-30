@@ -52,26 +52,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    // Primary: get username from Supabase session metadata
-    final supabase = Supabase.instance.client;
-    final session = supabase.auth.currentSession;
+    // Primary: SharedPreferences (stores the phone-number-based username)
+    final prefs = await SharedPreferences.getInstance();
+    _myUsername = prefs.getString('username') ?? '';
 
-    if (session != null) {
-      final meta = session.user.userMetadata ?? {};
-      final sessionName = (meta['full_name'] as String? ??
-              meta['name'] as String? ??
-              session.user.email?.split('@').first ??
-              '')
-          .trim();
-      if (sessionName.isNotEmpty) {
-        _myUsername = sessionName;
-      }
-    }
-
-    // Fallback: SharedPreferences
+    // Fallback: Supabase session metadata (only for legacy/migration)
     if (_myUsername.isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      _myUsername = prefs.getString('username') ?? '';
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
+      if (session != null) {
+        final meta = session.user.userMetadata ?? {};
+        final sessionName = (meta['full_name'] as String? ??
+                meta['name'] as String? ??
+                session.user.email?.split('@').first ??
+                '')
+            .trim();
+        if (sessionName.isNotEmpty) {
+          _myUsername = sessionName;
+        }
+      }
     }
 
     if (_myUsername.isEmpty) return;

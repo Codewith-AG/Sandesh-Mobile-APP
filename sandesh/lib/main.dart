@@ -279,7 +279,7 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
           await Supabase.instance.client
               .from('profiles')
               .update({'fcm_token': token})
-              .eq('username', myUsername.toLowerCase());
+              .eq('username', myUsername);
           debugPrint('FCM token refreshed and saved');
         }
       } catch (e) {

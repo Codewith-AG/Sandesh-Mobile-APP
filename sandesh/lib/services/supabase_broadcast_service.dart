@@ -351,8 +351,8 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     try {
       await _client.from('messages').insert({
         'id': message.id,
-        'sender_username': message.senderUsername.toLowerCase(),
-        'receiver_username': message.receiverUsername.toLowerCase(),
+        'sender_username': message.senderUsername,
+        'receiver_username': message.receiverUsername,
         'text': message.text,
         'media_url': message.mediaUrl,
         'file_name': message.fileName,
@@ -567,7 +567,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
         await _client.from('profiles').update({
           'is_online': isOnline,
           'last_seen': DateTime.now().toUtc().toIso8601String(),
-        }).eq('username', _myUsername.toLowerCase());
+        }).eq('username', _myUsername);
       }
     } catch (e) {
       debugPrint('Failed to update presence: $e');
