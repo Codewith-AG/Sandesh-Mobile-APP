@@ -24,8 +24,17 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// Tracks the user we are currently chatting with to prevent local notifications
   String? activeChatUser;
 
-  /// Suppresses local notifications during sync (messages already delivered by FCM)
+  /// Suppresses local notifications during INITIAL sync (messages were already
+  /// delivered by FCM while the app was closed; their FCM notification already
+  /// appeared in the tray, so we don’t want a second one when we re-save them).
+  /// This must NOT suppress notifications for NEW messages arriving via Realtime
+  /// while the app is open.
   bool _isSyncing = false;
+
+  /// IDs of messages that were pre-saved by the FCM background handler.
+  /// The Realtime channel will fire for these when the app comes online, but
+  /// we must NOT show a second local notification for them.
+  final Set<String> _bgHandlerSavedIds = {};
 
   /// The single Postgres realtime channel that listens for all incoming messages
   RealtimeChannel? _inboxChannel;
@@ -136,11 +145,25 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
             final row = payload.newRecord;
             if (row.isEmpty) return;
 
+            final messageId = row['id'] as String?;
+
+            // RACE-CONDITION FIX: if syncPendingMessages() already downloaded
+            // and deleted this message, skip it here to avoid a second
+            // notification and a redundant DB insert.
+            if (messageId != null && _bgHandlerSavedIds.contains(messageId)) {
+              debugPrint('[Realtime] Skipping already-synced message $messageId');
+              _bgHandlerSavedIds.remove(messageId);
+              // Delete from cloud in case sync missed it
+              try {
+                await _client.from('messages').delete().eq('id', messageId);
+              } catch (_) {}
+              return;
+            }
+
             // Handle the incoming message (save locally + notify UI)
             await _handleIncomingMessage(row);
 
             // The magic — DELETE the cloud copy immediately after local save
-            final messageId = row['id'] as String?;
             if (messageId != null) {
               try {
                 await _client
@@ -223,7 +246,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
   /// Fetches all messages addressed to [_myUsername] from the Supabase
   /// `messages` table, saves each one locally, then deletes it from the cloud.
-  /// This handles the "store-and-forward" catch-up on every app launch.
+  /// This handles the “store-and-forward” catch-up on every app launch.
   Future<void> syncPendingMessages() async {
     _isSyncing = true;
     try {
@@ -238,17 +261,21 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       for (final row in messages) {
         final record = Map<String, dynamic>.from(row as Map);
 
-        // Save locally and notify UI
+        // Track this ID so the Realtime channel callback knows not to
+        // show a duplicate notification for it.
+        final msgId = record['id'] as String?;
+        if (msgId != null) _bgHandlerSavedIds.add(msgId);
+
+        // Save locally and notify UI (no notification shown while _isSyncing)
         await _handleIncomingMessage(record);
 
         // Delete from cloud immediately after safe local storage
-        final messageId = record['id'] as String?;
-        if (messageId != null) {
+        if (msgId != null) {
           try {
-            await _client.from('messages').delete().eq('id', messageId);
-            debugPrint('syncPendingMessages: deleted cloud message $messageId');
+            await _client.from('messages').delete().eq('id', msgId);
+            debugPrint('syncPendingMessages: deleted cloud message $msgId');
           } catch (e) {
-            debugPrint('syncPendingMessages: failed to delete $messageId: $e');
+            debugPrint('syncPendingMessages: failed to delete $msgId: $e');
           }
         }
       }
@@ -312,14 +339,25 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
       // Show local notification ONLY if:
       // 1. Not actively chatting with this sender
-      // 2. Not during sync (FCM already showed the notification)
-      if (!_isSyncing &&
-          activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
-        _showLocalNotification(
-          title: message.senderUsername,
-          body: message.text ?? 'Sent an attachment',
-          senderUsername: message.senderUsername,
-        );
+      // 2. Not during initial sync (FCM already showed the notification for
+      //    messages that arrived while the app was closed)
+      //
+      // IMPORTANT: New messages arriving via Realtime while the app is open
+      // must ALWAYS show a notification (unless the chat is already open).
+      // The old code used `!_isSyncing` here which accidentally suppressed
+      // notifications for new messages if syncPendingMessages() happened to
+      // still be running in the background.
+      if (activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
+        if (!_isSyncing) {
+          // App is fully running — this is a live new message, always notify
+          _showLocalNotification(
+            title: message.senderUsername,
+            body: message.text ?? 'Sent an attachment',
+            senderUsername: message.senderUsername,
+          );
+        }
+        // If _isSyncing, FCM already showed the system notification
+        // so we intentionally skip showing a duplicate.
       }
 
       // Notify UI globally — use microtask so listeners are guaranteed to be ready

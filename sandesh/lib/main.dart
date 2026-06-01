@@ -37,14 +37,30 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // duplicate notifications.
 
   // ── Save the message to the local DB so it appears when the app opens ──
+  // FIX: also save message_type (FCM sends it as msg_type) so the bubble
+  // renders correctly (image / video / document) when the chat opens.
   if (data['id'] != null && data['id']!.isNotEmpty) {
     try {
       await LocalDbService().database; // ensure DB is open
+
+      // FCM sends the type as 'msg_type'; fall back to 'text' if absent
+      final rawType = data['msg_type'] ?? data['message_type'] ?? 'text';
+      // Ignore call-signal types — they should never be stored
+      if (rawType == 'call_invite' ||
+          rawType == 'call_accepted' ||
+          rawType == 'call_rejected' ||
+          rawType == 'call_ended') {
+        return;
+      }
+
       final msg = Message(
         id: data['id']!,
         senderUsername: data['sender_username'] ?? '',
         receiverUsername: data['receiver_username'] ?? '',
         text: data['text'],
+        mediaUrl: data['media_url'],
+        fileName: data['file_name'],
+        messageType: MessageTypeX.fromString(rawType),
         isMe: false,
         timestamp: int.tryParse(data['timestamp'] ?? '') ??
             DateTime.now().millisecondsSinceEpoch,
