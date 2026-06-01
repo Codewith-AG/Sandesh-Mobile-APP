@@ -52,6 +52,12 @@ class _ChatScreenState extends State<ChatScreen> {
   /// WhatsApp-style display name — resolved from widget param or local contacts DB.
   String? _displayName;
 
+  /// Block status for this peer user.
+  bool _isBlocked = false;
+
+  /// Timer that periodically refreshes the "last seen X ago" text.
+  Timer? _lastSeenRefreshTimer;
+
   /// Cached ColorScheme — set at the top of build() so all helper methods can use it.
   late ColorScheme _cs;
 
@@ -61,6 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadMessages();
     _loadReceiverAvatar();
     _loadDisplayName();
+    _checkBlockStatus();
     SupabaseBroadcastService().activeChatUser = widget.receiverUsername;
     SupabaseBroadcastService().subscribeToRoom(widget.receiverUsername);
     _messageSubscription = SupabaseBroadcastService()
@@ -71,6 +78,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _loadMessages();
     });
     _listenToPeerPresence();
+    // Auto-refresh "Last seen X ago" text every 30 seconds
+    _lastSeenRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   /// Resolves the display name: uses widget param if provided, otherwise
@@ -91,7 +102,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final response = await Supabase.instance.client
           .from('profiles')
           .select('avatar_url')
-          .eq('username', widget.receiverUsername)
+          .ilike('username', widget.receiverUsername)
           .maybeSingle();
       final url = (response?['avatar_url'] as String?) ?? '';
       if (url.isNotEmpty && mounted) {
@@ -108,20 +119,51 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _listenToPeerPresence() {
+  void _listenToPeerPresence() async {
     final client = Supabase.instance.client;
-    final peer = widget.receiverUsername;
+    
+    // First, find the exact casing of the username from the DB.
+    // Supabase .stream().eq() is case-sensitive, so if they are saved as "Sandesh",
+    // "sandesh" will not match.
+    String exactUsername = widget.receiverUsername;
+    try {
+      final res = await client
+          .from('profiles')
+          .select('username')
+          .ilike('username', widget.receiverUsername)
+          .maybeSingle();
+      if (res != null && res['username'] != null) {
+        exactUsername = res['username'] as String;
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+
     _presenceSubscription = client
         .from('profiles')
         .stream(primaryKey: ['id'])
-        .eq('username', peer)
+        .eq('username', exactUsername)
         .listen((data) {
       if (data.isNotEmpty && mounted) {
         final profile = data.first;
+        final isOnline = profile['is_online'] == true;
+        final raw = profile['last_seen'] as String?;
+        final lastSeen = raw != null ? DateTime.tryParse(raw) : null;
+
+        // Client-side staleness check: if is_online=true but last_seen
+        // is >60 seconds old, the user's app likely crashed or lost
+        // connectivity without properly going offline.
+        bool effectiveOnline = isOnline;
+        if (isOnline && lastSeen != null) {
+          final staleness = DateTime.now().toUtc().difference(lastSeen);
+          if (staleness.inSeconds > 60) {
+            effectiveOnline = false;
+          }
+        }
+
         setState(() {
-          _isPeerOnline = profile['is_online'] == true;
-          final raw = profile['last_seen'] as String?;
-          if (raw != null) _peerLastSeen = DateTime.tryParse(raw);
+          _isPeerOnline = effectiveOnline;
+          _peerLastSeen = lastSeen;
         });
       }
     }, onError: (e) {
@@ -129,9 +171,16 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  /// Check if this peer is blocked.
+  Future<void> _checkBlockStatus() async {
+    final blocked = await LocalDbService().isBlocked(widget.receiverUsername);
+    if (mounted) setState(() => _isBlocked = blocked);
+  }
+
   @override
   void dispose() {
     _presenceSubscription?.cancel();
+    _lastSeenRefreshTimer?.cancel();
     SupabaseBroadcastService().activeChatUser = null;
     _messageSubscription?.cancel();
     _textController.dispose();
@@ -485,25 +534,67 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showBlockUserConfirm() {
     final cs = _cs;
+    final isCurrentlyBlocked = _isBlocked;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
-        title: Text('Block User', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
-        content: Text('Are you sure you want to block this user?', style: GoogleFonts.outfit(color: cs.onSurfaceVariant)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(
+          isCurrentlyBlocked ? 'Unblock User' : 'Block User',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface),
+        ),
+        content: Text(
+          isCurrentlyBlocked
+              ? 'Unblock ${_displayName ?? widget.receiverUsername}? You will start receiving messages from this user again.'
+              : 'Block ${_displayName ?? widget.receiverUsername}? Blocked contacts will no longer be able to send you messages or call you.',
+          style: GoogleFonts.outfit(color: cs.onSurfaceVariant, height: 1.5),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline)),
+          ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('User blocked.', style: GoogleFonts.outfit()), backgroundColor: cs.primary),
-                );
+              if (isCurrentlyBlocked) {
+                await LocalDbService().unblockUser(widget.receiverUsername);
+                if (mounted) {
+                  setState(() => _isBlocked = false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${_displayName ?? widget.receiverUsername} unblocked',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                      backgroundColor: Colors.green.shade600,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  );
+                }
+              } else {
+                await LocalDbService().blockUser(widget.receiverUsername);
+                if (mounted) {
+                  setState(() => _isBlocked = true);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${_displayName ?? widget.receiverUsername} blocked',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                      backgroundColor: cs.error,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  );
+                }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cs.error),
-            child: Text('Block', style: GoogleFonts.outfit(color: cs.onError)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isCurrentlyBlocked ? Colors.green.shade600 : cs.error,
+            ),
+            child: Text(
+              isCurrentlyBlocked ? 'Unblock' : 'Block',
+              style: GoogleFonts.outfit(color: cs.onError),
+            ),
           ),
         ],
       ),
@@ -539,7 +630,39 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
             ),
-            _buildInputBar(),
+            if (_isBlocked)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: BoxDecoration(
+                  color: _cs.errorContainer.withValues(alpha: 0.3),
+                  border: Border(top: BorderSide(color: _cs.error.withValues(alpha: 0.2))),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.block_rounded, color: _cs.error, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'You blocked this contact',
+                        style: GoogleFonts.outfit(color: _cs.error, fontWeight: FontWeight.w500, fontSize: 14),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await LocalDbService().unblockUser(widget.receiverUsername);
+                        if (mounted) setState(() => _isBlocked = false);
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: _cs.error.withValues(alpha: 0.1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: Text('Unblock', style: GoogleFonts.outfit(color: _cs.error, fontWeight: FontWeight.w600, fontSize: 13)),
+                    ),
+                  ],
+                ),
+              )
+            else
+              _buildInputBar(),
             if (_showEmojiPicker)
               SizedBox(
                 height: 250,
@@ -698,7 +821,13 @@ class _ChatScreenState extends State<ChatScreen> {
           },
           itemBuilder: (context) => [
             PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.outfit())),
-            PopupMenuItem(value: 'block', child: Text('Block User', style: GoogleFonts.outfit())),
+            PopupMenuItem(
+              value: 'block',
+              child: Text(
+                _isBlocked ? 'Unblock User' : 'Block User',
+                style: GoogleFonts.outfit(color: _isBlocked ? Colors.green.shade600 : null),
+              ),
+            ),
           ],
         ),
         const SizedBox(width: 4),

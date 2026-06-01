@@ -296,6 +296,16 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       // Case-insensitive comparison so it works regardless of name capitalization
       if (senderUsername.toLowerCase() == _myUsername.toLowerCase()) return;
 
+      // Block check: silently ignore messages from blocked users.
+      // The message is still deleted from the cloud to prevent buildup.
+      final isBlocked = await LocalDbService().isBlocked(senderUsername);
+      if (isBlocked) {
+        try {
+          await _client.from('messages').delete().eq('id', payload['id'] as String);
+        } catch (_) {}
+        return;
+      }
+
       final message = Message(
         id: payload['id'] as String,
         senderUsername: senderUsername,
@@ -551,7 +561,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     try {
       final localContacts = await LocalDbService().getContacts();
       if (localContacts.isEmpty) return 0;
-      final usernames = localContacts.map((c) => c.username.toLowerCase()).toList();
+      final usernames = localContacts
+          .expand((c) => [c.username, c.username.toLowerCase()])
+          .toSet()
+          .toList();
 
       final response = await _client
           .from('profiles')

@@ -269,7 +269,7 @@ class MediaUploadService {
   /// object from the given [bucket].
   ///
   /// Supabase public URL format:
-  ///   https://<project>.supabase.co/storage/v1/object/public/<bucket>/<storagePath>
+  ///   `https://<project>.supabase.co/storage/v1/object/public/<bucket>/<storagePath>`
   Future<void> deleteFromStorage(String publicUrl, String bucket) async {
     try {
       // Parse the storage path from the public URL

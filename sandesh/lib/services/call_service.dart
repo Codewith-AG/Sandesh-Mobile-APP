@@ -148,7 +148,9 @@ class CallService {
       // Show the actual server error so we know what's really failing
       return 'Call failed: ${result.error ?? "Unknown error from agora-token function"}';
     }
-    final tokenResult = result.token!;
+    // token is retrieved by CallScreen directly via AgoraTokenService
+    // ignore: unused_local_variable
+    final _ = result.token!;
 
     _isInCall = true;
 
@@ -327,7 +329,7 @@ class CallService {
     // Strip spaces and any special characters — usernames like "Sandesh Sharma"
     // would produce "sandesh sharma" which contains a space. The Edge Function
     // regex only allows [a-z0-9._-] so spaces must be removed before joining.
-    final sanitize = (String s) =>
+    String sanitize(String s) =>
         s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     final clean = [sanitize(a), sanitize(b)]..sort();
     return 'call_${clean[0]}_${clean[1]}';

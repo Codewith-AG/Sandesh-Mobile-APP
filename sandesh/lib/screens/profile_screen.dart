@@ -61,7 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final data = await client
             .from('profiles')
             .select('username, bio, avatar_url')
-            .eq('username', peer)
+            .ilike('username', peer)
             .maybeSingle();
 
         if (data != null) {

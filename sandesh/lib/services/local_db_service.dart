@@ -3,6 +3,7 @@ import 'package:path/path.dart';
 import '../models/message_model.dart';
 import '../models/contact_model.dart';
 import '../models/user_profile_model.dart';
+import '../models/group_model.dart';
 
 class LocalDbService {
   static final LocalDbService _instance = LocalDbService._internal();
@@ -19,9 +20,9 @@ class LocalDbService {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    // v7: adds call_type column to messages.
+    // v8: adds blocked_users, groups, group_members, group_messages tables.
     // New filename ensures a clean migration without ALTER TABLE complexity.
-    final path = join(dbPath, 'sandesh_v7.db');
+    final path = join(dbPath, 'sandesh_v8.db');
 
     return await openDatabase(
       path,
@@ -72,6 +73,50 @@ class LocalDbService {
         avatar_url TEXT DEFAULT ''
       )
     ''');
+
+    // ── Blocked users (WhatsApp-style block/unblock) ──
+    await db.execute('''
+      CREATE TABLE blocked_users (
+        username TEXT PRIMARY KEY,
+        blocked_at INTEGER NOT NULL
+      )
+    ''');
+
+    // ── Groups ──
+    await db.execute('''
+      CREATE TABLE groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        avatar_url TEXT DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE group_members (
+        group_id TEXT NOT NULL,
+        username TEXT NOT NULL,
+        role TEXT DEFAULT 'member',
+        PRIMARY KEY (group_id, username)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE group_messages (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        sender_username TEXT NOT NULL,
+        text TEXT,
+        media_url TEXT,
+        file_name TEXT,
+        message_type TEXT NOT NULL DEFAULT 'text',
+        timestamp INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX idx_grpmsg_group ON group_messages(group_id)');
+    await db.execute('CREATE INDEX idx_grpmsg_ts ON group_messages(timestamp)');
   }
 
   // ──────────────────────────── Messages ────────────────────────────
@@ -286,5 +331,160 @@ class LocalDbService {
     await db.delete('messages');
     await db.delete('contacts');
     await db.delete('user_profile');
+    await db.delete('blocked_users');
+    await db.delete('group_messages');
+    await db.delete('group_members');
+    await db.delete('groups');
+  }
+
+  // ──────────────────────────── Blocked Users ────────────────────────────
+
+  Future<void> blockUser(String username) async {
+    final db = await database;
+    await db.insert('blocked_users', {
+      'username': username.toLowerCase(),
+      'blocked_at': DateTime.now().millisecondsSinceEpoch,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> unblockUser(String username) async {
+    final db = await database;
+    await db.delete('blocked_users',
+        where: 'username = ?', whereArgs: [username.toLowerCase()]);
+  }
+
+  Future<bool> isBlocked(String username) async {
+    final db = await database;
+    final results = await db.query('blocked_users',
+        where: 'username = ?', whereArgs: [username.toLowerCase()]);
+    return results.isNotEmpty;
+  }
+
+  Future<List<String>> getBlockedUsers() async {
+    final db = await database;
+    final results = await db.query('blocked_users');
+    return results.map((r) => r['username'] as String).toList();
+  }
+
+  // ──────────────────────────── Groups ────────────────────────────
+
+  Future<void> insertGroup(Group group) async {
+    final db = await database;
+    await db.insert('groups', group.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    final db = await database;
+    await db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
+    await db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
+    await db.delete('group_messages', where: 'group_id = ?', whereArgs: [groupId]);
+  }
+
+  Future<List<Group>> getGroups() async {
+    final db = await database;
+    final results = await db.query('groups', orderBy: 'created_at DESC');
+    final groups = <Group>[];
+    for (final row in results) {
+      final groupId = row['id'] as String;
+      final members = await getGroupMembers(groupId);
+      groups.add(Group.fromMap(row).copyWith(members: members));
+    }
+    return groups;
+  }
+
+  Future<List<Group>> getGroupsWithLastMessage() async {
+    final groups = await getGroups();
+    final enriched = <Group>[];
+    for (final group in groups) {
+      final lastMsg = await getLastGroupMessage(group.id);
+      String? lastText;
+      String? lastSender;
+      int? lastTime;
+      if (lastMsg != null) {
+        lastText = lastMsg['text'] as String? ?? '📎 Attachment';
+        lastSender = lastMsg['sender_username'] as String?;
+        lastTime = lastMsg['timestamp'] as int?;
+      }
+      enriched.add(group.copyWith(
+        lastMessage: lastText,
+        lastMessageSender: lastSender,
+        lastMessageTime: lastTime,
+      ));
+    }
+    enriched.sort((a, b) {
+      if (a.lastMessageTime == null && b.lastMessageTime == null) return 0;
+      if (a.lastMessageTime == null) return 1;
+      if (b.lastMessageTime == null) return -1;
+      return b.lastMessageTime!.compareTo(a.lastMessageTime!);
+    });
+    return enriched;
+  }
+
+  // ──────────────────────────── Group Members ────────────────────────────
+
+  Future<void> insertGroupMember(String groupId, String username, {String role = 'member'}) async {
+    final db = await database;
+    await db.insert('group_members', {
+      'group_id': groupId,
+      'username': username.toLowerCase(),
+      'role': role,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> removeGroupMember(String groupId, String username) async {
+    final db = await database;
+    await db.delete('group_members',
+        where: 'group_id = ? AND username = ?',
+        whereArgs: [groupId, username.toLowerCase()]);
+  }
+
+  Future<List<String>> getGroupMembers(String groupId) async {
+    final db = await database;
+    final results = await db.query('group_members',
+        where: 'group_id = ?', whereArgs: [groupId]);
+    return results.map((r) => r['username'] as String).toList();
+  }
+
+  Future<String?> getGroupMemberRole(String groupId, String username) async {
+    final db = await database;
+    final results = await db.query('group_members',
+        where: 'group_id = ? AND username = ?',
+        whereArgs: [groupId, username.toLowerCase()]);
+    if (results.isEmpty) return null;
+    return results.first['role'] as String?;
+  }
+
+  // ──────────────────────────── Group Messages ────────────────────────────
+
+  Future<void> insertGroupMessage(Map<String, dynamic> message) async {
+    final db = await database;
+    await db.insert('group_messages', message,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getGroupMessages(String groupId) async {
+    final db = await database;
+    return await db.query('group_messages',
+        where: 'group_id = ?',
+        whereArgs: [groupId],
+        orderBy: 'timestamp ASC');
+  }
+
+  Future<Map<String, dynamic>?> getLastGroupMessage(String groupId) async {
+    final db = await database;
+    final results = await db.query('group_messages',
+        where: 'group_id = ?',
+        whereArgs: [groupId],
+        orderBy: 'timestamp DESC',
+        limit: 1);
+    if (results.isEmpty) return null;
+    return results.first;
+  }
+
+  Future<void> deleteGroupMessages(String groupId) async {
+    final db = await database;
+    await db.delete('group_messages',
+        where: 'group_id = ?', whereArgs: [groupId]);
   }
 }

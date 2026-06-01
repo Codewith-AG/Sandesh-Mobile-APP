@@ -217,12 +217,21 @@ Future<void> _routeFromNotificationData(Map<String, String> data) async {
   final myUsername = prefs.getString('username') ?? '';
   if (myUsername.isEmpty) return;
 
-  // CRITICAL FIX: Ensure SupabaseBroadcastService is initialized before
-  // opening ChatScreen. Without this, messages sent from the ChatScreen
-  // won't be delivered because the service's _myUsername is empty and
-  // the Realtime channel isn't connected.
-  SupabaseBroadcastService().initialize(myUsername);
+  // CRITICAL FIX: Ensure SupabaseBroadcastService is FULLY initialized before
+  // opening ChatScreen. Without this, messages sent from the notification-opened
+  // ChatScreen won't be delivered because the Realtime channel isn't connected.
+  // We must await initialize() so the service is ready before navigating.
+  final sbs = SupabaseBroadcastService();
+  sbs.initialize(myUsername);
   CallService().initialize(myUsername);
+
+  // Subscribe to the room for this specific sender so outgoing messages
+  // from ChatScreen can be received by User 1 via the Realtime channel.
+  sbs.subscribeToRoom(sender);
+
+  // Also subscribe to all other contact rooms so we don't miss other messages
+  // while this chat is open (runs fire-and-forget, no need to await).
+  sbs.subscribeToAllContactRooms();
 
   // WhatsApp-style: look up the saved contact name from the phone contacts
   // so the chat header shows "Mom" instead of "+919876543210"
@@ -312,6 +321,8 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
 
   void _routeFromFcm(RemoteMessage message) {
     final data = message.data;
+    // Use unawaited — we fire the async routing task without blocking the
+    // FCM handler (which is sync). The routing itself is fully awaited internally.
     _routeFromNotificationData(data.map((k, v) => MapEntry(k, v.toString())));
   }
 
