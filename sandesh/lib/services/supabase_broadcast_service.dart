@@ -411,32 +411,95 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// Sends a message using the Store-and-Forward pattern:
   /// 1. Saves locally for instant UI feedback.
   /// 2. INSERTs into Supabase `messages` table for durable delivery.
+  /// 3. If INSERT succeeds, the Supabase Database Webhook → send-push Edge
+  ///    Function will fire automatically and send the FCM push.
+  /// 4. As a FALLBACK, we also call the send-notification Edge Function
+  ///    directly so delivery works even if the webhook is misconfigured,
+  ///    delayed, or the receiver's Realtime channel is not connected.
   ///
-  /// The FCM push notification is sent AUTOMATICALLY by the Supabase
-  /// Database Webhook → send-push Edge Function when the INSERT fires.
-  /// Flutter does NOT need to call the Edge Function directly.
-  Future<void> sendMessage(Message message) async {
+  /// Returns true if the cloud insert succeeded, false otherwise.
+  Future<bool> sendMessage(Message message) async {
     // Save locally immediately so the UI updates instantly
     await LocalDbService().insertMessage(message);
 
-    // INSERT into Supabase — durable, offline-safe delivery.
-    // Using lowercase usernames so the realtime filter and webhook always match.
-    try {
-      await _client.from('messages').insert({
-        'id': message.id,
-        'sender_username': message.senderUsername,
-        'receiver_username': message.receiverUsername,
-        'text': message.text,
-        'media_url': message.mediaUrl,
-        'file_name': message.fileName,
-        'message_type': message.messageType.value,
-        'timestamp': message.timestamp,
-      });
-      debugPrint('Message ${message.id} inserted — webhook will trigger FCM push');
-    } catch (e) {
-      debugPrint('Error inserting message into Supabase: $e');
+    // CRITICAL FIX: lowercase usernames so the Realtime Postgres filter
+    // (which uses lowercased _myUsername) always matches.
+    final senderLower = message.senderUsername.toLowerCase();
+    final receiverLower = message.receiverUsername.toLowerCase();
+
+    // INSERT into Supabase — retry up to 3 times on failure.
+    bool insertOk = false;
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await _client.from('messages').insert({
+          'id': message.id,
+          'sender_username': senderLower,
+          'receiver_username': receiverLower,
+          'text': message.text,
+          'media_url': message.mediaUrl,
+          'file_name': message.fileName,
+          'message_type': message.messageType.value,
+          'timestamp': message.timestamp,
+        });
+        debugPrint('[sendMessage] Inserted on attempt $attempt — webhook will trigger FCM');
+        insertOk = true;
+        break;
+      } catch (e) {
+        debugPrint('[sendMessage] INSERT failed (attempt $attempt/3): $e');
+        if (attempt < 3) {
+          await Future.delayed(Duration(seconds: attempt)); // 1s, 2s backoff
+        }
+      }
     }
+
+    // FALLBACK: If INSERT succeeded, the webhook SHOULD fire and send FCM.
+    // But we ALSO call the send-notification edge function directly as a
+    // safety net. This guarantees delivery even if:
+    //  - The webhook is not configured or broken
+    //  - The receiver's Realtime channel is not connected
+    //  - The receiver's app is killed and only FCM can wake it
+    //
+    // The send-notification function is idempotent — a duplicate FCM push
+    // just shows one extra notification which is far better than zero.
+    if (insertOk) {
+      _sendDirectPushFallback(message, senderLower, receiverLower);
+    }
+
+    if (!insertOk) {
+      debugPrint('[sendMessage] All 3 INSERT attempts failed — message may not be delivered to receiver');
+    }
+
+    return insertOk;
   }
+
+  /// Fire-and-forget: Calls the send-notification Edge Function directly
+  /// so the receiver gets an FCM push even if the Database Webhook is broken.
+  void _sendDirectPushFallback(Message message, String sender, String receiver) {
+    Future(() async {
+      try {
+        // Wait a short moment to let the webhook fire first
+        await Future.delayed(const Duration(seconds: 2));
+
+        final response = await _client.functions.invoke(
+          'send-notification',
+          body: {
+            'sender_username': sender,
+            'receiver_username': receiver,
+            'text': message.text ?? '',
+            'message_id': message.id,
+            'message_type': message.messageType.value,
+            'timestamp': message.timestamp.toString(),
+          },
+        );
+
+        debugPrint('[sendMessage] Direct push fallback response: ${response.status}');
+      } catch (e) {
+        // Swallow — this is a best-effort fallback
+        debugPrint('[sendMessage] Direct push fallback error (non-fatal): $e');
+      }
+    });
+  }
+
 
   /// Sends a call signaling message (callInvite / callAccepted / callRejected / callEnded).
   /// Does NOT save to local DB — call signals are ephemeral.
@@ -444,8 +507,8 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     try {
       await _client.from('messages').insert({
         'id': message.id,
-        'sender_username': message.senderUsername,
-        'receiver_username': message.receiverUsername,
+        'sender_username': message.senderUsername.toLowerCase(),
+        'receiver_username': message.receiverUsername.toLowerCase(),
         'text': message.text,
         'message_type': message.messageType.value,
         'timestamp': message.timestamp,
