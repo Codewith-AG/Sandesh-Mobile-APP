@@ -32,6 +32,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // _pendingAvatarFile holds a locally-picked file before it's uploaded.
   File? _pendingAvatarFile;
 
+  /// WhatsApp-style: locally saved contact name for peer profile view.
+  String? _peerDisplayName;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +87,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _bioController.text = profile.bio;
           _phoneController.text = profile.phone;
           _profile = profile;
+
+          // WhatsApp-style: look up the saved contact name from the phone
+          final savedName = await LocalDbService().getContactDisplayName(peer);
+          if (savedName != null) _peerDisplayName = savedName;
         } else {
           // Supabase row not found — fall back to local contacts DB
           final contacts = await LocalDbService().getContacts();
@@ -100,8 +107,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               bio: c.bio,
               avatarUrl: c.avatarUrl,
             );
+            // WhatsApp-style: use saved contact name
+            if (c.displayName.isNotEmpty) _peerDisplayName = c.displayName;
           } catch (_) {
-            // Absolute fallback: just show the username
+            // Absolute fallback: try display name from DB
+            final savedName = await LocalDbService().getContactDisplayName(peer);
+            if (savedName != null) _peerDisplayName = savedName;
             _usernameController.text = peer;
           }
         }
@@ -332,13 +343,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildLetterAvatar(ColorScheme cs) {
+    // WhatsApp-style: prefer display name initial for peer profiles
+    final name = _peerDisplayName ?? _profile?.username ?? '';
     return CircleAvatar(
       radius: 56,
       backgroundColor: cs.surfaceContainerHigh,
       child: Text(
-        (_profile?.username.isNotEmpty == true)
-            ? _profile!.username[0].toUpperCase()
-            : '?',
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
         style: GoogleFonts.outfit(
           fontSize: 40,
           fontWeight: FontWeight.w600,
@@ -358,9 +369,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         elevation: 0,
         title: Text(
           _isReadOnly
-              ? (_usernameController.text.isNotEmpty
-                  ? _usernameController.text
-                  : (widget.peerUsername ?? 'Profile'))
+              ? (_peerDisplayName ??
+                  (_usernameController.text.isNotEmpty
+                      ? _usernameController.text
+                      : (widget.peerUsername ?? 'Profile')))
               : 'Profile',
           style: GoogleFonts.outfit(
               fontWeight: FontWeight.w700,

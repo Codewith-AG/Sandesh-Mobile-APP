@@ -156,6 +156,33 @@ class LocalDbService {
     );
   }
 
+  /// Updates the display_name for a contact (WhatsApp-style phone contact name).
+  Future<void> updateContactDisplayName(String username, String displayName) async {
+    final db = await database;
+    await db.update(
+      'contacts',
+      {'display_name': displayName},
+      where: 'LOWER(username) = ?',
+      whereArgs: [username.toLowerCase()],
+    );
+  }
+
+  /// Returns the locally saved display name for a contact (from phone contacts).
+  /// Returns null if no contact or no display name is stored.
+  Future<String?> getContactDisplayName(String username) async {
+    final db = await database;
+    final results = await db.query(
+      'contacts',
+      columns: ['display_name'],
+      where: 'LOWER(username) = ?',
+      whereArgs: [username.toLowerCase()],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    final name = results.first['display_name'] as String?;
+    return (name != null && name.isNotEmpty) ? name : null;
+  }
+
   Future<List<Contact>> getContacts() async {
     final db = await database;
     final results = await db.query('contacts', orderBy: 'username ASC');

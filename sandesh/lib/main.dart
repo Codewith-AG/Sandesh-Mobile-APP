@@ -17,6 +17,7 @@ import 'screens/chat_screen.dart';
 import 'screens/incoming_call_screen.dart';
 import 'navigation/navigator_key.dart';
 import 'services/call_service.dart';
+import 'services/supabase_broadcast_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -215,11 +216,24 @@ Future<void> _routeFromNotificationData(Map<String, String> data) async {
   final prefs = await SharedPreferences.getInstance();
   final myUsername = prefs.getString('username') ?? '';
   if (myUsername.isEmpty) return;
+
+  // CRITICAL FIX: Ensure SupabaseBroadcastService is initialized before
+  // opening ChatScreen. Without this, messages sent from the ChatScreen
+  // won't be delivered because the service's _myUsername is empty and
+  // the Realtime channel isn't connected.
+  SupabaseBroadcastService().initialize(myUsername);
+  CallService().initialize(myUsername);
+
+  // WhatsApp-style: look up the saved contact name from the phone contacts
+  // so the chat header shows "Mom" instead of "+919876543210"
+  final displayName = await LocalDbService().getContactDisplayName(sender);
+
   navigatorKey.currentState?.push(
     MaterialPageRoute<void>(
       builder: (_) => ChatScreen(
         myUsername: myUsername,
         receiverUsername: sender,
+        receiverDisplayName: displayName,
       ),
     ),
   );
@@ -281,14 +295,14 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
     _tokenRefreshSub =
         FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final myUsername = prefs.getString('username');
-        if (myUsername != null && myUsername.isNotEmpty) {
-          await Supabase.instance.client
+        final supabase = Supabase.instance.client;
+        final authUser = supabase.auth.currentUser;
+        if (authUser != null) {
+          await supabase
               .from('profiles')
               .update({'fcm_token': token})
-              .eq('username', myUsername);
-          debugPrint('FCM token refreshed and saved');
+              .eq('id', authUser.id);
+          debugPrint('FCM token refreshed and saved (by auth ID)');
         }
       } catch (e) {
         debugPrint('Token refresh save failed: $e');

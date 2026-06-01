@@ -617,6 +617,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildFallbackAvatar(BuildContext context, Contact contact) {
     final cs = Theme.of(context).colorScheme;
+    // WhatsApp-style: prefer display name initial, fall back to username
+    final label = contact.displayName.isNotEmpty
+        ? contact.displayName[0].toUpperCase()
+        : (contact.username.isNotEmpty ? contact.username[0].toUpperCase() : '?');
     return Container(
       width: 56,
       height: 56,
@@ -626,9 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Center(
         child: Text(
-          contact.username.isNotEmpty
-              ? contact.username[0].toUpperCase()
-              : '?',
+          label,
           style: GoogleFonts.outfit(
             color: cs.primary,
             fontWeight: FontWeight.w700,

@@ -49,6 +49,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isPeerOnline = false;
   DateTime? _peerLastSeen;
 
+  /// WhatsApp-style display name — resolved from widget param or local contacts DB.
+  String? _displayName;
+
   /// Cached ColorScheme — set at the top of build() so all helper methods can use it.
   late ColorScheme _cs;
 
@@ -57,6 +60,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _loadMessages();
     _loadReceiverAvatar();
+    _loadDisplayName();
     SupabaseBroadcastService().activeChatUser = widget.receiverUsername;
     SupabaseBroadcastService().subscribeToRoom(widget.receiverUsername);
     _messageSubscription = SupabaseBroadcastService()
@@ -67,6 +71,19 @@ class _ChatScreenState extends State<ChatScreen> {
       _loadMessages();
     });
     _listenToPeerPresence();
+  }
+
+  /// Resolves the display name: uses widget param if provided, otherwise
+  /// looks up the saved contact name from the local DB (WhatsApp-style).
+  Future<void> _loadDisplayName() async {
+    if (widget.receiverDisplayName != null && widget.receiverDisplayName!.isNotEmpty) {
+      if (mounted) setState(() => _displayName = widget.receiverDisplayName);
+      return;
+    }
+    final name = await LocalDbService().getContactDisplayName(widget.receiverUsername);
+    if (name != null && mounted) {
+      setState(() => _displayName = name);
+    }
   }
 
   Future<void> _loadReceiverAvatar() async {
@@ -581,7 +598,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.receiverDisplayName?.isNotEmpty == true ? widget.receiverDisplayName! : widget.receiverUsername,
+                    _displayName ?? widget.receiverUsername,
                     style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -702,7 +719,9 @@ class _ChatScreenState extends State<ChatScreen> {
       radius: 20,
       backgroundColor: cs.surfaceContainerHigh,
       child: Text(
-        widget.receiverUsername.isNotEmpty ? widget.receiverUsername[0].toUpperCase() : '?',
+        _displayName != null && _displayName!.isNotEmpty
+            ? _displayName![0].toUpperCase()
+            : (widget.receiverUsername.isNotEmpty ? widget.receiverUsername[0].toUpperCase() : '?'),
         style: GoogleFonts.outfit(color: cs.primary, fontWeight: FontWeight.w700, fontSize: 18),
       ),
     );

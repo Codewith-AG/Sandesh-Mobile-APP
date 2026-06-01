@@ -349,9 +349,11 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       // still be running in the background.
       if (activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
         if (!_isSyncing) {
-          // App is fully running — this is a live new message, always notify
+          // WhatsApp-style: show the saved contact name instead of raw username
+          final displayName = await LocalDbService()
+              .getContactDisplayName(message.senderUsername);
           _showLocalNotification(
-            title: message.senderUsername,
+            title: displayName ?? message.senderUsername,
             body: message.text ?? 'Sent an attachment',
             senderUsername: message.senderUsername,
           );
@@ -620,6 +622,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
             avatarUrl: (user['avatar_url'] ?? '') as String,
           ));
           newContacts++;
+        } else if (displayName.isNotEmpty) {
+          // WhatsApp-style: always update display name from phone contacts
+          // so if the user renames a contact in their phone, it reflects here.
+          await LocalDbService().updateContactDisplayName(username, displayName);
         }
       }
 
