@@ -35,12 +35,38 @@ class UpdateWorker(
         
         if (versionCode == -1L) return Result.failure()
 
+        if (!downloadUrl.startsWith("https://")) {
+            Log.e("UpdateWorker", "Only HTTPS is allowed for downloads")
+            return Result.failure()
+        }
+
+        if (!Build.SUPPORTED_ABIS.contains("arm64-v8a")) {
+            Log.e("UpdateWorker", "Only arm64-v8a is supported")
+            return Result.failure()
+        }
+
+        val wifiOnly = inputData.getBoolean("wifiOnly", true)
+        if (wifiOnly) {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val network = connectivityManager.activeNetwork
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            if (capabilities == null || !capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) || !capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) {
+                Log.w("UpdateWorker", "Wi-Fi required but not connected or metered. Retrying later.")
+                return Result.retry()
+            }
+        }
+
         Log.i("UpdateWorker", "Starting background update download for v$versionCode")
 
         val apkFile = File(context.cacheDir, "update_$versionCode.apk")
         
         try {
-            // Delete existing partial downloads
+            // Delete existing partial/old downloads
+            context.cacheDir.listFiles { _, name -> name.startsWith("update_") && name.endsWith(".apk") }?.forEach {
+                if (it.name != apkFile.name) {
+                    it.delete()
+                }
+            }
             if (apkFile.exists()) {
                 apkFile.delete()
             }
@@ -110,6 +136,37 @@ class UpdateWorker(
                 return Result.failure() // Should not retry if version is older
             }
 
+            val currentSignatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                currentPackageInfo.signingInfo?.apkContentsSigners
+            } else {
+                @Suppress("DEPRECATION")
+                currentPackageInfo.signatures
+            }
+            
+            val apkSignatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageInfo.signingInfo?.apkContentsSigners
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.signatures
+            }
+
+            if (currentSignatures.isNullOrEmpty() || apkSignatures.isNullOrEmpty()) {
+                Log.e("UpdateWorker", "Failed to get signatures")
+                apkFile.delete()
+                return Result.failure()
+            }
+
+            val md = MessageDigest.getInstance("SHA-256")
+            val currentSigHash = md.digest(currentSignatures[0].toByteArray()).joinToString("") { "%02x".format(it) }
+            md.reset()
+            val apkSigHash = md.digest(apkSignatures[0].toByteArray()).joinToString("") { "%02x".format(it) }
+
+            if (currentSigHash != apkSigHash) {
+                Log.e("UpdateWorker", "Signature mismatch. Expected: $currentSigHash, Actual: $apkSigHash")
+                apkFile.delete()
+                return Result.failure()
+            }
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
                 Log.w("UpdateWorker", "Cannot auto-install, missing permission. Prompting user to open app.")
                 showAppNotification(context, "Update Downloaded", "Tap to open Sandesh and install the update")
@@ -118,6 +175,7 @@ class UpdateWorker(
 
             // Install APK
             installApk(apkFile)
+            apkFile.delete()
             return Result.success()
 
         } catch (e: Exception) {
@@ -156,8 +214,8 @@ class UpdateWorker(
             }
         }
 
-        val intent = Intent(PackageInstallerReceiver.ACTION_INSTALL_COMPLETE).apply {
-            setPackage(context.packageName)
+        val intent = Intent(context, PackageInstallerReceiver::class.java).apply {
+            action = PackageInstallerReceiver.ACTION_INSTALL_COMPLETE
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,

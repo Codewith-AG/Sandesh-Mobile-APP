@@ -54,3 +54,5 @@ android/key.properties
 # Firebase service-account JSON (Admin SDK) — NEVER commit
 serviceAccountKey*.json
 firebase-adminsdk*.json
+
+build_old/

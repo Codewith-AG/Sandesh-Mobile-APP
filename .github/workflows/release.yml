@@ -44,7 +44,7 @@ jobs:
       - name: Verify Version Code strictly increasing
         run: |
           # Fetch latest release update.json to get remote versionCode
-          HTTP_STATUS=$(curl -s -w "%{http_code}" -o update.json https://github.com/Codewith-AG/Sandesh-Releases/releases/latest/download/update.json)
+          HTTP_STATUS=$(curl -sL -w "%{http_code}" -o update.json https://github.com/Codewith-AG/Sandesh-Releases/releases/latest/download/update.json || echo "curl_failed")
           
           if [ "$HTTP_STATUS" = "200" ]; then
             REMOTE_VERSION_CODE=$(grep -o '"versionCode"[[:space:]]*:[[:space:]]*[0-9]*' update.json | grep -o '[0-9]*')
@@ -55,8 +55,11 @@ jobs:
               echo "Error: Local versionCode (${{ env.VERSION_CODE }}) must be strictly greater than remote ($REMOTE_VERSION_CODE)"
               exit 1
             fi
+          elif [ "$HTTP_STATUS" = "404" ]; then
+            echo "No previous release found (404). Proceeding as first release."
           else
-            echo "No previous release found or could not fetch update.json. Proceeding."
+            echo "Error: Could not fetch update.json. HTTP Status: $HTTP_STATUS. Failing closed."
+            exit 1
           fi
 
       - name: Set up Java 17
@@ -96,6 +99,10 @@ jobs:
       - name: Flutter Analyze
         working-directory: sandesh
         run: flutter analyze
+
+      - name: Flutter Test
+        working-directory: sandesh
+        run: flutter test
 
       - name: Build Release APK
         working-directory: sandesh

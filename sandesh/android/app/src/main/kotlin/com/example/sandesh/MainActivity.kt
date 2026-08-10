@@ -31,22 +31,13 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.example.sandesh/updater"
-    private var receiver: PackageInstallerReceiver? = null
-
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
-        receiver = PackageInstallerReceiver()
-        val filter = android.content.IntentFilter(PackageInstallerReceiver.ACTION_INSTALL_COMPLETE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(receiver, filter)
-        }
+        PeriodicUpdateCheckWorker.schedule(this)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        receiver?.let { unregisterReceiver(it) }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -159,8 +150,9 @@ class MainActivity: FlutterActivity() {
         outStream.close()
         inStream.close()
 
-        val intent = Intent(PackageInstallerReceiver.ACTION_INSTALL_COMPLETE)
-        intent.setPackage(packageName)
+        val intent = Intent(this, PackageInstallerReceiver::class.java).apply {
+            action = PackageInstallerReceiver.ACTION_INSTALL_COMPLETE
+        }
         val pendingIntent = PendingIntent.getBroadcast(
             this,
             sessionId,
@@ -214,6 +206,21 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun scheduleBackgroundUpdate(downloadUrl: String, sha256: String, versionCode: Long, wifiOnly: Boolean) {
+        val workManager = WorkManager.getInstance(this)
+        
+        try {
+            val workInfos = workManager.getWorkInfosForUniqueWork("sandesh_update").get()
+            val existingWork = workInfos.firstOrNull { !it.state.isFinished }
+            if (existingWork != null) {
+                val existingVersion = existingWork.tags.firstOrNull { it.startsWith("version_") }?.removePrefix("version_")?.toLongOrNull()
+                if (existingVersion != null && existingVersion >= versionCode) {
+                    return // Already downloading this or a newer version
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore exception and proceed to replace
+        }
+
         val constraintsBuilder = Constraints.Builder()
             .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
 
@@ -223,7 +230,8 @@ class MainActivity: FlutterActivity() {
                 workDataOf(
                     UpdateWorker.KEY_DOWNLOAD_URL to downloadUrl,
                     UpdateWorker.KEY_SHA256 to sha256,
-                    UpdateWorker.KEY_VERSION_CODE to versionCode
+                    UpdateWorker.KEY_VERSION_CODE to versionCode,
+                    "wifiOnly" to wifiOnly
                 )
             )
             .setBackoffCriteria(
@@ -231,10 +239,10 @@ class MainActivity: FlutterActivity() {
                 WorkRequest.MIN_BACKOFF_MILLIS,
                 TimeUnit.MILLISECONDS
             )
-            .addTag("update_worker_$versionCode")
+            .addTag("version_$versionCode")
             .build()
 
-        WorkManager.getInstance(this).enqueueUniqueWork(
+        workManager.enqueueUniqueWork(
             "sandesh_update",
             ExistingWorkPolicy.REPLACE,
             workRequest
