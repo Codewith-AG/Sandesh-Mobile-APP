@@ -24,15 +24,10 @@ subprojects {
 }
 
 subprojects {
-    plugins.withId("com.android.library") {
-        configure<com.android.build.gradle.LibraryExtension> {
-            compileSdk = 36
-            ndkVersion = "27.3.13750724"
-        }
-    }
-    plugins.withId("com.android.application") {
-        configure<com.android.build.gradle.AppExtension> {
-            compileSdk = 36
+    afterEvaluate {
+        val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+        android?.apply {
+            compileSdkVersion(36)
             ndkVersion = "27.3.13750724"
         }
     }
