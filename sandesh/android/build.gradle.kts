@@ -20,17 +20,20 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
-    project.evaluationDependsOn(":app")
+    plugins.withId("com.android.library") {
+        val android = extensions.getByType(com.android.build.gradle.LibraryExtension::class.java)
+        android.compileSdk = 36
+        android.ndkVersion = "27.3.13750724"
+    }
+    plugins.withId("com.android.application") {
+        val android = extensions.getByType(com.android.build.gradle.AppExtension::class.java)
+        android.compileSdk = 36
+        android.ndkVersion = "27.3.13750724"
+    }
 }
 
 subprojects {
-    afterEvaluate {
-        val android = extensions.findByName("android") as? com.android.build.gradle.BaseExtension
-        android?.apply {
-            compileSdkVersion(36)
-            ndkVersion = "27.3.13750724"
-        }
-    }
+    project.evaluationDependsOn(":app")
 }
 
 tasks.register<Delete>("clean") {
