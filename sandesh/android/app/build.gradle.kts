@@ -23,7 +23,7 @@ val keystoreProps = Properties().apply {
 android {
     // TODO PRODUCTION: rename this to your own package (e.g. com.codewithag.sandesh)
     // and rebuild google-services.json + the Google Sign-In OAuth client.
-    namespace = "com.codewithag.sandesh"
+    namespace = "com.example.sandesh"
     compileSdk = 36
     ndkVersion = "27.3.13750724"
 
@@ -39,7 +39,7 @@ android {
 
     defaultConfig {
         // TODO PRODUCTION: must NOT remain com.example.* on the Play Store.
-        applicationId = "com.codewithag.sandesh"
+        applicationId = "com.example.sandesh"
         minSdk = 31
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
