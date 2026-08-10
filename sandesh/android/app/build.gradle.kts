@@ -25,7 +25,7 @@ android {
     // and rebuild google-services.json + the Google Sign-In OAuth client.
     namespace = "com.codewithag.sandesh"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "27.3.13750724"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
