@@ -22,12 +22,12 @@ subprojects {
 subprojects {
     plugins.withId("com.android.library") {
         val android = extensions.getByType(com.android.build.gradle.LibraryExtension::class.java)
-        android.compileSdk = 36
+        android.compileSdkVersion(36)
         android.ndkVersion = "27.3.13750724"
     }
     plugins.withId("com.android.application") {
         val android = extensions.getByType(com.android.build.gradle.AppExtension::class.java)
-        android.compileSdk = 36
+        android.compileSdkVersion(36)
         android.ndkVersion = "27.3.13750724"
     }
 }
