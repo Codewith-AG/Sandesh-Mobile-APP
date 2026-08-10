@@ -54,7 +54,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data
-                    android:scheme="com.example.sandesh"
+                    android:scheme="com.codewithag.sandesh"
                     android:host="login-callback"/>
             </intent-filter>
         </activity>
