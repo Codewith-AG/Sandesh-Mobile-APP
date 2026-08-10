@@ -61,6 +61,13 @@
                     android:host="login-callback"/>
             </intent-filter>
         </activity>
+        
+        <!-- Statically register PackageInstallerReceiver to handle installation results in the background -->
+        <receiver android:name=".PackageInstallerReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.sandesh.INSTALL_COMPLETE" />
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

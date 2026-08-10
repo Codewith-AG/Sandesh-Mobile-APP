@@ -65,11 +65,24 @@ When preparing a new release, you must update the version in `sandesh/pubspec.ya
 3. Select the **Release Sandesh APK** workflow.
 4. Click **Run workflow**.
 5. Fill in the inputs:
-   - **Version Name:** (e.g., `1.1.0`)
-   - **Version Code:** (e.g., `2`)
    - **Release Notes:** A description of changes.
    - **Mandatory:** Check this box if users must update.
-6. Run the workflow. It will automatically build the APK and publish it to the `Sandesh-Releases` repo.
+6. Run the workflow. It will automatically read the version from `pubspec.yaml`, build the APK, verify it is strictly newer, and publish it to the `Sandesh-Releases` repo.
+
+## FOR AG — SIMPLE RELEASE STEPS
+
+I do not code. Here is the exact, extremely simple procedure for you to release a new update of the app:
+
+1. Ask AI to finish the new Sandesh changes.
+2. Ask AI to bump the pubspec version (for example, if the current version is `1.0.0+1`, tell the AI to change it to `1.0.1+2`). The number after the `+` MUST go up.
+3. Push/merge your code to the `main` branch.
+4. Open the GitHub Actions tab in your repository.
+5. Select the **Release Sandesh APK** workflow and run it.
+6. Enter only the minimum required information (Release Notes and whether it's mandatory).
+7. GitHub automatically reads the version, builds, signs, and publishes the new APK to `Sandesh-Releases`.
+8. Users' Sandesh installations discover the new version automatically.
+
+**Note:** The FIRST updater-enabled transition APK still needs to be installed manually by users who currently have an older version without the updater. After that manual update, all future releases will update automatically using this built-in updater system.
 
 ## 6. Signing Requirements
 

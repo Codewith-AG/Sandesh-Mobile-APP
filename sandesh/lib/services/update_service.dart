@@ -319,8 +319,8 @@ class UpdateService {
     }
   }
 
-  /// Full auto-update flow: check → download → validate → install.
-  /// Respects WiFi preference and install permissions.
+  /// Full auto-update flow using Android WorkManager.
+  /// WorkManager will handle WiFi constraints, retries, downloading, validation, and installation.
   Future<void> performAutoUpdate() async {
     if (availableUpdate == null) {
       final checkResult = await checkForUpdate();
@@ -331,16 +331,18 @@ class UpdateService {
     final autoUpdate = await _preferences.autoUpdateEnabled;
     if (!autoUpdate) return;
 
-    final success = await downloadUpdate();
-    if (!success) return;
-
-    // Only auto-install if permission is already granted
-    final canInstall = await canRequestInstall();
-    if (canInstall) {
-      await installUpdate();
+    final wifiOnly = await _preferences.wifiOnlyEnabled;
+    try {
+      await _channel.invokeMethod('scheduleBackgroundUpdate', {
+        'downloadUrl': availableUpdate!.downloadUrl,
+        'sha256': availableUpdate!.sha256,
+        'versionCode': availableUpdate!.versionCode,
+        'wifiOnly': wifiOnly,
+      });
+      debugPrint('[UpdateService] Scheduled background update via WorkManager');
+    } catch (e) {
+      debugPrint('[UpdateService] Failed to schedule WorkManager update: $e');
     }
-    // If permission not granted, leave at readyToInstall state.
-    // The user can install via the update screen.
   }
 
   /// Check if WiFi is available (non-metered connection).

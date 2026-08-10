@@ -19,6 +19,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkRequest
+import androidx.work.BackoffPolicy
+import androidx.work.workDataOf
+import java.util.concurrent.TimeUnit
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.example.sandesh/updater"
@@ -106,6 +115,19 @@ class MainActivity: FlutterActivity() {
                 "isWifiConnected" -> {
                     result.success(isWifiConnected())
                 }
+                "scheduleBackgroundUpdate" -> {
+                    val downloadUrl = call.argument<String>("downloadUrl")
+                    val sha256 = call.argument<String>("sha256")
+                    val versionCode = call.argument<Int>("versionCode")?.toLong()
+                    val wifiOnly = call.argument<Boolean>("wifiOnly") ?: true
+
+                    if (downloadUrl != null && sha256 != null && versionCode != null) {
+                        scheduleBackgroundUpdate(downloadUrl, sha256, versionCode, wifiOnly)
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Missing arguments", null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -189,5 +211,33 @@ class MainActivity: FlutterActivity() {
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    }
+
+    private fun scheduleBackgroundUpdate(downloadUrl: String, sha256: String, versionCode: Long, wifiOnly: Boolean) {
+        val constraintsBuilder = Constraints.Builder()
+            .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+
+        val workRequest = OneTimeWorkRequestBuilder<UpdateWorker>()
+            .setConstraints(constraintsBuilder.build())
+            .setInputData(
+                workDataOf(
+                    UpdateWorker.KEY_DOWNLOAD_URL to downloadUrl,
+                    UpdateWorker.KEY_SHA256 to sha256,
+                    UpdateWorker.KEY_VERSION_CODE to versionCode
+                )
+            )
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
+            .addTag("update_worker_$versionCode")
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            "sandesh_update",
+            ExistingWorkPolicy.REPLACE,
+            workRequest
+        )
     }
 }
