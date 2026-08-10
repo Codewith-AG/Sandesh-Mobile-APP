@@ -65,6 +65,8 @@ android {
             // Play Store will reject debug-signed APKs anyway.
             signingConfig = if (keystoreProps.isNotEmpty()) {
                 signingConfigs.getByName("release")
+            } else if (System.getenv("CI") != null) {
+                throw GradleException("Release signing credentials not found. CI builds must be release-signed.")
             } else {
                 signingConfigs.getByName("debug")
             }

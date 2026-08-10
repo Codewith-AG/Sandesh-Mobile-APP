@@ -19,6 +19,10 @@ import 'navigation/navigator_key.dart';
 import 'services/call_service.dart';
 import 'services/supabase_broadcast_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
+import 'services/update_service.dart';
+import 'services/update_preferences.dart';
+import 'screens/update_screen.dart';
+import 'widgets/update_dialog.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -277,6 +281,57 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
 
     // ── FCM handlers ────────────────────────────────────────────────────────
     _initFcmHandlers();
+
+    // ── Self-update check (fire-and-forget, respects 6-hour cache) ──
+    _initUpdateCheck();
+  }
+
+  /// Check for app updates after a delay (avoids splash screen interference).
+  Future<void> _initUpdateCheck() async {
+    // Delay to avoid interfering with splash screen navigation
+    await Future.delayed(const Duration(seconds: 5));
+    if (!mounted) return;
+
+    try {
+      final result = await UpdateService().checkForUpdate();
+      if (result != UpdateCheckResult.updateAvailable) return;
+      if (!mounted) return;
+
+      final update = UpdateService().availableUpdate;
+      if (update == null) return;
+
+      final prefs = UpdatePreferences();
+      final autoUpdate = await prefs.autoUpdateEnabled;
+
+      if (autoUpdate) {
+        // Auto-update: download and install in background
+        UpdateService().performAutoUpdate();
+      } else {
+        // Manual mode: show dialog if not previously dismissed for this version
+        final dismissed = await prefs.dismissedVersionCode;
+        if (dismissed == update.versionCode) return;
+        if (!mounted) return;
+
+        showDialog(
+          context: navigatorKey.currentContext ?? context,
+          builder: (_) => UpdateAvailableDialog(
+            updateInfo: update,
+            onUpdate: () {
+              Navigator.pop(navigatorKey.currentContext ?? context);
+              navigatorKey.currentState?.push(
+                MaterialPageRoute(builder: (_) => const UpdateScreen()),
+              );
+            },
+            onLater: () {
+              prefs.setDismissedVersion(update.versionCode);
+              Navigator.pop(navigatorKey.currentContext ?? context);
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[main] Update check error: $e');
+    }
   }
 
   Future<void> _initFcmHandlers() async {
