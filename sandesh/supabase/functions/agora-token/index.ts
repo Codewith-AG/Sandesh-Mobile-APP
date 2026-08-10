@@ -31,14 +31,12 @@ Deno.serve(async (req: Request) => {
   try {
     // ── 1. Verify Supabase JWT ────────────────────────────────────────────────
     const authHeader = req.headers.get("Authorization") ?? "";
-    console.log("[agora-token] auth header present:", authHeader.startsWith("Bearer "));
     if (!authHeader.startsWith("Bearer ")) {
       return json({ error: "Unauthorized: missing Bearer token" }, 401);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    console.log("[agora-token] SUPABASE_URL present:", !!supabaseUrl);
 
     const supabase = createClient(
       supabaseUrl!,
@@ -47,7 +45,6 @@ Deno.serve(async (req: Request) => {
     );
 
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    console.log("[agora-token] auth user:", user?.id ?? "null", "err:", userErr?.message ?? "none");
     if (userErr || !user) {
       return json({ error: "Unauthorized: invalid JWT" }, 401);
     }
@@ -58,7 +55,6 @@ Deno.serve(async (req: Request) => {
       .select("username")
       .eq("id", user.id)
       .maybeSingle();
-    console.log("[agora-token] profile:", profile?.username ?? "null", "err:", profErr?.message ?? "none");
     if (profErr || !profile?.username) {
       return json({ error: "Profile not found for this user" }, 403);
     }
@@ -66,12 +62,10 @@ Deno.serve(async (req: Request) => {
     // Strip spaces & special chars — same logic as Flutter's _makeChannelName
     // e.g. "Sandesh Sharma" → "sandeshsharma"
     const myUsername = String(profile.username).toLowerCase().replace(/[^a-z0-9]/g, "");
-    console.log("[agora-token] sanitized username:", myUsername);
 
     // ── 3. Validate channelName ───────────────────────────────────────────────
     const body = await req.json().catch(() => ({}));
     const channelName: unknown = body.channelName;
-    console.log("[agora-token] channelName:", channelName);
 
     if (typeof channelName !== "string" || channelName.length > 80) {
       return json({ error: "channelName is required and must be under 80 chars" }, 400);
@@ -79,14 +73,12 @@ Deno.serve(async (req: Request) => {
 
     // Format: call_<a>_<b> where a < b alphabetically
     const match = /^call_([a-z0-9]+)_([a-z0-9]+)$/i.exec(channelName);
-    console.log("[agora-token] channel regex match:", match ? "OK" : "FAILED");
     if (!match) {
       return json({ error: `Invalid channelName format: "${channelName}". Expected: call_<user1>_<user2>` }, 400);
     }
 
     const a = match[1].toLowerCase();
     const b = match[2].toLowerCase();
-    console.log("[agora-token] channel parts:", a, b, "| my username:", myUsername);
 
     if (myUsername !== a && myUsername !== b) {
       return json({ error: `Forbidden: "${myUsername}" not in channel "${channelName}"` }, 403);
@@ -95,7 +87,6 @@ Deno.serve(async (req: Request) => {
     // ── 4. Agora credentials check ───────────────────────────────────────────
     const appId = Deno.env.get("AGORA_APP_ID");
     const appCert = Deno.env.get("AGORA_APP_CERTIFICATE");
-    console.log("[agora-token] AGORA_APP_ID present:", !!appId, "AGORA_APP_CERTIFICATE present:", !!appCert);
     if (!appId || !appCert) {
       return json({ error: "Agora credentials not configured on server" }, 500);
     }
@@ -108,7 +99,6 @@ Deno.serve(async (req: Request) => {
     const h = new Uint8Array(hashBuf);
     let uid = ((h[0] << 24) | (h[1] << 16) | (h[2] << 8) | h[3]) >>> 0;
     if (uid === 0) uid = 1;
-    console.log("[agora-token] derived uid:", uid);
 
     // ── 6. Build Agora RTC token (10 min expiry) ─────────────────────────────
     const expiry = Math.floor(Date.now() / 1000) + 600;
@@ -121,9 +111,9 @@ Deno.serve(async (req: Request) => {
       expiry,
       expiry,
     );
-    console.log("[agora-token] token built successfully, length:", token?.length ?? 0);
+    console.log("[agora-token] token issued for channel:", channelName);
 
-    return json({ token, uid, appId, expiresAt: expiry }, 200);
+    return json({ token, uid, expiresAt: expiry }, 200);
 
   } catch (e) {
     console.error("[agora-token] unexpected error:", (e as Error).message, (e as Error).stack);

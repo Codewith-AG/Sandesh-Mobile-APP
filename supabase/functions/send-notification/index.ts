@@ -92,6 +92,36 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
+    // ── 0. Verify Supabase JWT — prevent unauthenticated abuse ────────────
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return json({ error: "Unauthorized: missing Bearer token" }, 401);
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return json({ error: "Server not configured" }, 500);
+    }
+
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userErr } = await supabaseAuth.auth.getUser();
+    if (userErr || !user) {
+      return json({ error: "Unauthorized: invalid JWT" }, 401);
+    }
+
+    // Look up the caller's username to prevent impersonation
+    const { data: callerProfile } = await supabaseAuth
+      .from("profiles")
+      .select("username")
+      .eq("id", user.id)
+      .maybeSingle();
+    const callerUsername = callerProfile?.username?.toLowerCase() ?? "";
+
     // ── 1. Parse request body ────────────────────────────────────────────────
     const body = await req.json().catch(() => ({})) as Record<string, string>;
     const {
@@ -107,13 +137,17 @@ Deno.serve(async (req: Request) => {
       return json({ error: "receiver_username and sender_username are required" }, 400);
     }
 
-    console.log(`[send-notification] ${sender_username} → ${receiver_username}: "${text}"`);
+    // Ensure the caller is actually the sender (prevent impersonation)
+    if (callerUsername && sender_username.toLowerCase() !== callerUsername) {
+      return json({ error: "Forbidden: sender_username does not match authenticated user" }, 403);
+    }
+
+    console.log(`[send-notification] ${sender_username} → ${receiver_username}`);
 
     // ── 2. Load secrets ──────────────────────────────────────────────────────
     const projectId     = Deno.env.get("FIREBASE_PROJECT_ID");
     const clientEmail   = Deno.env.get("FIREBASE_CLIENT_EMAIL");
     const privateKey    = Deno.env.get("FIREBASE_PRIVATE_KEY");
-    const supabaseUrl   = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!projectId || !clientEmail || !privateKey || !supabaseUrl || !supabaseServiceKey) {

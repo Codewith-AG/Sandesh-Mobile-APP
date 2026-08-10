@@ -3,9 +3,9 @@
 // Fetches the receiver's FCM token from `profiles`, then sends a FCM HTTP v1 push.
 //
 // Required Supabase Secrets:
-//   FIREBASE_PROJECT_ID        = sandesh-app-544c7
-//   FIREBASE_CLIENT_EMAIL      = firebase-adminsdk-fbsvc@sandesh-app-544c7.iam.gserviceaccount.com
-//   FIREBASE_PRIVATE_KEY       = -----BEGIN PRIVATE KEY-----\n...full key...\n-----END PRIVATE KEY-----\n
+//   FIREBASE_PROJECT_ID        = (your Firebase project ID)
+//   FIREBASE_CLIENT_EMAIL      = (your Firebase Admin SDK service account email)
+//   FIREBASE_PRIVATE_KEY       = (your Firebase Admin SDK private key)
 //   SEND_PUSH_WEBHOOK_SECRET   = (your webhook secret)
 //   SUPABASE_SERVICE_ROLE_KEY  = (your service role key)
 

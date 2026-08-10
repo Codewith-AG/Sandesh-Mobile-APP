@@ -128,29 +128,26 @@ class CallService {
   // Permissions MUST be granted by the caller (chat_screen.dart) before calling this.
   // ════════════════════════════════════════════════════════════════════════════
 
-  Future<String?> initiateCall({
+  /// Returns ({token, error}). If error is non-null, the call failed.
+  Future<({CallToken? token, String? error})> initiateCall({
     required String receiverUsername,
     required String callType,
   }) async {
     if (_isInCall) {
-      return 'Already in a call.';
+      return (token: null, error: 'Already in a call.');
     }
 
     // Lazily initialize the Agora engine if not already done
     final engineError = await _ensureEngineReady();
-    if (engineError != null) return engineError;
+    if (engineError != null) return (token: null, error: engineError);
 
     final ch = _makeChannelName(_myUsername, receiverUsername);
 
     // Fetch token from Supabase Edge Function
     final result = await _fetchToken(ch);
     if (result.token == null) {
-      // Show the actual server error so we know what's really failing
-      return 'Call failed: ${result.error ?? "Unknown error from agora-token function"}';
+      return (token: null, error: result.error ?? 'Unknown error from agora-token function');
     }
-    // token is retrieved by CallScreen directly via AgoraTokenService
-    // ignore: unused_local_variable
-    final _ = result.token!;
 
     _isInCall = true;
 
@@ -164,7 +161,7 @@ class CallService {
       );
     } catch (e) {
       _isInCall = false;
-      return 'Failed to send call signal: $e';
+      return (token: null, error: 'Failed to send call signal: $e');
     }
 
     // Emit an event so the caller's ChatScreen can navigate to CallScreen
@@ -176,7 +173,7 @@ class CallService {
       callType: callType,
     ));
 
-    return null; // success
+    return (token: result.token, error: null); // success with token
   }
 
   /// Returns the token + per-user uid for the caller to use in CallScreen.
@@ -325,13 +322,14 @@ class CallService {
     }
   }
 
+  static String sanitizeUsername(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
   static String _makeChannelName(String a, String b) {
     // Strip spaces and any special characters — usernames like "Sandesh Sharma"
     // would produce "sandesh sharma" which contains a space. The Edge Function
     // regex only allows [a-z0-9._-] so spaces must be removed before joining.
-    String sanitize(String s) =>
-        s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final clean = [sanitize(a), sanitize(b)]..sort();
+    final clean = [sanitizeUsername(a), sanitizeUsername(b)]..sort();
     return 'call_${clean[0]}_${clean[1]}';
   }
 

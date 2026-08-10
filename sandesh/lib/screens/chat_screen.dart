@@ -756,21 +756,31 @@ class _ChatScreenState extends State<ChatScreen> {
               }
               return;
             }
-            final error = await CallService().initiateCall(
+            final result = await CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'audio',
             );
             if (!mounted) return;
-            if (error != null) {
+            if (result.error != null) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Call failed: $error'),
+                content: Text('Call failed: ${result.error}'),
                 duration: const Duration(seconds: 6),
               ));
             } else {
+              final sorted = [CallService.sanitizeUsername(widget.myUsername), CallService.sanitizeUsername(widget.receiverUsername)]..sort();
+              final channelName = 'call_${sorted[0]}_${sorted[1]}';
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => _buildCallScreen('audio'),
+                  builder: (_) => CallScreen(
+                    myUsername: widget.myUsername,
+                    peerUsername: widget.receiverUsername,
+                    channelName: channelName,
+                    token: result.token!.token,
+                    agoraUid: result.token!.uid,
+                    callType: 'audio',
+                    isOutgoing: true,
+                  ),
                 ),
               );
             }
@@ -790,21 +800,31 @@ class _ChatScreenState extends State<ChatScreen> {
               }
               return;
             }
-            final error = await CallService().initiateCall(
+            final result = await CallService().initiateCall(
               receiverUsername: widget.receiverUsername,
               callType: 'video',
             );
             if (!mounted) return;
-            if (error != null) {
+            if (result.error != null) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Call failed: $error'),
+                content: Text('Call failed: ${result.error}'),
                 duration: const Duration(seconds: 6),
               ));
             } else {
+              final sorted = [CallService.sanitizeUsername(widget.myUsername), CallService.sanitizeUsername(widget.receiverUsername)]..sort();
+              final channelName = 'call_${sorted[0]}_${sorted[1]}';
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => _buildCallScreen('video'),
+                  builder: (_) => CallScreen(
+                    myUsername: widget.myUsername,
+                    peerUsername: widget.receiverUsername,
+                    channelName: channelName,
+                    token: result.token!.token,
+                    agoraUid: result.token!.uid,
+                    callType: 'video',
+                    isOutgoing: true,
+                  ),
                 ),
               );
             }
@@ -872,43 +892,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildCallScreen(String callType) {
-    final cs = _cs;
-    final sorted = [widget.myUsername.toLowerCase(), widget.receiverUsername.toLowerCase()]..sort();
-    final channelName = 'call_${sorted[0]}_${sorted[1]}';
-    return FutureBuilder<CallToken?>(
-      future: CallService().fetchTokenForChannel(channelName),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Scaffold(
-            backgroundColor: cs.surface,
-            body: Center(child: CircularProgressIndicator(color: cs.primary)),
-          );
-        }
-        final ct = snapshot.data;
-        if (ct == null) {
-          return Scaffold(
-            backgroundColor: cs.surface,
-            body: Center(
-              child: Text(
-                'Could not start the call. Please try again.',
-                style: GoogleFonts.outfit(color: cs.onSurface),
-              ),
-            ),
-          );
-        }
-        return CallScreen(
-          myUsername: widget.myUsername,
-          peerUsername: widget.receiverUsername,
-          channelName: channelName,
-          token: ct.token,
-          agoraUid: ct.uid,
-          callType: callType,
-          isOutgoing: true,
-        );
-      },
-    );
-  }
+
 
   Widget _buildMessageBubble(Message message) {
     final isMe = message.isMe;
