@@ -680,7 +680,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                cacheExtent: 1000,
+                scrollCacheExtent: 1000,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
@@ -1136,17 +1136,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildVideoContent(Message message, bool isMe, String timeString) {
     final cs = _cs;
-    return Container(
-      width: 220,
-      decoration: BoxDecoration(
-        color: isMe ? cs.primary : cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
-          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
     return GestureDetector(
       onTap: () {
         final heroTag = 'media_${message.id}';
