@@ -49,7 +49,9 @@ class UpdateRepository {
 
       if (response == null || response.statusCode != 200) return null;
 
-      final data = response.data as Map<String, dynamic>;
+      final data = (response.data is String) 
+          ? jsonDecode(response.data as String) as Map<String, dynamic>
+          : response.data as Map<String, dynamic>;
       final List<dynamic> assets = data['assets'] ?? [];
 
       // Find update.json asset
