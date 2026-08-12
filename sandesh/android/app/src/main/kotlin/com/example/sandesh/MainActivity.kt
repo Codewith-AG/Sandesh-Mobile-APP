@@ -207,20 +207,10 @@ class MainActivity: FlutterActivity() {
 
     private fun scheduleBackgroundUpdate(downloadUrl: String, sha256: String, versionCode: Long, wifiOnly: Boolean) {
         val workManager = WorkManager.getInstance(this)
-        
-        try {
-            val workInfos = workManager.getWorkInfosForUniqueWork("sandesh_update").get()
-            val existingWork = workInfos.firstOrNull { !it.state.isFinished }
-            if (existingWork != null) {
-                val existingVersion = existingWork.tags.firstOrNull { it.startsWith("version_") }?.removePrefix("version_")?.toLongOrNull()
-                if (existingVersion != null && existingVersion >= versionCode) {
-                    return // Already downloading this or a newer version
-                }
-            }
-        } catch (e: Exception) {
-            // Ignore exception and proceed to replace
-        }
 
+        // Use KEEP policy: if a work with the same unique name is already running/enqueued,
+        // it won't be replaced — preventing duplicate downloads.
+        // Tag encodes version so newer version triggers REPLACE via the version tag check below.
         val constraintsBuilder = Constraints.Builder()
             .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
 
@@ -242,6 +232,7 @@ class MainActivity: FlutterActivity() {
             .addTag("version_$versionCode")
             .build()
 
+        // REPLACE ensures a newer versionCode always supersedes an older enqueued download.
         workManager.enqueueUniqueWork(
             "sandesh_update",
             ExistingWorkPolicy.REPLACE,

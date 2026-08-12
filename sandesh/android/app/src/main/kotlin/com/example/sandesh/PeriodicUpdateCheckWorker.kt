@@ -61,14 +61,6 @@ class PeriodicUpdateCheckWorker(
                 Log.i("PeriodicUpdateCheck", "New version $remoteVersionCode found! Enqueueing UpdateWorker.")
                 
                 val workManager = WorkManager.getInstance(context)
-                val workInfos = workManager.getWorkInfosForUniqueWork("sandesh_update").get()
-                val existingWork = workInfos.firstOrNull { !it.state.isFinished }
-                if (existingWork != null) {
-                    val existingVersion = existingWork.tags.firstOrNull { it.startsWith("version_") }?.removePrefix("version_")?.toLongOrNull()
-                    if (existingVersion != null && existingVersion >= remoteVersionCode) {
-                        return Result.success() // Already downloading this or a newer version
-                    }
-                }
 
                 val constraintsBuilder = Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.UNMETERED) // Always Wi-Fi for periodic
@@ -87,6 +79,7 @@ class PeriodicUpdateCheckWorker(
                     .addTag("version_$remoteVersionCode")
                     .build()
 
+                // REPLACE ensures newer version supersedes any existing enqueued download.
                 workManager.enqueueUniqueWork(
                     "sandesh_update",
                     ExistingWorkPolicy.REPLACE,
