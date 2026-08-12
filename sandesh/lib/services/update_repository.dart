@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -69,7 +70,7 @@ class UpdateRepository {
       if (updateResponse.statusCode != 200) return null;
 
       final updateJson = (updateResponse.data is String) 
-          ? updateResponse.data as Map<String, dynamic> 
+          ? jsonDecode(updateResponse.data as String) as Map<String, dynamic>
           : updateResponse.data as Map<String, dynamic>;
 
       // Find APK asset download URL (support both camelCase and snake_case)
