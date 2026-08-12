@@ -80,6 +80,61 @@ class InstallPermissionDialog extends StatelessWidget {
   }
 }
 
+/// Shown when the user taps "Download" while "Wi-Fi only" is on but the device
+/// is on mobile data. Warns about data usage and shows the total update size,
+/// then lets the user proceed over mobile data or cancel.
+class NoWifiWarningDialog extends StatelessWidget {
+  final UpdateInfo updateInfo;
+
+  const NoWifiWarningDialog({super.key, required this.updateInfo});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final size = updateInfo.formattedSize;
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Row(
+        children: [
+          Icon(Icons.signal_cellular_alt, color: cs.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text("You're not on Wi-Fi",
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            size != null
+                ? 'This update is $size and will be downloaded using your mobile data, which may incur charges.'
+                : 'This update will be downloaded using your mobile data, which may incur charges.',
+            style: GoogleFonts.outfit(),
+          ),
+          const SizedBox(height: 12),
+          Text('Do you want to install without Wi-Fi?',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text('Cancel', style: GoogleFonts.outfit()),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+              backgroundColor: cs.primary, foregroundColor: cs.onPrimary),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text('Install without Wi-Fi', style: GoogleFonts.outfit()),
+        ),
+      ],
+    );
+  }
+}
+
 class UpdateReadyDialog extends StatelessWidget {
   final String version;
   final VoidCallback onInstall;

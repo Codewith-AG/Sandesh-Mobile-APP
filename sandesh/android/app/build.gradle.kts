@@ -46,6 +46,11 @@ android {
         versionName = flutter.versionName
         multiDexEnabled = true
 
+        // The app only ships English strings (see supportedLocales in main.dart),
+        // so strip every other locale's resources that libraries like Firebase,
+        // Google Play services and AndroidX bundle. Trims a few MB from the APK.
+        resourceConfigurations += listOf("en")
+
         // Ship arm64-v8a only. This app is validated for arm64 at runtime
         // (see UpdateWorker / UpdateService ABI checks), so bundling armeabi-v7a
         // and x86_64 just bloated the APK. Guarantees arm64-only even for a

@@ -72,37 +72,38 @@ class UpdateWorker(
         }
 
         val apkFile = File(context.cacheDir, "update_$versionCode.apk")
-        
+        // Partial download lives here and is PRESERVED across retries so an
+        // interrupted download resumes instead of starting from zero.
+        val partFile = File(context.cacheDir, "update_$versionCode.apk.part")
+
         try {
-            // Delete existing partial/old downloads
-            context.cacheDir.listFiles { _, name -> name.startsWith("update_") && name.endsWith(".apk") }?.forEach {
-                if (it.name != apkFile.name) {
+            // Delete stale downloads for OTHER versions, but keep this version's
+            // .apk and .part so we can resume / reuse them.
+            context.cacheDir.listFiles { _, name ->
+                name.startsWith("update_") && (name.endsWith(".apk") || name.endsWith(".apk.part"))
+            }?.forEach {
+                if (it.name != apkFile.name && it.name != partFile.name) {
                     it.delete()
                 }
             }
+            // A leftover finished .apk from a previous run is stale — rebuild from .part.
             if (apkFile.exists()) {
                 apkFile.delete()
             }
 
-            val url = URL(downloadUrl)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 60000
-
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                Log.e("UpdateWorker", "Failed to download, HTTP code: ${connection.responseCode}")
-                return if (connection.responseCode in 500..599 || connection.responseCode == 429) {
-                    Result.retry()
-                } else {
-                    Result.failure()
-                }
+            // Resumable download. Returns false on a recoverable error, leaving
+            // the .part file intact so WorkManager's retry picks up where it left off.
+            val complete = downloadWithResume(downloadUrl, partFile)
+            if (!complete) {
+                Log.w("UpdateWorker", "Download incomplete/interrupted — will resume on retry")
+                return Result.retry()
             }
 
-            connection.inputStream.use { input ->
-                FileOutputStream(apkFile).use { output ->
-                    input.copyTo(output)
-                }
+            // Finalize: promote the completed .part to the real .apk file.
+            if (apkFile.exists()) apkFile.delete()
+            if (!partFile.renameTo(apkFile)) {
+                partFile.inputStream().use { i -> FileOutputStream(apkFile).use { o -> i.copyTo(o) } }
+                partFile.delete()
             }
 
             // Verify SHA-256
@@ -240,6 +241,103 @@ class UpdateWorker(
         }
     }
 
+    /**
+     * Resumable download into [partFile] using HTTP Range requests.
+     * Returns true only when the full file has been written. Returns false on a
+     * recoverable network/server error or if the worker was stopped — in that
+     * case the .part file is left on disk so the next run resumes from its length.
+     */
+    private fun downloadWithResume(downloadUrl: String, partFile: File): Boolean {
+        var existing = if (partFile.exists()) partFile.length() else 0L
+
+        val connection = URL(downloadUrl).openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 15000
+        connection.readTimeout = 60000
+        connection.instanceFollowRedirects = true
+        if (existing > 0) {
+            // Ask the server to continue from where we stopped.
+            connection.setRequestProperty("Range", "bytes=$existing-")
+        }
+
+        try {
+            connection.connect()
+            val code = connection.responseCode
+
+            val append: Boolean
+            when (code) {
+                HttpURLConnection.HTTP_PARTIAL -> { // 206 — server supports resume
+                    append = true
+                }
+                HttpURLConnection.HTTP_OK -> { // 200 — no resume support, start over
+                    if (existing > 0) {
+                        partFile.delete()
+                        existing = 0L
+                    }
+                    append = false
+                }
+                416 -> { // Range Not Satisfiable — stale .part, wipe and restart clean
+                    partFile.delete()
+                    connection.disconnect()
+                    return downloadWithResume(downloadUrl, partFile)
+                }
+                429, in 500..599 -> {
+                    Log.w("UpdateWorker", "Server busy (HTTP $code) — will retry, keeping .part")
+                    return false
+                }
+                else -> {
+                    Log.e("UpdateWorker", "Download failed with HTTP $code")
+                    partFile.delete()
+                    return false
+                }
+            }
+
+            // contentLengthLong is the REMAINING bytes for a 206 response.
+            val remaining = connection.contentLengthLong
+            val total = if (append && remaining > 0) existing + remaining else remaining
+
+            var downloaded = existing
+            var lastPct = -1
+            connection.inputStream.use { input ->
+                FileOutputStream(partFile, append).use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    var read: Int
+                    while (input.read(buffer).also { read = it } != -1) {
+                        // If WorkManager stops us (Doze/constraints/cancel), flush and
+                        // bail out; the .part file survives for the next attempt.
+                        if (isStopped) {
+                            output.flush()
+                            return false
+                        }
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        if (total > 0) {
+                            val pct = ((downloaded * 100) / total).toInt()
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                try { setForegroundAsync(buildForegroundInfo(pct)) } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                    output.flush()
+                }
+            }
+
+            // If we know the expected size, make sure we actually got all of it.
+            if (total > 0 && partFile.length() < total) {
+                Log.w("UpdateWorker", "Incomplete: ${partFile.length()}/$total bytes — will resume")
+                return false
+            }
+            return true
+        } catch (e: Exception) {
+            // Network dropped mid-stream: keep the .part so we resume next time.
+            Log.w("UpdateWorker", "Download interrupted — keeping .part for resume", e)
+            return false
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun calculateSha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         FileInputStream(file).use { fis ->
@@ -255,6 +353,10 @@ class UpdateWorker(
     private fun installApk(file: File) {
         val packageInstaller = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        // Declaring the package + exact size up front avoids INSTALL_FAILED_INVALID_APK
+        // / session-size errors that caused installs to fail after download.
+        params.setAppPackageName(context.packageName)
+        params.setSize(file.length())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }

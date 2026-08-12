@@ -136,6 +136,8 @@ jobs:
           
           cp $APK_PATH $NEW_APK_NAME
           SHA256=$(sha256sum $NEW_APK_NAME | cut -d ' ' -f 1)
+          # APK size in bytes — the app shows this in the "install without Wi-Fi" warning.
+          SIZE=$(stat -c%s $NEW_APK_NAME)
           
           cat > update.json << EOF
           {
@@ -144,6 +146,7 @@ jobs:
             "versionName": "${{ env.VERSION_NAME }}",
             "apkAsset": "$NEW_APK_NAME",
             "sha256": "$SHA256",
+            "size": $SIZE,
             "mandatory": ${{ inputs.mandatory }},
             "releaseNotes": "${{ inputs.release_notes }}"
           }

@@ -107,7 +107,12 @@ class UpdateRepository {
     }
   }
 
-  /// Download APK to app cache directory with progress tracking.
+  /// Download APK to the app cache directory with progress tracking.
+  ///
+  /// Resumable: bytes are streamed into a `.part` file and, if a partial file
+  /// from a previous interrupted attempt exists, the download continues from
+  /// where it stopped using an HTTP `Range` request instead of starting over.
+  /// Only once the full file is received is it promoted to the final `.apk`.
   Future<String> downloadApk(
     UpdateInfo info, {
     void Function(int received, int total)? onProgress,
@@ -115,18 +120,65 @@ class UpdateRepository {
   }) async {
     final tempDir = await getTemporaryDirectory();
     final savePath = '${tempDir.path}/update_${info.versionCode}.apk';
+    final partPath = '$savePath.part';
 
-    // Delete any existing partial download
-    final existing = File(savePath);
-    if (await existing.exists()) await existing.delete();
+    final partFile = File(partPath);
+    int existingBytes = 0;
+    if (await partFile.exists()) {
+      existingBytes = await partFile.length();
+    }
 
-    await _dio.download(
-      info.downloadUrl,
-      savePath,
-      onReceiveProgress: onProgress,
-      cancelToken: cancelToken,
-    );
+    // A finished .apk from a prior attempt is stale; rebuild from scratch/part.
+    final finalFile = File(savePath);
+    if (await finalFile.exists()) await finalFile.delete();
 
-    return savePath;
+    try {
+      final response = await _dio.get<ResponseBody>(
+        info.downloadUrl,
+        cancelToken: cancelToken,
+        options: Options(
+          responseType: ResponseType.stream,
+          followRedirects: true,
+          headers: existingBytes > 0 ? {'Range': 'bytes=$existingBytes-'} : null,
+          validateStatus: (s) => s != null && s < 400,
+        ),
+      );
+
+      // If the server ignored the Range header (200 instead of 206), restart.
+      final status = response.statusCode ?? 200;
+      final bool append = status == 206;
+      if (!append && existingBytes > 0) {
+        if (await partFile.exists()) await partFile.delete();
+        existingBytes = 0;
+      }
+
+      // Work out the total size for progress reporting.
+      final contentLen = int.tryParse(
+              response.headers.value(Headers.contentLengthHeader) ?? '') ??
+          0;
+      final total = append && contentLen > 0
+          ? existingBytes + contentLen
+          : (contentLen > 0 ? contentLen : info.sizeBytes);
+
+      final sink = partFile.openSync(mode: append ? FileMode.writeOnlyAppend : FileMode.writeOnly);
+      int received = existingBytes;
+      try {
+        await for (final chunk in response.data!.stream) {
+          sink.writeFromSync(chunk);
+          received += chunk.length;
+          if (onProgress != null && total > 0) onProgress(received, total);
+        }
+      } finally {
+        await sink.flush();
+        await sink.close();
+      }
+
+      // Promote the completed part file to the final APK path.
+      await partFile.rename(savePath);
+      return savePath;
+    } on DioException {
+      // Leave the .part file in place so a later attempt can resume it.
+      rethrow;
+    }
   }
 }

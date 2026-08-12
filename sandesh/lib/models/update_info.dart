@@ -8,6 +8,10 @@ class UpdateInfo {
   final String releaseNotes;
   final String downloadUrl;
 
+  /// Size of the APK in bytes (0 if the release did not advertise it).
+  /// Used to warn the user how much data an over-mobile-data update will use.
+  final int sizeBytes;
+
   const UpdateInfo({
     required this.packageName,
     required this.versionCode,
@@ -17,7 +21,21 @@ class UpdateInfo {
     this.mandatory = false,
     this.releaseNotes = '',
     required this.downloadUrl,
+    this.sizeBytes = 0,
   });
+
+  /// Human-readable APK size, e.g. "62.4 MB". Returns null when unknown.
+  String? get formattedSize {
+    if (sizeBytes <= 0) return null;
+    const units = ['B', 'KB', 'MB', 'GB'];
+    double size = sizeBytes.toDouble();
+    int unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit++;
+    }
+    return '${size.toStringAsFixed(size >= 100 || unit == 0 ? 0 : 1)} ${units[unit]}';
+  }
 
   /// Parse update.json from GitHub release.
   /// Supports both camelCase (canonical) and snake_case keys.
@@ -31,6 +49,7 @@ class UpdateInfo {
       mandatory: (json['mandatory'] ?? false) as bool,
       releaseNotes: (json['releaseNotes'] ?? json['release_notes'] ?? '') as String,
       downloadUrl: downloadUrl,
+      sizeBytes: _parseInt(json['size'] ?? json['sizeBytes'] ?? json['apkSize'] ?? 0),
     );
   }
 
@@ -45,6 +64,7 @@ class UpdateInfo {
       mandatory: (json['mandatory'] ?? false) as bool,
       releaseNotes: (json['releaseNotes'] ?? json['release_notes'] ?? '') as String,
       downloadUrl: (json['downloadUrl'] ?? json['download_url'] ?? '') as String,
+      sizeBytes: _parseInt(json['size'] ?? json['sizeBytes'] ?? json['apkSize'] ?? 0),
     );
   }
 
@@ -58,6 +78,7 @@ class UpdateInfo {
       'mandatory': mandatory,
       'releaseNotes': releaseNotes,
       'downloadUrl': downloadUrl,
+      'sizeBytes': sizeBytes,
     };
   }
 
@@ -70,6 +91,7 @@ class UpdateInfo {
     bool? mandatory,
     String? releaseNotes,
     String? downloadUrl,
+    int? sizeBytes,
   }) {
     return UpdateInfo(
       packageName: packageName ?? this.packageName,
@@ -80,6 +102,7 @@ class UpdateInfo {
       mandatory: mandatory ?? this.mandatory,
       releaseNotes: releaseNotes ?? this.releaseNotes,
       downloadUrl: downloadUrl ?? this.downloadUrl,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
     );
   }
 

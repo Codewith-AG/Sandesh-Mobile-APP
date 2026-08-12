@@ -116,13 +116,24 @@ class UpdateService {
     }
   }
 
+  /// True when a manual download would be blocked because the "Wi-Fi only"
+  /// preference is on and the device is not currently on (unmetered) Wi-Fi.
+  /// The UI uses this to show the "install without Wi-Fi" size warning.
+  Future<bool> isWifiConfirmationRequired() async {
+    final wifiOnly = await _preferences.wifiOnlyEnabled;
+    if (!wifiOnly) return false;
+    return !(await isWifiAvailable());
+  }
+
   /// Download the update APK with progress tracking.
-  Future<bool> downloadUpdate() async {
+  /// Pass [ignoreWifi] = true when the user has explicitly confirmed they want
+  /// to download over mobile data (after seeing the size warning).
+  Future<bool> downloadUpdate({bool ignoreWifi = false}) async {
     if (_isDownloading || availableUpdate == null) return false;
 
-    // Check WiFi preference
+    // Check WiFi preference (unless the user explicitly opted to use mobile data)
     final wifiOnly = await _preferences.wifiOnlyEnabled;
-    if (wifiOnly) {
+    if (wifiOnly && !ignoreWifi) {
       final isWifi = await isWifiAvailable();
       if (!isWifi) {
         debugPrint('[UpdateService] WiFi required but not available, deferring download');

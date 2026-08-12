@@ -262,6 +262,20 @@ class _UpdateScreenState extends State<UpdateScreen> {
   }
 
   Future<void> _startDownload() async {
+    // If "Wi-Fi only" is on but we're on mobile data, warn the user (with the
+    // total update size) and let them explicitly choose to install without Wi-Fi.
+    final needsWifiConfirm = await _updateService.isWifiConfirmationRequired();
+    if (needsWifiConfirm) {
+      final update = _updateService.availableUpdate;
+      if (!mounted || update == null) return;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (_) => NoWifiWarningDialog(updateInfo: update),
+      );
+      if (proceed != true) return;
+      await _updateService.downloadUpdate(ignoreWifi: true);
+      return;
+    }
     await _updateService.downloadUpdate();
     // State transitions are handled by UpdateService via ValueNotifier
   }

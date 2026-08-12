@@ -128,8 +128,17 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun installApk(apkPath: String) {
+        val file = File(apkPath)
+        if (!file.exists() || file.length() == 0L) {
+            throw java.io.IOException("APK file missing or empty at $apkPath")
+        }
+
         val packageInstaller = packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        // Declare the target package and exact size so PackageInstaller doesn't
+        // reject the session (a common cause of "install failed after download").
+        params.setAppPackageName(packageName)
+        params.setSize(file.length())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }
@@ -137,32 +146,36 @@ class MainActivity: FlutterActivity() {
         val sessionId = packageInstaller.createSession(params)
         val session = packageInstaller.openSession(sessionId)
 
-        val file = File(apkPath)
-        val inStream = FileInputStream(file)
-        val outStream = session.openWrite("sandesh_update", 0, file.length())
+        try {
+            FileInputStream(file).use { inStream ->
+                session.openWrite("sandesh_update", 0, file.length()).use { outStream ->
+                    val buffer = ByteArray(65536)
+                    var bytesRead: Int
+                    while (inStream.read(buffer).also { bytesRead = it } != -1) {
+                        outStream.write(buffer, 0, bytesRead)
+                    }
+                    session.fsync(outStream)
+                }
+            }
 
-        val buffer = ByteArray(65536)
-        var bytesRead: Int
-        while (inStream.read(buffer).also { bytesRead = it } != -1) {
-            outStream.write(buffer, 0, bytesRead)
+            val intent = Intent(this, PackageInstallerReceiver::class.java).apply {
+                action = PackageInstallerReceiver.ACTION_INSTALL_COMPLETE
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                sessionId,
+                intent,
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            session.commit(pendingIntent.intentSender)
+        } catch (e: Exception) {
+            // Abandon the session so a failed attempt doesn't block the next one.
+            try { session.abandon() } catch (_: Exception) {}
+            throw e
+        } finally {
+            session.close()
         }
-        
-        session.fsync(outStream)
-        outStream.close()
-        inStream.close()
-
-        val intent = Intent(this, PackageInstallerReceiver::class.java).apply {
-            action = PackageInstallerReceiver.ACTION_INSTALL_COMPLETE
-        }
-        val pendingIntent = PendingIntent.getBroadcast(
-            this,
-            sessionId,
-            intent,
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        session.commit(pendingIntent.intentSender)
-        session.close()
     }
 
     private fun getInstalledSignatures(): String? {
