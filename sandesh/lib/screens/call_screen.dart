@@ -3,7 +3,11 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
 import '../services/call_service.dart';
+import '../services/supabase_broadcast_service.dart';
+import '../models/message_model.dart';
 import '../theme/app_theme.dart';
 
 class CallScreen extends StatefulWidget {
@@ -119,8 +123,10 @@ class _CallScreenState extends State<CallScreen> {
     if (event.channelName != widget.channelName) return;
     if (event.isAccepted && _isOutgoing) {
       if (mounted) setState(() => _isOutgoing = false);
-    } else if (event.isRejected || event.isEnded) {
-      _leaveAndPop();
+    } else if (event.isRejected) {
+      _leaveAndPop(reason: 'rejected');
+    } else if (event.isEnded) {
+      _leaveAndPop(reason: 'ended');
     }
   }
 
@@ -160,12 +166,54 @@ class _CallScreenState extends State<CallScreen> {
       channelName: widget.channelName,
       callType: widget.callType,
     );
-    _leaveAndPop();
+    _leaveAndPop(reason: 'ended');
   }
 
-  void _leaveAndPop() {
+  void _leaveAndPop({String? reason}) async {
     if (_callEnded) return;
     _callEnded = true;
+    
+    if (widget.isOutgoing) {
+      String status;
+      if (_callConnected) {
+        status = 'answered';
+      } else if (reason == 'rejected') {
+        status = 'declined';
+      } else {
+        status = 'missed'; // Caller hung up before answer, or timeout
+      }
+      
+      try {
+        await Supabase.instance.client.from('calls').insert({
+          'caller_username': widget.myUsername,
+          'receiver_username': widget.peerUsername,
+          'call_type': widget.callType,
+          'status': status,
+          'duration_seconds': _elapsedSeconds,
+        });
+
+        // Also add a chat message for the call log
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final msgText = jsonEncode({
+          'status': status,
+          'duration': _elapsedSeconds,
+          'call_type': widget.callType,
+        });
+        final msg = Message(
+          id: 'call_${widget.myUsername}_$timestamp',
+          senderUsername: widget.myUsername,
+          receiverUsername: widget.peerUsername,
+          text: msgText,
+          messageType: MessageType.call,
+          isMe: true,
+          timestamp: timestamp,
+        );
+        await SupabaseBroadcastService().sendMessage(msg);
+      } catch (e) {
+        debugPrint('Error logging call to DB: $e');
+      }
+    }
+
     CallService().markCallEnded();
     _durationTimer?.cancel();
     try {

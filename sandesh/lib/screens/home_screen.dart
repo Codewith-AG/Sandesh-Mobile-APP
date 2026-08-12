@@ -12,14 +12,15 @@ import '../services/local_db_service.dart';
 import '../services/supabase_broadcast_service.dart';
 import '../services/call_service.dart';
 // app_theme.dart intentionally not imported — all colors from Theme.of(context)
+import '../widgets/user_avatar.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
 import 'create_group_screen.dart';
 import 'group_chat_screen.dart';
+import 'calls_tab.dart';
 import 'dart:async';
-import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -47,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() => _currentTab = _tabController.index);
     });
@@ -425,26 +426,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 MaterialPageRoute(builder: (_) => const ProfileScreen()),
               ).then((_) => _loadContacts());
             },
-            child: _myAvatarUrl.startsWith('http')
-                ? CircleAvatar(
-                    radius: 20,
-                    backgroundColor: cs.surfaceContainerHigh,
-                    backgroundImage: NetworkImage(_myAvatarUrl),
-                    onBackgroundImageError: (_, __) {},
-                  )
-                : CircleAvatar(
-                    backgroundColor: cs.surfaceContainerHigh,
-                    child: Text(
-                      _myUsername.isNotEmpty
-                          ? _myUsername[0].toUpperCase()
-                          : '?',
-                      style: GoogleFonts.outfit(
-                        color: cs.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ),
+            child: UserAvatar(
+              imageUrl: _myAvatarUrl.startsWith('http') ? _myAvatarUrl : null,
+              name: _myUsername,
+              radius: 20,
+            ),
           ),
         ),
         title: _isSelectionMode
@@ -595,6 +581,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           tabs: const [
             Tab(text: 'Chats'),
             Tab(text: 'Groups'),
+            Tab(text: 'Calls'),
           ],
         ),
       ),
@@ -638,6 +625,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           },
                         ),
                       ),
+                // ── Calls tab ──
+                CallsTab(myUsername: _myUsername),
               ],
             ),
       floatingActionButton: FloatingActionButton(
@@ -740,27 +729,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildContactTile(BuildContext context, Contact contact) {
     final cs = Theme.of(context).colorScheme;
-    Widget avatarWidget;
-    final url = contact.avatarUrl;
-
-    if (url.startsWith('http')) {
-      avatarWidget = CircleAvatar(
-        radius: 28,
-        backgroundColor: cs.surfaceContainerHigh,
-        backgroundImage: NetworkImage(url),
-        onBackgroundImageError: (_, __) {},
-      );
-    } else if (url.isNotEmpty) {
-      try {
-        final bytes = base64Decode(url);
-        avatarWidget =
-            CircleAvatar(radius: 28, backgroundImage: MemoryImage(bytes));
-      } catch (_) {
-        avatarWidget = _buildFallbackAvatar(context, contact);
-      }
-    } else {
-      avatarWidget = _buildFallbackAvatar(context, contact);
-    }
+    final avatarWidget = UserAvatar(
+      imageUrl: contact.avatarUrl.startsWith('http') ? contact.avatarUrl : null,
+      name: contact.displayName.isNotEmpty ? contact.displayName : contact.username,
+      radius: 28,
+    );
 
     final isSelected = _selectedUsernames.contains(contact.username);
 
@@ -956,27 +929,4 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildFallbackAvatar(BuildContext context, Contact contact) {
-    final cs = Theme.of(context).colorScheme;
-    final label = contact.displayName.isNotEmpty
-        ? contact.displayName[0].toUpperCase()
-        : (contact.username.isNotEmpty
-            ? contact.username[0].toUpperCase()
-            : '?');
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: cs.primaryContainer.withValues(alpha: 0.1),
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: Text(
-          label,
-          style: GoogleFonts.outfit(
-              color: cs.primary, fontWeight: FontWeight.w700, fontSize: 24),
-        ),
-      ),
-    );
-  }
 }

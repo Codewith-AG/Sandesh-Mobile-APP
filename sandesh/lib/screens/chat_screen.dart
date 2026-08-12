@@ -17,6 +17,7 @@ import 'media_viewer_screen.dart';
 import 'call_screen.dart';
 import '../services/call_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../widgets/user_avatar.dart';
 
 class ChatScreen extends StatefulWidget {
   final String myUsername;
@@ -888,23 +889,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildReceiverAvatar(ColorScheme cs) {
-    if (_receiverAvatarUrl.startsWith('http')) {
-      return CircleAvatar(
-        radius: 20,
-        backgroundColor: cs.surfaceContainerHigh,
-        backgroundImage: NetworkImage(_receiverAvatarUrl),
-        onBackgroundImageError: (_, __) {},
-      );
-    }
-    return CircleAvatar(
+    return UserAvatar(
+      imageUrl: _receiverAvatarUrl.startsWith('http') ? _receiverAvatarUrl : null,
+      name: _displayName ?? widget.receiverUsername,
       radius: 20,
-      backgroundColor: cs.surfaceContainerHigh,
-      child: Text(
-        _displayName != null && _displayName!.isNotEmpty
-            ? _displayName![0].toUpperCase()
-            : (widget.receiverUsername.isNotEmpty ? widget.receiverUsername[0].toUpperCase() : '?'),
-        style: GoogleFonts.outfit(color: cs.primary, fontWeight: FontWeight.w700, fontSize: 18),
-      ),
     );
   }
 
@@ -941,6 +929,9 @@ class _ChatScreenState extends State<ChatScreen> {
       case MessageType.document:
         content = _buildDocumentContent(message, isMe, timeString);
         break;
+      case MessageType.call:
+        content = _buildCallContent(message, isMe, timeString);
+        break;
       case MessageType.text:
       default:
         content = _buildTextContent(message, isMe, timeString);
@@ -972,6 +963,76 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Text(message.text ?? '', style: GoogleFonts.outfit(
               color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, height: 1.4)),
+          const SizedBox(height: 6),
+          _buildTimestamp(timeString, isMe, cs),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCallContent(Message message, bool isMe, String timeString) {
+    final cs = _cs;
+    Map<String, dynamic>? data;
+    try {
+      if (message.text != null) {
+        data = jsonDecode(message.text!);
+      }
+    } catch (_) {}
+
+    final status = data?['status'] ?? 'ended';
+    final duration = data?['duration'] as int? ?? 0;
+    final callType = data?['call_type'] ?? 'audio';
+
+    final isMissed = status == 'missed' || status == 'declined';
+    final iconColor = isMissed ? cs.error : (isMe ? cs.onPrimary : cs.primary);
+    final iconData = callType == 'video' ? Icons.videocam_rounded : Icons.call_rounded;
+
+    String title;
+    if (isMissed) {
+      title = isMe ? 'Unanswered ${callType} call' : 'Missed ${callType} call';
+    } else {
+      title = '${callType.substring(0, 1).toUpperCase()}${callType.substring(1)} call';
+    }
+
+    String subtitle = duration > 0 
+        ? '${duration ~/ 60}:${(duration % 60).toString().padLeft(2, '0')}'
+        : (isMissed ? 'Missed' : 'Ended');
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      decoration: BoxDecoration(
+        color: isMe ? cs.primary : cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
+          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isMe ? Colors.white.withValues(alpha: 0.2) : cs.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(iconData, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: GoogleFonts.outfit(
+                      color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(subtitle, style: GoogleFonts.outfit(
+                      color: isMe ? cs.onPrimary.withValues(alpha: 0.8) : cs.onSurfaceVariant, fontSize: 13)),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
           _buildTimestamp(timeString, isMe, cs),
         ],

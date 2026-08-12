@@ -8,6 +8,7 @@ import '../models/user_profile_model.dart';
 import '../services/local_db_service.dart';
 import '../services/supabase_broadcast_service.dart';
 import '../services/media_upload_service.dart';
+import '../widgets/user_avatar.dart';
 // app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'login_screen.dart';
 
@@ -305,17 +306,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: cs.surfaceContainerHighest,
         child: const CircularProgressIndicator(strokeWidth: 2),
       );
-    } else if (_profile?.avatarUrl.isNotEmpty == true &&
-        _profile!.avatarUrl.startsWith('http')) {
-      // URL-based avatar from Supabase Storage
-      avatarContent = CircleAvatar(
-        radius: 56,
-        backgroundImage: NetworkImage(_profile!.avatarUrl),
-        onBackgroundImageError: (_, __) {},
-        child: null,
-      );
     } else {
-      avatarContent = _buildLetterAvatar(cs);
+      // Use shared UserAvatar for both network and fallback
+      avatarContent = UserAvatar(
+        imageUrl: (_profile?.avatarUrl.isNotEmpty == true && _profile!.avatarUrl.startsWith('http'))
+            ? _profile!.avatarUrl
+            : null,
+        name: _peerDisplayName ?? _profile?.username ?? '',
+        radius: 56,
+      );
     }
 
     return GestureDetector(
@@ -338,23 +337,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLetterAvatar(ColorScheme cs) {
-    // WhatsApp-style: prefer display name initial for peer profiles
-    final name = _peerDisplayName ?? _profile?.username ?? '';
-    return CircleAvatar(
-      radius: 56,
-      backgroundColor: cs.surfaceContainerHigh,
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: GoogleFonts.outfit(
-          fontSize: 40,
-          fontWeight: FontWeight.w600,
-          color: cs.primary,
-        ),
       ),
     );
   }

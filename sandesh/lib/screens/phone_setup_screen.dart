@@ -83,17 +83,45 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('No authenticated user found');
 
-      final profile = UserProfile(
-        username: _e164Phone!,
-        phone: _e164Phone!,
-        phoneE164: _e164Phone!,
-      );
+      // Check if profile exists by phone number
+      final existingProfile = await supabase
+          .from('profiles')
+          .select()
+          .eq('phone_e164', _e164Phone!)
+          .maybeSingle();
 
-      // Upsert to Supabase profiles table keyed by auth UUID
-      await supabase.from('profiles').upsert(
-        profile.toSupabaseMap(authId: user.id),
-        onConflict: 'id',
-      );
+      UserProfile profile;
+
+      if (existingProfile != null) {
+        // Reuse existing profile
+        profile = UserProfile(
+          username: existingProfile['username'] as String,
+          phone: existingProfile['phone_e164'] as String,
+          phoneE164: existingProfile['phone_e164'] as String,
+          bio: existingProfile['bio'] as String? ?? '',
+          avatarUrl: existingProfile['avatar_url'] as String? ?? '',
+          hashedPhone: existingProfile['hashed_phone'] as String? ?? '',
+        );
+
+        // Relink the existing profile to the new auth user ID
+        await supabase.rpc('relink_profile_to_new_auth', params: {
+          'p_phone': _e164Phone!,
+          'p_new_auth_id': user.id,
+        });
+      } else {
+        // Create new profile
+        profile = UserProfile(
+          username: _e164Phone!,
+          phone: _e164Phone!,
+          phoneE164: _e164Phone!,
+        );
+
+        // Upsert to Supabase profiles table keyed by auth UUID
+        await supabase.from('profiles').upsert(
+          profile.toSupabaseMap(authId: user.id),
+          onConflict: 'id',
+        );
+      }
 
       // Save to local SQLite
       await LocalDbService().saveProfile(profile);

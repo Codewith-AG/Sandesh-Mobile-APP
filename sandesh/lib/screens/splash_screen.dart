@@ -181,16 +181,6 @@ class _SplashScreenState extends State<SplashScreen>
                             letterSpacing: 1.5,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Secure  •  Fast  •  Local',
-                          style: GoogleFonts.urbanist(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.white70,
-                            letterSpacing: 2,
-                          ),
-                        ),
                       ],
                     ),
                   ),

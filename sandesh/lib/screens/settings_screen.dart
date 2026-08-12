@@ -186,6 +186,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: GoogleFonts.outfit(
                     color: cs.onSurfaceVariant, fontSize: 14)),
           ),
+          const SizedBox(height: 32),
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Made with ',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Icon(
+                  Icons.favorite,
+                  color: Colors.red,
+                  size: 16,
+                ),
+                Text(
+                  ' in India',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
         ],
       ),
     );

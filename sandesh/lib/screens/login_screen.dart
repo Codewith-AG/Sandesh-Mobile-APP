@@ -7,6 +7,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 // app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'home_screen.dart';
 import 'phone_setup_screen.dart';
+import '../models/user_profile_model.dart';
+import '../services/local_db_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -118,6 +120,21 @@ class _LoginScreenState extends State<LoginScreen>
       if (profile != null && profile['phone_e164'] != null) {
         final username = profile['username'] as String?;
         final phone = profile['phone_e164'] as String?;
+        final bio = profile['bio'] as String?;
+        final avatarUrl = profile['avatar_url'] as String?;
+        final hashedPhone = profile['hashed_phone'] as String?;
+
+        if (username != null && phone != null) {
+          final userProfile = UserProfile(
+            username: username,
+            phone: phone,
+            phoneE164: phone,
+            bio: bio ?? '',
+            avatarUrl: avatarUrl ?? '',
+            hashedPhone: hashedPhone ?? '',
+          );
+          await LocalDbService().saveProfile(userProfile);
+        }
 
         final prefs = await SharedPreferences.getInstance();
         if (username != null) {
