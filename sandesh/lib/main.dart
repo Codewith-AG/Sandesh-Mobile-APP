@@ -125,19 +125,6 @@ void main() async {
         importance: Importance.max,
       ));
 
-  // Request notification permission on Android 13+ (API 33+)
-  // On older Android versions this is a no-op — permission is granted by default.
-  final notifStatus = await Permission.notification.status;
-  if (!notifStatus.isGranted) {
-    await Permission.notification.request();
-  }
-  // Firebase's own request — works on both iOS and Android 13+
-  await FirebaseMessaging.instance.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
-
   // ── Eager FCM token sync — runs at every cold start so the token is always
   //    fresh in Supabase before any peer tries to send a message. This is the
   //    critical fix for the "no notification when app is killed" bug.
@@ -284,6 +271,21 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
 
     // ── Self-update check (fire-and-forget, respects 6-hour cache) ──
     _initUpdateCheck();
+
+    // ── Request permissions safely after UI is rendering ──
+    _requestPermissions();
+  }
+
+  Future<void> _requestPermissions() async {
+    final notifStatus = await Permission.notification.status;
+    if (!notifStatus.isGranted) {
+      await Permission.notification.request();
+    }
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
   }
 
   /// Check for app updates after a delay (avoids splash screen interference).
