@@ -247,7 +247,7 @@ class UpdateWorker(
      * recoverable network/server error or if the worker was stopped — in that
      * case the .part file is left on disk so the next run resumes from its length.
      */
-    private fun downloadWithResume(downloadUrl: String, partFile: File): Boolean {
+    private suspend fun downloadWithResume(downloadUrl: String, partFile: File): Boolean {
         var existing = if (partFile.exists()) partFile.length() else 0L
 
         val connection = URL(downloadUrl).openConnection() as HttpURLConnection
@@ -315,7 +315,7 @@ class UpdateWorker(
                             val pct = ((downloaded * 100) / total).toInt()
                             if (pct != lastPct) {
                                 lastPct = pct
-                                try { setForegroundAsync(buildForegroundInfo(pct)) } catch (_: Exception) {}
+                                try { setForeground(buildForegroundInfo(pct)) } catch (_: Exception) {}
                             }
                         }
                     }
