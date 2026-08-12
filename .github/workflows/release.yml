@@ -43,7 +43,6 @@ jobs:
 
       - name: Verify Version Code strictly increasing
         run: |
-          # Fetch latest release update.json to get remote versionCode
           HTTP_STATUS=$(curl -sL -w "%{http_code}" -o update.json https://github.com/Codewith-AG/Sandesh-Releases/releases/latest/download/update.json || echo "curl_failed")
           
           if [ "$HTTP_STATUS" = "200" ]; then
@@ -63,10 +62,20 @@ jobs:
           fi
 
       - name: Set up Java 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Install Android SDK 36 and NDK 27
+        run: |
+          echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install \
+            "platforms;android-36" \
+            "ndk;27.3.13750724" \
+            "build-tools;34.0.0" 2>/dev/null || true
+          echo "Installed SDK components:"
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed 2>/dev/null | \
+            grep -E 'android-36|ndk;27|build-tools' || true
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -77,11 +86,11 @@ jobs:
       - name: Create .env file
         run: |
           echo "${{ secrets.FLUTTER_ENV }}" > sandesh/.env
-          
+
       - name: Set up Android Keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > sandesh/android/sandesh-release.keystore
-          
+
       - name: Create key.properties
         run: |
           cat > sandesh/android/key.properties << EOF
