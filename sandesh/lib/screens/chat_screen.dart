@@ -680,7 +680,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                scrollCacheExtent: 1000,
+                scrollCacheExtent: const ScrollCacheExtent.pixels(1000),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
