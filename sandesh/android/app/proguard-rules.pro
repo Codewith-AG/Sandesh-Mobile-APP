@@ -17,3 +17,10 @@
 
 # Supabase
 -keep class io.supabase.** { *; }
+
+# Play Core (referenced by Flutter's deferred components / dynamic delivery,
+# but this app does not use Play Store dynamic delivery — safe to ignore)
+-dontwarn com.google.android.play.core.**
+-dontwarn com.google.android.play.core.splitcompat.**
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
