@@ -360,8 +360,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
-        title: Text('Delete Selected Chats?', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
-        content: Text('Are you sure you want to delete ${_selectedUsernames.length} conversation(s)? This will delete them locally and on the server for you.', style: GoogleFonts.outfit(color: cs.onSurfaceVariant)),
+        title: Text('Delete conversation', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
+        content: Text('Are you sure want to delete this conversation!', style: GoogleFonts.outfit(color: cs.onSurfaceVariant)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline))),
           ElevatedButton(
@@ -377,6 +377,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final supabase = Supabase.instance.client;
       for (final u in _selectedUsernames) {
         await LocalDbService().deleteChatHistory(_myUsername, u);
+        // Also remove the contact row so the conversation disappears from the
+        // home list instead of lingering as an empty chat.
+        await LocalDbService().deleteContact(u);
         try {
           await supabase.from('messages').delete().or(
             'and(sender_username.eq.$_myUsername,receiver_username.eq.$u),and(sender_username.eq.$u,receiver_username.eq.$_myUsername)'

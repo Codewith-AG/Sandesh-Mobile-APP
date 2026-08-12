@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/contact_model.dart';
 import '../models/group_model.dart';
 import '../services/local_db_service.dart';
+import '../services/group_events.dart';
 // app_theme.dart intentionally not imported — all colors from Theme.of(context)
 
 class CreateGroupScreen extends StatefulWidget {
@@ -154,6 +155,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
       for (final username in _selectedUsernames) {
         await LocalDbService().insertGroupMember(groupId, username);
       }
+
+      // 3b. Post a system message announcing the group creation.
+      await sendGroupSystemMessage(
+        groupId: groupId,
+        actingUsername: widget.myUsername,
+        text: '${widget.myUsername} created the group "$groupName"',
+      );
 
       // 4. Pop back with the created group so HomeScreen can use it
       if (mounted) {

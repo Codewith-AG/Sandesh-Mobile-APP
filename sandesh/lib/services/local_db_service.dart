@@ -277,6 +277,7 @@ class LocalDbService {
           case MessageType.call:
             lastMessageText = '📞 Call';
             break;
+          case MessageType.system:
           case MessageType.text:
             lastMessageText = lastMsg.text;
             break;
@@ -303,6 +304,14 @@ class LocalDbService {
     });
 
     return enriched;
+  }
+
+  /// Deletes a single contact row. Used when the user deletes a conversation
+  /// so the chat no longer shows up on the home screen.
+  Future<void> deleteContact(String username) async {
+    final db = await database;
+    await db.delete('contacts',
+        where: 'LOWER(username) = ?', whereArgs: [username.toLowerCase()]);
   }
 
   Future<bool> contactExists(String username) async {

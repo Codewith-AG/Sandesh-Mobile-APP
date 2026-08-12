@@ -1,5 +1,5 @@
 /// Supported message content types.
-enum MessageType { text, image, video, document, call, callInvite, callAccepted, callRejected, callEnded }
+enum MessageType { text, image, video, document, call, callInvite, callAccepted, callRejected, callEnded, system }
 
 /// Extension to convert between enum and DB string values.
 extension MessageTypeX on MessageType {
@@ -23,6 +23,8 @@ extension MessageTypeX on MessageType {
         return 'call_rejected';
       case MessageType.callEnded:
         return 'call_ended';
+      case MessageType.system:
+        return 'system';
     }
   }
 
@@ -49,6 +51,8 @@ extension MessageTypeX on MessageType {
         return MessageType.callRejected;
       case 'call_ended':
         return MessageType.callEnded;
+      case 'system':
+        return MessageType.system;
       default:
         return MessageType.text;
     }

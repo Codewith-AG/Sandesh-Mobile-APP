@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/message_model.dart';
 import 'supabase_broadcast_service.dart';
+import 'local_db_service.dart';
 
 /// Wraps a CallToken result with an optional error message.
 /// When [token] is null, [error] explains why.
@@ -173,7 +174,51 @@ class CallService {
       callType: callType,
     ));
 
+    // Log the outgoing call so it shows up in the Calls tab (call history)
+    // and as a call bubble inside the 1:1 chat. Fire-and-forget: never block
+    // or fail the call because of logging.
+    _logOutgoingCall(receiverUsername, callType);
+
     return (token: result.token, error: null); // success with token
+  }
+
+  /// Records an outgoing call in two places:
+  ///  1. The Supabase `calls` table — powers the Calls tab / call history.
+  ///  2. A local `call`-type message — shows as a call bubble in the chat.
+  Future<void> _logOutgoingCall(String receiverUsername, String callType) async {
+    final to = receiverUsername.toLowerCase();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+
+    try {
+      await Supabase.instance.client.from('calls').insert({
+        'caller_username': _myUsername,
+        'receiver_username': to,
+        'call_type': callType,
+        'status': 'outgoing',
+      });
+    } catch (e) {
+      debugPrint('CallService: failed to log call history: $e');
+    }
+
+    try {
+      final msg = Message(
+        id: '${_myUsername}_call_$ts',
+        senderUsername: _myUsername,
+        receiverUsername: to,
+        text: jsonEncode({
+          'status': 'outgoing',
+          'duration': 0,
+          'call_type': callType,
+        }),
+        messageType: MessageType.call,
+        callType: callType,
+        isMe: true,
+        timestamp: ts,
+      );
+      await LocalDbService().insertMessage(msg);
+    } catch (e) {
+      debugPrint('CallService: failed to log call message: $e');
+    }
   }
 
   /// Returns the token + per-user uid for the caller to use in CallScreen.

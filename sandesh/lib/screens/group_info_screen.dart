@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../services/local_db_service.dart';
+import '../services/media_upload_service.dart';
+import '../services/group_events.dart';
 import '../models/group_model.dart';
 // app_theme.dart intentionally not imported — all colors from Theme.of(context)
 
@@ -321,6 +325,15 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       await LocalDbService()
           .removeGroupMember(widget.groupId, username);
 
+      // Post a system notice into the group chat.
+      final actorName =
+          _displayNames[widget.myUsername.toLowerCase()] ?? widget.myUsername;
+      await sendGroupSystemMessage(
+        groupId: widget.groupId,
+        actingUsername: widget.myUsername,
+        text: '$actorName removed $displayName',
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -339,6 +352,116 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e', style: GoogleFonts.outfit()),
+            backgroundColor: cs.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _makeAdmin(String username) async {
+    final displayName = _displayNames[username] ?? username;
+    try {
+      await Supabase.instance.client
+          .from('group_members')
+          .update({'role': 'admin'})
+          .eq('group_id', widget.groupId)
+          .eq('username', username.toLowerCase());
+      await LocalDbService()
+          .insertGroupMember(widget.groupId, username, role: 'admin');
+
+      final actorName =
+          _displayNames[widget.myUsername.toLowerCase()] ?? widget.myUsername;
+      await sendGroupSystemMessage(
+        groupId: widget.groupId,
+        actingUsername: widget.myUsername,
+        text: '$actorName made $displayName an admin',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$displayName is now an admin',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+      await _loadGroupInfo();
+    } catch (e) {
+      if (mounted) {
+        final cs = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e', style: GoogleFonts.outfit()),
+            backgroundColor: cs.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Lets an admin pick an image and set it as the group's display picture.
+  Future<void> _changeGroupPhoto() async {
+    try {
+      final picked = await ImagePicker()
+          .pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (picked == null) return;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Uploading group photo…',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      // Reuse the public `avatars` bucket, scoped under a group-specific key.
+      final url = await MediaUploadService()
+          .uploadAvatar(File(picked.path), 'group_${widget.groupId}');
+
+      await Supabase.instance.client
+          .from('groups')
+          .update({'avatar_url': url}).eq('id', widget.groupId);
+
+      // Update local copy so it reflects immediately.
+      final g = _group;
+      if (g != null) {
+        await LocalDbService().insertGroup(g.copyWith(avatarUrl: url));
+      }
+
+      final actorName =
+          _displayNames[widget.myUsername.toLowerCase()] ?? widget.myUsername;
+      await sendGroupSystemMessage(
+        groupId: widget.groupId,
+        actingUsername: widget.myUsername,
+        text: '$actorName changed the group photo',
+      );
+
+      await _loadGroupInfo();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Group photo updated',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final cs = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Error updating photo: $e', style: GoogleFonts.outfit()),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -505,6 +628,18 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               .insertGroupMember(widget.groupId, username);
         }
 
+        // Post a system notice for each added member.
+        final actorName =
+            _displayNames[widget.myUsername.toLowerCase()] ?? widget.myUsername;
+        for (final username in selected) {
+          final addedName = _displayNames[username] ?? username;
+          await sendGroupSystemMessage(
+            groupId: widget.groupId,
+            actingUsername: widget.myUsername,
+            text: '$actorName added $addedName',
+          );
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -632,6 +767,27 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               ),
             )
           : null,
+      trailing: (_isAdmin && !isMe)
+          ? PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+              onSelected: (value) {
+                if (value == 'make_admin') {
+                  _makeAdmin(username);
+                } else if (value == 'remove') {
+                  _removeMember(username);
+                }
+              },
+              itemBuilder: (context) => [
+                if (!isAdmin)
+                  PopupMenuItem(
+                      value: 'make_admin',
+                      child: Text('Make admin', style: GoogleFonts.outfit())),
+                PopupMenuItem(
+                    value: 'remove',
+                    child: Text('Remove', style: GoogleFonts.outfit())),
+              ],
+            )
+          : null,
       onLongPress: (_isAdmin && !isMe)
           ? () => _removeMember(username)
           : null,
@@ -678,7 +834,32 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 children: [
                   // ── Group header (avatar + name + description) ──
                   const SizedBox(height: 12),
-                  Center(child: _buildGroupAvatar(cs)),
+                  Center(
+                    child: GestureDetector(
+                      onTap: _isAdmin ? _changeGroupPhoto : null,
+                      child: Stack(
+                        children: [
+                          _buildGroupAvatar(cs),
+                          if (_isAdmin)
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: cs.primary,
+                                  shape: BoxShape.circle,
+                                  border:
+                                      Border.all(color: cs.surface, width: 2),
+                                ),
+                                child: Icon(Icons.camera_alt_rounded,
+                                    size: 16, color: cs.onPrimary),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Center(
                     child: Text(

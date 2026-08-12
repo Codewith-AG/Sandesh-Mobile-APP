@@ -513,6 +513,29 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final isMe = message.isMe;
     final timeString = DateFormat('h:mm a').format(DateTime.fromMillisecondsSinceEpoch(message.timestamp));
 
+    // System notices (member added/removed, group created, admin changes,
+    // photo changed) render as a centered pill, WhatsApp-style.
+    if (message.messageType == MessageType.system) {
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: _cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            message.text ?? '',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: _cs.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
     // Check if previous message is from the same sender (for grouping)
     final msgIndex = _messages.indexOf(message);
     final showSenderName = !isMe && (msgIndex == 0 ||
