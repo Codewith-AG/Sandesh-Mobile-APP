@@ -259,6 +259,7 @@ class LocalDbService {
           case MessageType.callAccepted:
           case MessageType.callRejected:
           case MessageType.callEnded:
+          case MessageType.call:
             lastMessageText = '📞 Call';
             break;
           case MessageType.text:

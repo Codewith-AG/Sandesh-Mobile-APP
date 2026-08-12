@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../widgets/user_avatar.dart';
-import '../theme/app_theme.dart';
 import 'chat_screen.dart'; 
 
 class CallsTab extends StatefulWidget {

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart' hide Config;
 import 'package:intl/intl.dart';
@@ -989,7 +990,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     String title;
     if (isMissed) {
-      title = isMe ? 'Unanswered ${callType} call' : 'Missed ${callType} call';
+      title = isMe ? 'Unanswered $callType call' : 'Missed $callType call';
     } else {
       title = '${callType.substring(0, 1).toUpperCase()}${callType.substring(1)} call';
     }
