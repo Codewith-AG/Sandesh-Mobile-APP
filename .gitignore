@@ -11,11 +11,19 @@ Thumbs.db
 
 # Environments and Sensitive Keys
 .env
+.env.*
 *.keystore
 *.jks
+key.properties
+sandesh/android/key.properties
 
-# Flutter subproject build and cache outputs
+# Gradle / Android / Flutter build and cache outputs (never commit build output)
+build/
 sandesh/build/
+sandesh/android/build/
+sandesh/android/app/build/
+sandesh/android/.gradle/
+.gradle/
 sandesh/.dart_tool/
 sandesh/.pub/
 sandesh/.pub-cache/
