@@ -50,6 +50,7 @@ class LocalDbService {
     ''');
     await db.execute('CREATE INDEX idx_msg_sender ON messages(sender_username)');
     await db.execute('CREATE INDEX idx_msg_receiver ON messages(receiver_username)');
+    await db.execute('CREATE INDEX idx_msg_sender_receiver ON messages(sender_username, receiver_username)');
     await db.execute('CREATE INDEX idx_msg_timestamp ON messages(timestamp)');
 
     await db.execute('''
@@ -123,20 +124,34 @@ class LocalDbService {
 
   Future<void> insertMessage(Message message) async {
     final db = await database;
-    await db.insert('messages', message.toMap(),
+    final map = message.toMap();
+    map['sender_username'] = (map['sender_username'] as String).toLowerCase();
+    map['receiver_username'] = (map['receiver_username'] as String).toLowerCase();
+    // Stop storing huge base64 strings in DB
+    map.remove('media_base64');
+    await db.insert('messages', map,
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<Message>> getMessages(String myUsername, String chatWithUsername) async {
+  Future<List<Message>> getMessages(String myUsername, String chatWithUsername, {int limit = 50, int? beforeTimestamp}) async {
     final db = await database;
     final my = myUsername.toLowerCase();
     final peer = chatWithUsername.toLowerCase();
+    
+    String whereClause = '(sender_username = ? AND receiver_username = ?) OR (sender_username = ? AND receiver_username = ?)';
+    List<dynamic> whereArgs = [my, peer, peer, my];
+
+    if (beforeTimestamp != null) {
+      whereClause = '($whereClause) AND timestamp < ?';
+      whereArgs.add(beforeTimestamp);
+    }
+
     final results = await db.query(
       'messages',
-      where:
-          '(LOWER(sender_username) = ? AND LOWER(receiver_username) = ?) OR (LOWER(sender_username) = ? AND LOWER(receiver_username) = ?)',
-      whereArgs: [my, peer, peer, my],
-      orderBy: 'timestamp ASC',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'timestamp DESC',
+      limit: limit,
     );
     return results.map((m) => Message.fromMap(m)).toList();
   }
@@ -159,7 +174,7 @@ class LocalDbService {
     await db.delete(
       'messages',
       where:
-          '(LOWER(sender_username) = ? AND LOWER(receiver_username) = ?) OR (LOWER(sender_username) = ? AND LOWER(receiver_username) = ?)',
+          '(sender_username = ? AND receiver_username = ?) OR (sender_username = ? AND receiver_username = ?)',
       whereArgs: [my, peer, peer, my],
     );
   }
@@ -172,7 +187,7 @@ class LocalDbService {
     final results = await db.query(
       'messages',
       where:
-          '(LOWER(sender_username) = ? AND LOWER(receiver_username) = ?) OR (LOWER(sender_username) = ? AND LOWER(receiver_username) = ?)',
+          '(sender_username = ? AND receiver_username = ?) OR (sender_username = ? AND receiver_username = ?)',
       whereArgs: [my, peer, peer, my],
       orderBy: 'timestamp DESC',
       limit: 1,
@@ -464,12 +479,21 @@ class LocalDbService {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<Map<String, dynamic>>> getGroupMessages(String groupId) async {
+  Future<List<Map<String, dynamic>>> getGroupMessages(String groupId, {int limit = 50, int? beforeTimestamp}) async {
     final db = await database;
+    String whereClause = 'group_id = ?';
+    List<dynamic> whereArgs = [groupId];
+
+    if (beforeTimestamp != null) {
+      whereClause += ' AND timestamp < ?';
+      whereArgs.add(beforeTimestamp);
+    }
+
     return await db.query('group_messages',
-        where: 'group_id = ?',
-        whereArgs: [groupId],
-        orderBy: 'timestamp ASC');
+        where: whereClause,
+        whereArgs: whereArgs,
+        orderBy: 'timestamp DESC',
+        limit: limit);
   }
 
   Future<Map<String, dynamic>?> getLastGroupMessage(String groupId) async {
@@ -487,5 +511,22 @@ class LocalDbService {
     final db = await database;
     await db.delete('group_messages',
         where: 'group_id = ?', whereArgs: [groupId]);
+  }
+
+  // ──────────────────────────── Maintenance ────────────────────────────
+
+  Future<void> cleanupOldMessages({int olderThanDays = 30}) async {
+    final db = await database;
+    final cutoffTimestamp = DateTime.now().subtract(Duration(days: olderThanDays)).millisecondsSinceEpoch;
+    await db.delete(
+      'messages',
+      where: 'timestamp < ?',
+      whereArgs: [cutoffTimestamp],
+    );
+    await db.delete(
+      'group_messages',
+      where: 'timestamp < ?',
+      whereArgs: [cutoffTimestamp],
+    );
   }
 }

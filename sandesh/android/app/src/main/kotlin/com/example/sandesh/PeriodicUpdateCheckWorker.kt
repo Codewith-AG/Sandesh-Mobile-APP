@@ -75,6 +75,7 @@ class PeriodicUpdateCheckWorker(
                 
                 val workRequest = OneTimeWorkRequestBuilder<UpdateWorker>()
                     .setConstraints(constraintsBuilder.build())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, WorkRequest.MIN_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
                     .setInputData(
                         workDataOf(
                             UpdateWorker.KEY_DOWNLOAD_URL to downloadUrl,
@@ -108,6 +109,7 @@ class PeriodicUpdateCheckWorker(
                 
             val request = PeriodicWorkRequestBuilder<PeriodicUpdateCheckWorker>(6, TimeUnit.HOURS)
                 .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, WorkRequest.MIN_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
                 .build()
                 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(

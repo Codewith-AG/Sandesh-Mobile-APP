@@ -105,7 +105,7 @@ jobs:
 
       - name: Build Release APK
         working-directory: sandesh
-        run: flutter build apk --release --target-platform=android-arm64 --build-name=${{ env.VERSION_NAME }} --build-number=${{ env.VERSION_CODE }}
+        run: flutter build apk --release --target-platform=android-arm64 --build-name=${{ env.VERSION_NAME }} --build-number=${{ env.VERSION_CODE }} --dart-define-from-file=.env --split-debug-info=build/symbols --obfuscate
 
       - name: Verify APK Signature
         working-directory: sandesh

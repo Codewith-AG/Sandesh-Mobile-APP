@@ -19,6 +19,7 @@ import 'call_screen.dart';
 import '../services/call_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../widgets/user_avatar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ChatScreen extends StatefulWidget {
   final String myUsername;
@@ -57,8 +58,8 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Block status for this peer user.
   bool _isBlocked = false;
 
-  /// Timer that periodically refreshes the "last seen X ago" text.
-  Timer? _lastSeenRefreshTimer;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
 
   /// Cached ColorScheme — set at the top of build() so all helper methods can use it.
   late ColorScheme _cs;
@@ -75,15 +76,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageSubscription = SupabaseBroadcastService()
         .messageStream
         .listen(_handleNewMessage);
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadMessages();
     });
     _listenToPeerPresence();
-    // Auto-refresh "Last seen X ago" text every 30 seconds
-    _lastSeenRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
-    });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels < 200 && !_isLoadingMore && _hasMore) {
+      _loadMoreMessages();
+    }
   }
 
   /// Resolves the display name: uses widget param if provided, otherwise
@@ -182,7 +186,6 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _presenceSubscription?.cancel();
-    _lastSeenRefreshTimer?.cancel();
     SupabaseBroadcastService().activeChatUser = null;
     _messageSubscription?.cancel();
     _textController.dispose();
@@ -203,16 +206,38 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadMessages() async {
-    final messages = await LocalDbService().getMessages(widget.myUsername, widget.receiverUsername);
+    final messages = await LocalDbService().getMessages(widget.myUsername, widget.receiverUsername, limit: 50);
     if (mounted) {
-      setState(() => _messages = messages);
+      setState(() {
+        _messages = messages.reversed.toList();
+        _hasMore = messages.length == 50;
+      });
       _scrollToBottom();
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (_messages.isEmpty) return;
+    setState(() => _isLoadingMore = true);
+    final oldestTimestamp = _messages.first.timestamp;
+    final olderMessages = await LocalDbService().getMessages(
+      widget.myUsername, 
+      widget.receiverUsername, 
+      limit: 50, 
+      beforeTimestamp: oldestTimestamp
+    );
+    if (mounted) {
+      setState(() {
+        _messages.insertAll(0, olderMessages.reversed.toList());
+        _hasMore = olderMessages.length == 50;
+        _isLoadingMore = false;
+      });
     }
   }
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      Future.delayed(const Duration(milliseconds: 80), () {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
             _scrollController.position.maxScrollExtent,
@@ -521,7 +546,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return items;
   }
 
-  String _formatLastSeen(DateTime? lastSeen) {
+  static String _formatLastSeen(DateTime? lastSeen) {
     if (lastSeen == null) return 'Offline';
     final now = DateTime.now();
     final local = lastSeen.toLocal();
@@ -655,12 +680,16 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
+                cacheExtent: 1000,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final item = items[index];
                   if (item is String) return _buildDateSeparator(item);
-                  return _buildMessageBubble(item as Message);
+                  return KeyedSubtree(
+                    key: ValueKey((item as Message).id),
+                    child: _buildMessageBubble(item),
+                  );
                 },
               ),
             ),
@@ -760,16 +789,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Row(children: [
-                    if (_isPeerOnline) ...[
-                      Container(width: 8, height: 8,
-                          decoration: BoxDecoration(color: Colors.green.shade400, shape: BoxShape.circle)),
-                      const SizedBox(width: 4),
-                      Text('Online', style: GoogleFonts.outfit(fontSize: 13, color: Colors.green.shade500, fontWeight: FontWeight.w500)),
-                    ] else ...[
-                      Text(_formatLastSeen(_peerLastSeen), style: GoogleFonts.outfit(fontSize: 13, color: cs.onSurfaceVariant, fontWeight: FontWeight.w400)),
-                    ],
-                  ]),
+                  _LastSeenSubtitle(isOnline: _isPeerOnline, lastSeen: _peerLastSeen, cs: cs),
                 ],
               ),
             ),
@@ -1052,33 +1072,28 @@ class _ChatScreenState extends State<ChatScreen> {
       imageWidget = Image.file(
         File(localPath),
         width: 220, height: 220, fit: BoxFit.cover,
+        cacheWidth: 440, cacheHeight: 440,
         errorBuilder: (_, __, ___) => Container(
             width: 220, height: 220,
             color: cs.surfaceContainerHigh,
             child: Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant)),
       );
     } else if (networkUrl != null && networkUrl.startsWith('http')) {
-      imageWidget = Image.network(
-        networkUrl,
+      imageWidget = CachedNetworkImage(
+        imageUrl: networkUrl,
         width: 220, height: 220, fit: BoxFit.cover,
-        loadingBuilder: (_, child, progress) => progress == null
-            ? child
-            : Container(
+        memCacheWidth: 440, memCacheHeight: 440,
+        placeholder: (_, __) => Container(
                 width: 220, height: 220,
                 color: cs.surfaceContainerHigh,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(
-                      value: progress.expectedTotalBytes != null
-                          ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                          : null,
-                      strokeWidth: 2, color: cs.primary,
-                    ),
+                    CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
                   ],
                 ),
               ),
-        errorBuilder: (_, __, ___) => Container(
+        errorWidget: (_, __, ___) => Container(
             width: 220, height: 100,
             color: cs.surfaceContainerHigh,
             child: Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant)),
@@ -1132,32 +1147,62 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(
-                child: Icon(Icons.play_circle_filled_rounded, size: 48, color: Colors.white),
-              ),
+    return GestureDetector(
+      onTap: () {
+        final heroTag = 'media_${message.id}';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MediaViewerScreen(
+              heroTag: heroTag,
+              localPath: message.localPath,
+              networkUrl: message.mediaUrl,
+              isVideo: true,
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.videocam_outlined, size: 16, color: isMe ? cs.onPrimary : cs.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Text('Video', style: GoogleFonts.outfit(
-                    fontSize: 14, color: isMe ? cs.onPrimary : cs.onSurface, fontWeight: FontWeight.w500)),
-                const Spacer(),
-                _buildTimestamp(timeString, isMe, cs),
-              ],
-            ),
-          ],
+          ),
+        );
+      },
+      child: Container(
+        width: 220,
+        decoration: BoxDecoration(
+          color: isMe ? cs.primary : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
+            bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Hero(
+                tag: 'media_${message.id}',
+                child: Container(
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.play_circle_filled_rounded, size: 48, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.videocam_outlined, size: 16, color: isMe ? cs.onPrimary : cs.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Text('Video', style: GoogleFonts.outfit(
+                      fontSize: 14, color: isMe ? cs.onPrimary : cs.onSurface, fontWeight: FontWeight.w500)),
+                  const Spacer(),
+                  _buildTimestamp(timeString, isMe, cs),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1328,3 +1373,47 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
+class _LastSeenSubtitle extends StatefulWidget {
+  final bool isOnline;
+  final DateTime? lastSeen;
+  final ColorScheme cs;
+
+  const _LastSeenSubtitle({required this.isOnline, this.lastSeen, required this.cs});
+
+  @override
+  State<_LastSeenSubtitle> createState() => _LastSeenSubtitleState();
+}
+
+class _LastSeenSubtitleState extends State<_LastSeenSubtitle> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      if (widget.isOnline) ...[
+        Container(width: 8, height: 8,
+            decoration: BoxDecoration(color: Colors.green.shade400, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text('Online', style: GoogleFonts.outfit(fontSize: 13, color: Colors.green.shade500, fontWeight: FontWeight.w500)),
+      ] else ...[
+        Text(_ChatScreenState._formatLastSeen(widget.lastSeen), style: GoogleFonts.outfit(fontSize: 13, color: widget.cs.onSurfaceVariant, fontWeight: FontWeight.w400)),
+      ],
+    ]);
+  }
+}
+
