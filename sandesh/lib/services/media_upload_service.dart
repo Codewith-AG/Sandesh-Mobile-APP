@@ -28,7 +28,7 @@ class MediaUploadService {
   // Allowed document extensions.
   static const Set<String> _allowedDocExts = {
     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-    '.txt', '.zip', '.rtf', '.csv',
+    '.txt', '.zip', '.rtf', '.csv', '.png', '.jpg', '.jpeg',
   };
 
   static final RegExp _filenameSanitizer = RegExp(r'[^A-Za-z0-9._-]');
@@ -92,7 +92,7 @@ class MediaUploadService {
     );
 
     final uploadFile = File(compressed?.path ?? imageFile.path);
-    final storagePath = 'avatars/$safeName.jpg';
+    final storagePath = '$safeName.jpg';
 
     await _client.storage.from('avatars').upload(
           storagePath,
@@ -232,6 +232,11 @@ class MediaUploadService {
         return 'text/plain';
       case '.zip':
         return 'application/zip';
+      case '.png':
+        return 'image/png';
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
       default:
         return 'application/octet-stream';
     }

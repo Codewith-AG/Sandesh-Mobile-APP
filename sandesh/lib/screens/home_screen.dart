@@ -40,6 +40,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
   int _currentTab = 0;
+  
+  bool _isSelectionMode = false;
+  final Set<String> _selectedUsernames = {};
 
   @override
   void initState() {
@@ -350,6 +353,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _deleteSelectedChats() async {
+    final cs = Theme.of(context).colorScheme;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        title: Text('Delete Selected Chats?', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
+        content: Text('Are you sure you want to delete ${_selectedUsernames.length} conversation(s)? This will delete them locally and on the server for you.', style: GoogleFonts.outfit(color: cs.onSurfaceVariant)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: cs.error),
+            child: Text('Delete', style: GoogleFonts.outfit(color: cs.onError)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final supabase = Supabase.instance.client;
+      for (final u in _selectedUsernames) {
+        await LocalDbService().deleteChatHistory(_myUsername, u);
+        try {
+          await supabase.from('messages').delete().or(
+            'and(sender_username.eq.$_myUsername,receiver_username.eq.$u),and(sender_username.eq.$u,receiver_username.eq.$_myUsername)'
+          );
+        } catch (e) {
+          debugPrint('Error deleting server messages: $e');
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _isSelectionMode = false;
+          _selectedUsernames.clear();
+        });
+        _loadContacts();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -364,7 +408,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Padding(
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => setState(() {
+                  _isSelectionMode = false;
+                  _selectedUsernames.clear();
+                }),
+              )
+            : Padding(
           padding: const EdgeInsets.only(left: 20),
           child: GestureDetector(
             onTap: () {
@@ -395,32 +447,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
           ),
         ),
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                style: GoogleFonts.outfit(color: cs.onSurface, fontSize: 16),
-                decoration: InputDecoration(
-                  hintText: 'Search chats...',
-                  border: InputBorder.none,
-                  hintStyle: GoogleFonts.outfit(color: cs.onSurfaceVariant),
+        title: _isSelectionMode
+            ? Text('${_selectedUsernames.length} Selected', style: GoogleFonts.outfit(color: cs.onSurface, fontWeight: FontWeight.w700))
+            : (_isSearching
+                ? TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    style: GoogleFonts.outfit(color: cs.onSurface, fontSize: 16),
+                    decoration: InputDecoration(
+                      hintText: 'Search chats...',
+                      border: InputBorder.none,
+                      hintStyle: GoogleFonts.outfit(color: cs.onSurfaceVariant),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.toLowerCase();
+                      });
+                    },
+                  )
+                : Text(
+                    'Sandesh',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 28,
+                      color: cs.onSurface,
+                      letterSpacing: -0.01,
+                    ),
+                  )),
+        actions: _isSelectionMode
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.select_all_rounded),
+                  onPressed: () => setState(() => _selectedUsernames.addAll(filteredContacts.map((c) => c.username))),
                 ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value.toLowerCase();
-                  });
-                },
-              )
-            : Text(
-                'Sandesh',
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 28,
-                  color: cs.onSurface,
-                  letterSpacing: -0.01,
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: cs.error,
+                  onPressed: _deleteSelectedChats,
                 ),
-              ),
-        actions: [
+                const SizedBox(width: 8),
+              ]
+            : [
           IconButton(
             icon: Icon(
               _isSearching ? Icons.close_rounded : Icons.search_rounded,
@@ -695,25 +762,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       avatarWidget = _buildFallbackAvatar(context, contact);
     }
 
+    final isSelected = _selectedUsernames.contains(contact.username);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         hoverColor: cs.surfaceContainer,
         splashColor: cs.surfaceContainerHigh,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatScreen(
-                myUsername: _myUsername,
-                receiverUsername: contact.username,
-                receiverDisplayName: contact.displayName,
-              ),
-            ),
-          ).then((_) => _loadContacts());
+        onLongPress: () {
+          if (!_isSelectionMode) {
+            setState(() {
+              _isSelectionMode = true;
+              _selectedUsernames.add(contact.username);
+            });
+          }
         },
-        child: Padding(
+        onTap: () {
+          if (_isSelectionMode) {
+            setState(() {
+              if (isSelected) {
+                _selectedUsernames.remove(contact.username);
+                if (_selectedUsernames.isEmpty) _isSelectionMode = false;
+              } else {
+                _selectedUsernames.add(contact.username);
+              }
+            });
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  myUsername: _myUsername,
+                  receiverUsername: contact.username,
+                  receiverDisplayName: contact.displayName,
+                ),
+              ),
+            ).then((_) => _loadContacts());
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? cs.primaryContainer.withValues(alpha: 0.3) : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [

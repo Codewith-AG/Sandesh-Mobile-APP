@@ -123,40 +123,15 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
       final groupName = _nameController.text.trim();
       final groupDesc = _descController.text.trim();
 
-      // 1. Insert into Supabase `groups` table
-      final response = await supabase
-          .from('groups')
-          .insert({
-            'name': groupName,
-            'description': groupDesc,
-            'avatar_url': '',
-            'created_by': widget.myUsername,
-          })
-          .select()
-          .single();
-
-      final groupId = response['id'] as String;
-
-      // 2. Insert all selected members + self into `group_members`
-      final memberInserts = <Map<String, dynamic>>[];
-
-      // Self as admin
-      memberInserts.add({
-        'group_id': groupId,
-        'username': widget.myUsername,
-        'role': 'admin',
+      // 1 & 2. Call RPC to create group and add members atomically
+      final response = await supabase.rpc('create_group', params: {
+        'p_name': groupName,
+        'p_description': groupDesc,
+        'p_avatar_url': '',
+        'p_members': _selectedUsernames.toList(),
       });
 
-      // Selected contacts as members
-      for (final username in _selectedUsernames) {
-        memberInserts.add({
-          'group_id': groupId,
-          'username': username,
-          'role': 'member',
-        });
-      }
-
-      await supabase.from('group_members').insert(memberInserts);
+      final groupId = response as String;
 
       // 3. Save group locally to SQLite
       final group = Group(

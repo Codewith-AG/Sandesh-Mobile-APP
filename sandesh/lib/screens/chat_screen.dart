@@ -244,32 +244,49 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendImage(ImageSource source) async {
     Navigator.pop(context);
     try {
-      final picked = await ImagePicker().pickImage(source: source);
-      if (picked == null) return;
+      List<XFile> pickedFiles = [];
+      if (source == ImageSource.gallery) {
+        pickedFiles = await ImagePicker().pickMultiImage();
+      } else {
+        final picked = await ImagePicker().pickImage(source: source);
+        if (picked != null) pickedFiles.add(picked);
+      }
+      if (pickedFiles.isEmpty) return;
 
       if (!mounted) return;
-      final confirmed = await _showImagePreview(File(picked.path));
+      final confirmed = await _showImagePreview(File(pickedFiles.first.path));
       if (confirmed != true) return;
 
       setState(() { _isSendingMedia = true; _uploadProgress = 0; });
-      final url = await MediaUploadService().uploadChatImage(File(picked.path));
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final msg = Message(
-        id: '${widget.myUsername}_$timestamp',
-        senderUsername: widget.myUsername,
-        receiverUsername: widget.receiverUsername,
-        mediaUrl: url,
-        localPath: picked.path,
-        messageType: MessageType.image,
-        isMe: true,
-        timestamp: timestamp,
-      );
-      setState(() { _messages.add(msg); _isSendingMedia = false; });
-      _scrollToBottom();
-      await SupabaseBroadcastService().sendMessage(msg);
+      
+      for (int i = 0; i < pickedFiles.length; i++) {
+        final picked = pickedFiles[i];
+        try {
+          final url = await MediaUploadService().uploadChatImage(File(picked.path));
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final msg = Message(
+            id: '${widget.myUsername}_$timestamp',
+            senderUsername: widget.myUsername,
+            receiverUsername: widget.receiverUsername,
+            mediaUrl: url,
+            localPath: picked.path,
+            messageType: MessageType.image,
+            isMe: true,
+            timestamp: timestamp,
+          );
+          if (mounted) {
+            setState(() { _messages.add(msg); });
+            _scrollToBottom();
+          }
+          await SupabaseBroadcastService().sendMessage(msg);
+        } catch (e) {
+          if (mounted) _showError('Failed to upload image ${i+1}: $e');
+        }
+      }
+      if (mounted) setState(() => _isSendingMedia = false);
     } catch (e) {
-      setState(() => _isSendingMedia = false);
-      if (mounted) _showError('Image upload failed: $e');
+      if (mounted) setState(() => _isSendingMedia = false);
+      if (mounted) _showError('Image selection failed: $e');
     }
   }
 
@@ -311,28 +328,43 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendDocument() async {
     Navigator.pop(context);
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.any);
-      if (result == null || result.files.single.path == null) return;
-      final f = result.files.single;
-      setState(() { _isSendingMedia = true; _uploadProgress = 0; });
-      final url = await MediaUploadService().uploadDocument(File(f.path!), f.name);
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final msg = Message(
-        id: '${widget.myUsername}_$timestamp',
-        senderUsername: widget.myUsername,
-        receiverUsername: widget.receiverUsername,
-        fileName: f.name,
-        mediaUrl: url,
-        messageType: MessageType.document,
-        isMe: true,
-        timestamp: timestamp,
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
       );
-      setState(() { _messages.add(msg); _isSendingMedia = false; });
-      _scrollToBottom();
-      await SupabaseBroadcastService().sendMessage(msg);
+      if (result == null || result.files.isEmpty) return;
+      
+      setState(() { _isSendingMedia = true; _uploadProgress = 0; });
+      
+      for (int i = 0; i < result.files.length; i++) {
+        final f = result.files[i];
+        if (f.path == null) continue;
+        try {
+          final url = await MediaUploadService().uploadDocument(File(f.path!), f.name);
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final msg = Message(
+            id: '${widget.myUsername}_$timestamp',
+            senderUsername: widget.myUsername,
+            receiverUsername: widget.receiverUsername,
+            fileName: f.name,
+            mediaUrl: url,
+            messageType: MessageType.document,
+            isMe: true,
+            timestamp: timestamp,
+          );
+          if (mounted) {
+            setState(() { _messages.add(msg); });
+            _scrollToBottom();
+          }
+          await SupabaseBroadcastService().sendMessage(msg);
+        } catch (e) {
+          if (mounted) _showError('Failed to upload ${f.name}: $e');
+        }
+      }
+      if (mounted) setState(() => _isSendingMedia = false);
     } catch (e) {
-      setState(() => _isSendingMedia = false);
-      if (mounted) _showError('Document upload failed: $e');
+      if (mounted) setState(() => _isSendingMedia = false);
+      if (mounted) _showError('Document selection failed: $e');
     }
   }
 
