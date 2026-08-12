@@ -45,6 +45,37 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
+
+        // Ship arm64-v8a only. This app is validated for arm64 at runtime
+        // (see UpdateWorker / UpdateService ABI checks), so bundling armeabi-v7a
+        // and x86_64 just bloated the APK. Guarantees arm64-only even for a
+        // plain `flutter build apk` that omits --target-platform.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    // Drop large Agora RTC native extension libraries that this chat/calling
+    // app does not use (super-resolution, beauty/video-process, AI denoise,
+    // virtual-background/segmentation, spatial audio, content-inspect, DRM).
+    // These optional .so files add tens of MB each; removing them is the single
+    // biggest APK-size win. Do NOT exclude a library for a feature you actually use.
+    packaging {
+        jniLibs {
+            excludes += listOf(
+                "**/libagora_super_resolution_extension.so",
+                "**/libagora_video_process_extension.so",
+                "**/libagora_ai_denoise_extension.so",
+                "**/libagora_segmentation_extension.so",
+                "**/libagora_spatial_audio_extension.so",
+                "**/libagora_content_inspect_extension.so",
+                "**/libagora_drm_loader_extension.so",
+                "**/libagora_udrm3_extension.so",
+                "**/libagora_face_detection_extension.so",
+                "**/libagora_pvc_extension.so",
+                "**/libagora_clear_vision_extension.so"
+            )
+        }
     }
 
     signingConfigs {

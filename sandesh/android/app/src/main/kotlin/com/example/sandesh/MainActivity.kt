@@ -23,6 +23,7 @@ import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
 import androidx.work.BackoffPolicy
@@ -229,6 +230,9 @@ class MainActivity: FlutterActivity() {
                 WorkRequest.MIN_BACKOFF_MILLIS,
                 TimeUnit.MILLISECONDS
             )
+            // Run as expedited so the download starts promptly and, backed by the
+            // worker's setForeground(), keeps running after the app is closed.
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag("version_$versionCode")
             .build()
 

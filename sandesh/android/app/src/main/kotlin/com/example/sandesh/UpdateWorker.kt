@@ -5,9 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.util.Log
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import java.io.File
 import java.io.FileInputStream
@@ -57,6 +59,17 @@ class UpdateWorker(
         }
 
         Log.i("UpdateWorker", "Starting background update download for v$versionCode")
+
+        // Promote to a foreground service so the OS does NOT kill the worker when
+        // the app is swiped away / in Doze. Without this, a large (100MB+) APK
+        // download is throttled and terminated once the app is closed.
+        try {
+            setForeground(buildForegroundInfo(0))
+        } catch (e: Exception) {
+            // setForeground can throw if foreground-service start is restricted;
+            // continue as a best-effort background download in that case.
+            Log.w("UpdateWorker", "Could not enter foreground; continuing in background", e)
+        }
 
         val apkFile = File(context.cacheDir, "update_$versionCode.apk")
         
@@ -182,6 +195,48 @@ class UpdateWorker(
             Log.e("UpdateWorker", "Error downloading/installing update", e)
             apkFile.delete()
             return Result.retry()
+        }
+    }
+
+    // Required by WorkManager for expedited/foreground execution. Returns the
+    // ongoing notification shown while the update downloads in the background.
+    override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo(0)
+
+    private fun buildForegroundInfo(progress: Int): ForegroundInfo {
+        val channelId = "update_download_channel"
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "App Update Download",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "Shows progress while a Sandesh update downloads." }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.Notification.Builder(context, channelId)
+        } else {
+            @Suppress("DEPRECATION")
+            android.app.Notification.Builder(context)
+        }
+
+        val notification = builder
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("Downloading Sandesh update")
+            .setContentText("The update is downloading in the background…")
+            .setOngoing(true)
+            .setProgress(100, progress, progress <= 0)
+            .build()
+
+        // On Android 10+ (Q) WorkManager requires a foreground-service type.
+        // Use DATA_SYNC since this is a network download.
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(1003, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(1003, notification)
         }
     }
 

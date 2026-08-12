@@ -68,6 +68,9 @@ class PeriodicUpdateCheckWorker(
                 val workRequest = OneTimeWorkRequestBuilder<UpdateWorker>()
                     .setConstraints(constraintsBuilder.build())
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, WorkRequest.MIN_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
+                    // Expedited + the worker's setForeground() lets the download
+                    // run to completion even while the app is fully closed.
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                     .setInputData(
                         workDataOf(
                             UpdateWorker.KEY_DOWNLOAD_URL to downloadUrl,
