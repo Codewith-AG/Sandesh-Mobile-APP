@@ -25,11 +25,7 @@ class MediaUploadService {
   // come online + auto-download, short enough to stop public link sharing.
   static const int _signedUrlSeconds = 24 * 60 * 60;
 
-  // Allowed document extensions.
-  static const Set<String> _allowedDocExts = {
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-    '.txt', '.zip', '.rtf', '.csv', '.png', '.jpg', '.jpeg',
-  };
+
 
   static final RegExp _filenameSanitizer = RegExp(r'[^A-Za-z0-9._-]');
   static final MediaUploadService _instance = MediaUploadService._internal();
