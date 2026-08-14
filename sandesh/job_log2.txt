@@ -1,0 +1,588 @@
+﻿2026-08-14T09:58:42.6604115Z Current runner version: '2.336.0'
+2026-08-14T09:58:42.6631189Z ##[group]Runner Image Provisioner
+2026-08-14T09:58:42.6632665Z Hosted Compute Agent
+2026-08-14T09:58:42.6633498Z Version: 20260729.566
+2026-08-14T09:58:42.6634515Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-14T09:58:42.6635570Z Build Date: 2026-07-29T19:17:02Z
+2026-08-14T09:58:42.6636638Z Worker ID: {204ccae5-d17c-4447-93c8-b343e6079c52}
+2026-08-14T09:58:42.6637778Z Azure Region: centralus
+2026-08-14T09:58:42.6638656Z ##[endgroup]
+2026-08-14T09:58:42.6640487Z ##[group]Operating System
+2026-08-14T09:58:42.6641330Z Ubuntu
+2026-08-14T09:58:42.6642113Z 24.04.4
+2026-08-14T09:58:42.6643099Z LTS
+2026-08-14T09:58:42.6643862Z ##[endgroup]
+2026-08-14T09:58:42.6644672Z ##[group]Runner Image
+2026-08-14T09:58:42.6645573Z Image: ubuntu-24.04
+2026-08-14T09:58:42.6646418Z Version: 20260810.271.1
+2026-08-14T09:58:42.6648019Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260810.271/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-14T09:58:42.6650178Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260810.271
+2026-08-14T09:58:42.6651446Z ##[endgroup]
+2026-08-14T09:58:42.6653403Z ##[group]GITHUB_TOKEN Permissions
+2026-08-14T09:58:42.6656374Z Contents: read
+2026-08-14T09:58:42.6657296Z Metadata: read
+2026-08-14T09:58:42.6658142Z Packages: read
+2026-08-14T09:58:42.6658963Z ##[endgroup]
+2026-08-14T09:58:42.6661551Z Secret source: Actions
+2026-08-14T09:58:42.6663627Z Prepare workflow directory
+2026-08-14T09:58:42.7040096Z Prepare all required actions
+2026-08-14T09:58:42.7089906Z Getting action download info
+2026-08-14T09:58:42.9402100Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-14T09:58:43.1477719Z Download action repository 'actions/setup-java@v5' (SHA:b6effb05e454b25005698d916606bdc6ffcbf961)
+2026-08-14T09:58:43.8479674Z Download action repository 'subosito/flutter-action@v2' (SHA:1a449444c387b1966244ae4d4f8c696479add0b2)
+2026-08-14T09:58:44.0694854Z Download action repository 'softprops/action-gh-release@v2' (SHA:3bb12739c298aeb8a4eeaf626c5b8d85266b0e65)
+2026-08-14T09:58:44.5066501Z Getting action download info
+2026-08-14T09:58:44.5884252Z Download action repository 'actions/cache@v5' (SHA:caa296126883cff596d87d8935842f9db880ef25)
+2026-08-14T09:58:44.8925013Z Complete job name: build-and-release
+2026-08-14T09:58:44.9776134Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-14T09:58:44.9786171Z ##[group]Run actions/checkout@v4
+2026-08-14T09:58:44.9787559Z with:
+2026-08-14T09:58:44.9788565Z   repository: Codewith-AG/Sandesh-Mobile-APP
+2026-08-14T09:58:44.9796148Z   token: ***
+2026-08-14T09:58:44.9797127Z   ssh-strict: true
+2026-08-14T09:58:44.9798158Z   ssh-user: git
+2026-08-14T09:58:44.9799149Z   persist-credentials: true
+2026-08-14T09:58:44.9800217Z   clean: true
+2026-08-14T09:58:44.9801200Z   sparse-checkout-cone-mode: true
+2026-08-14T09:58:44.9802493Z   fetch-depth: 1
+2026-08-14T09:58:44.9803535Z   fetch-tags: false
+2026-08-14T09:58:44.9804494Z   show-progress: true
+2026-08-14T09:58:44.9805510Z   lfs: false
+2026-08-14T09:58:44.9806503Z   submodules: false
+2026-08-14T09:58:44.9807540Z   set-safe-directory: true
+2026-08-14T09:58:44.9808597Z   allow-unsafe-pr-checkout: false
+2026-08-14T09:58:44.9809900Z env:
+2026-08-14T09:58:44.9810790Z   CI: true
+2026-08-14T09:58:44.9811717Z ##[endgroup]
+2026-08-14T09:58:45.0751728Z Syncing repository: Codewith-AG/Sandesh-Mobile-APP
+2026-08-14T09:58:45.0754852Z ##[group]Getting Git version info
+2026-08-14T09:58:45.0756458Z Working directory is '/home/runner/work/Sandesh-Mobile-APP/Sandesh-Mobile-APP'
+2026-08-14T09:58:45.0758770Z [command]/usr/bin/git version
+2026-08-14T09:58:45.0809371Z git version 2.54.0
+2026-08-14T09:58:45.0830643Z ##[endgroup]
+2026-08-14T09:58:45.0855318Z Temporarily overriding HOME='/home/runner/work/_temp/6551458d-e25b-4ecf-a848-6b5f7f23bd1e' before making global git config changes
+2026-08-14T09:58:45.0858680Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-14T09:58:45.0861929Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Sandesh-Mobile-APP/Sandesh-Mobile-APP
+2026-08-14T09:58:45.0889567Z Deleting the contents of '/home/runner/work/Sandesh-Mobile-APP/Sandesh-Mobile-APP'
+2026-08-14T09:58:45.0894903Z ##[group]Initializing the repository
+2026-08-14T09:58:45.0914829Z [command]/usr/bin/git init /home/runner/work/Sandesh-Mobile-APP/Sandesh-Mobile-APP
+2026-08-14T09:58:45.1054816Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-14T09:58:45.1057025Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-14T09:58:45.1058897Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-14T09:58:45.1060629Z hint: call:
+2026-08-14T09:58:45.1061771Z hint:
+2026-08-14T09:58:45.1063152Z hint: 	git config --global init.defaultBranch <name>
+2026-08-14T09:58:45.1064907Z hint:
+2026-08-14T09:58:45.1066375Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-14T09:58:45.1068313Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-14T09:58:45.1069872Z hint:
+2026-08-14T09:58:45.1070929Z hint: 	git branch -m <name>
+2026-08-14T09:58:45.1072570Z hint:
+2026-08-14T09:58:45.1074677Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-14T09:58:45.1078208Z Initialized empty Git repository in /home/runner/work/Sandesh-Mobile-APP/Sandesh-Mobile-APP/.git/
+2026-08-14T09:58:45.1085530Z [command]/usr/bin/git remote add origin https://github.com/Codewith-AG/Sandesh-Mobile-APP
+2026-08-14T09:58:45.1101859Z ##[endgroup]
+2026-08-14T09:58:45.1104872Z ##[group]Disabling automatic garbage collection
+2026-08-14T09:58:45.1107412Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-14T09:58:45.1130185Z ##[endgroup]
+2026-08-14T09:58:45.1132854Z ##[group]Setting up auth
+2026-08-14T09:58:45.1135072Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-14T09:58:45.1171901Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-14T09:58:45.1754809Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-14T09:58:45.1783974Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-14T09:58:45.1962501Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-14T09:58:45.1992493Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-14T09:58:45.2168328Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-14T09:58:45.2197356Z ##[endgroup]
+2026-08-14T09:58:45.2199250Z ##[group]Fetching the repository
+2026-08-14T09:58:45.2206543Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +50f02a444b3a59eadaae093a3f0c24b767bdcdf6:refs/remotes/origin/main
+2026-08-14T09:58:46.0979221Z From https://github.com/Codewith-AG/Sandesh-Mobile-APP
+2026-08-14T09:58:46.0980947Z  * [new ref]         50f02a444b3a59eadaae093a3f0c24b767bdcdf6 -> origin/main
+2026-08-14T09:58:46.1000447Z ##[endgroup]
+2026-08-14T09:58:46.1001396Z ##[group]Determining the checkout info
+2026-08-14T09:58:46.1002205Z ##[endgroup]
+2026-08-14T09:58:46.1009907Z [command]/usr/bin/git sparse-checkout disable
+2026-08-14T09:58:46.1046325Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-14T09:58:46.1071117Z ##[group]Checking out the ref
+2026-08-14T09:58:46.1075120Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-08-14T09:58:46.1398304Z Switched to a new branch 'main'
+2026-08-14T09:58:46.1399027Z branch 'main' set up to track 'origin/main'.
+2026-08-14T09:58:46.1404423Z ##[endgroup]
+2026-08-14T09:58:46.1436589Z [command]/usr/bin/git log -1 --format=%H
+2026-08-14T09:58:46.1455540Z 50f02a444b3a59eadaae093a3f0c24b767bdcdf6
+2026-08-14T09:58:46.1625542Z ##[group]Run VERSION_STRING=$(grep '^version: ' pubspec.yaml | awk '{print $2}')
+2026-08-14T09:58:46.1626209Z [36;1mVERSION_STRING=$(grep '^version: ' pubspec.yaml | awk '{print $2}')[0m
+2026-08-14T09:58:46.1626710Z [36;1mVERSION_NAME=$(echo $VERSION_STRING | cut -d'+' -f1)[0m
+2026-08-14T09:58:46.1627167Z [36;1mVERSION_CODE=$(echo $VERSION_STRING | cut -d'+' -f2)[0m
+2026-08-14T09:58:46.1627550Z [36;1m[0m
+2026-08-14T09:58:46.1627886Z [36;1mecho "Extracted Version: $VERSION_NAME+$VERSION_CODE"[0m
+2026-08-14T09:58:46.1628298Z [36;1m[0m
+2026-08-14T09:58:46.1628624Z [36;1mif [[ -z "$VERSION_NAME" || -z "$VERSION_CODE" ]]; then[0m
+2026-08-14T09:58:46.1629097Z [36;1m  echo "Error: Could not extract valid version from pubspec.yaml"[0m
+2026-08-14T09:58:46.1629507Z [36;1m  exit 1[0m
+2026-08-14T09:58:46.1629776Z [36;1mfi[0m
+2026-08-14T09:58:46.1630037Z [36;1m[0m
+2026-08-14T09:58:46.1630356Z [36;1mecho "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV[0m
+2026-08-14T09:58:46.1630813Z [36;1mecho "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV[0m
+2026-08-14T09:58:46.1661041Z shell: /usr/bin/bash -e {0}
+2026-08-14T09:58:46.1661412Z env:
+2026-08-14T09:58:46.1661696Z   CI: true
+2026-08-14T09:58:46.1661960Z ##[endgroup]
+2026-08-14T09:58:46.1772081Z Extracted Version: 1.2.3+15
+2026-08-14T09:58:46.1828670Z ##[group]Run HTTP_STATUS=$(curl -sL -w "%{http_code}" -o update.json https://github.com/Codewith-AG/Sandesh-Releases/releases/latest/download/update.json || echo "curl_failed")
+2026-08-14T09:58:46.1829851Z [36;1mHTTP_STATUS=$(curl -sL -w "%{http_code}" -o update.json https://github.com/Codewith-AG/Sandesh-Releases/releases/latest/download/update.json || echo "curl_failed")[0m
+2026-08-14T09:58:46.1830555Z [36;1m[0m
+2026-08-14T09:58:46.1830849Z [36;1mif [ "$HTTP_STATUS" = "200" ]; then[0m
+2026-08-14T09:58:46.1831410Z [36;1m  REMOTE_VERSION_CODE=$(grep -o '"versionCode"[[:space:]]*:[[:space:]]*[0-9]*' update.json | grep -o '[0-9]*')[0m
+2026-08-14T09:58:46.1831990Z [36;1m  echo "Remote Version Code: $REMOTE_VERSION_CODE"[0m
+2026-08-14T09:58:46.1832657Z [36;1m  echo "Local Version Code: 15"[0m
+2026-08-14T09:58:46.1833007Z [36;1m  [0m
+2026-08-14T09:58:46.1833325Z [36;1m  if [ "15" -le "$REMOTE_VERSION_CODE" ]; then[0m
+2026-08-14T09:58:46.1833915Z [36;1m    echo "Error: Local versionCode (15) must be strictly greater than remote ($REMOTE_VERSION_CODE)"[0m
+2026-08-14T09:58:46.1834408Z [36;1m    exit 1[0m
+2026-08-14T09:58:46.1834698Z [36;1m  fi[0m
+2026-08-14T09:58:46.1835008Z [36;1melif [ "$HTTP_STATUS" = "404" ]; then[0m
+2026-08-14T09:58:46.1835473Z [36;1m  echo "No previous release found (404). Proceeding as first release."[0m
+2026-08-14T09:58:46.1835893Z [36;1melse[0m
+2026-08-14T09:58:46.1836309Z [36;1m  echo "Error: Could not fetch update.json. HTTP Status: $HTTP_STATUS. Failing closed."[0m
+2026-08-14T09:58:46.1836774Z [36;1m  exit 1[0m
+2026-08-14T09:58:46.1837050Z [36;1mfi[0m
+2026-08-14T09:58:46.1860412Z shell: /usr/bin/bash -e {0}
+2026-08-14T09:58:46.1860773Z env:
+2026-08-14T09:58:46.1861050Z   CI: true
+2026-08-14T09:58:46.1861328Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:46.1861632Z   VERSION_CODE: 15
+2026-08-14T09:58:46.1861916Z ##[endgroup]
+2026-08-14T09:58:46.5668196Z Remote Version Code: 14
+2026-08-14T09:58:46.5668764Z Local Version Code: 15
+2026-08-14T09:58:46.6671687Z ##[group]Run actions/setup-java@v5
+2026-08-14T09:58:46.6672077Z with:
+2026-08-14T09:58:46.6672583Z   distribution: temurin
+2026-08-14T09:58:46.6672910Z   java-version: 17
+2026-08-14T09:58:46.6673344Z   java-package: jdk
+2026-08-14T09:58:46.6673643Z   check-latest: false
+2026-08-14T09:58:46.6673934Z   set-default: true
+2026-08-14T09:58:46.6674239Z   verify-signature: false
+2026-08-14T09:58:46.6674549Z   server-id: github
+2026-08-14T09:58:46.6674841Z   server-username: GITHUB_ACTOR
+2026-08-14T09:58:46.6675176Z   server-password: GITHUB_TOKEN
+2026-08-14T09:58:46.6675502Z   overwrite-settings: true
+2026-08-14T09:58:46.6675817Z   job-status: success
+2026-08-14T09:58:46.6678016Z   token: ***
+2026-08-14T09:58:46.6678306Z   show-download-progress: false
+2026-08-14T09:58:46.6678622Z env:
+2026-08-14T09:58:46.6678885Z   CI: true
+2026-08-14T09:58:46.6679152Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:46.6679443Z   VERSION_CODE: 15
+2026-08-14T09:58:46.6679722Z ##[endgroup]
+2026-08-14T09:58:46.8718359Z ##[group]Installed distributions
+2026-08-14T09:58:46.8949999Z Resolved Java 17.0.20+8 from tool-cache
+2026-08-14T09:58:46.8950658Z Setting Java 17.0.20+8 as the default
+2026-08-14T09:58:46.8960042Z Creating toolchains.xml for JDK version 17 from temurin
+2026-08-14T09:58:46.9024156Z Writing to /home/runner/.m2/toolchains.xml
+2026-08-14T09:58:46.9024635Z 
+2026-08-14T09:58:46.9024832Z Java configuration:
+2026-08-14T09:58:46.9025269Z   Distribution: temurin
+2026-08-14T09:58:46.9025729Z   Version: 17.0.20+8
+2026-08-14T09:58:46.9026349Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:46.9026803Z 
+2026-08-14T09:58:46.9027392Z ##[endgroup]
+2026-08-14T09:58:46.9068436Z Creating settings.xml with server-id: github
+2026-08-14T09:58:46.9069330Z Writing to /home/runner/.m2/settings.xml
+2026-08-14T09:58:46.9070797Z Configured MAVEN_ARGS to include -ntp to suppress Maven transfer progress logs. Set 'show-download-progress: true' to keep the download progress output.
+2026-08-14T09:58:47.0341495Z ##[group]Run echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install \
+2026-08-14T09:58:47.0342176Z [36;1mecho "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install \[0m
+2026-08-14T09:58:47.0342843Z [36;1m  "platforms;android-36" \[0m
+2026-08-14T09:58:47.0343171Z [36;1m  "ndk;27.3.13750724" \[0m
+2026-08-14T09:58:47.0343522Z [36;1m  "build-tools;34.0.0" 2>/dev/null || true[0m
+2026-08-14T09:58:47.0343892Z [36;1mecho "Installed SDK components:"[0m
+2026-08-14T09:58:47.0344392Z [36;1m$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed 2>/dev/null | \[0m
+2026-08-14T09:58:47.0344926Z [36;1m  grep -E 'android-36|ndk;27|build-tools' || true[0m
+2026-08-14T09:58:47.0372064Z shell: /usr/bin/bash -e {0}
+2026-08-14T09:58:47.0372550Z env:
+2026-08-14T09:58:47.0372825Z   CI: true
+2026-08-14T09:58:47.0373102Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:47.0373386Z   VERSION_CODE: 15
+2026-08-14T09:58:47.0373833Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:47.0374360Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:47.0374798Z   MAVEN_ARGS: -ntp
+2026-08-14T09:58:47.0375097Z ##[endgroup]
+2026-08-14T09:58:55.1696381Z Loading package information...                                                  
+2026-08-14T09:58:55.2350183Z Loading local repository...                                                     
+2026-08-14T09:58:55.2352190Z [                                       ] 3% Loading local repository...        
+2026-08-14T09:58:55.7391196Z [                                       ] 3% Fetch remote repository...         
+2026-08-14T09:58:56.3848572Z [=                                      ] 3% Fetch remote repository...         
+2026-08-14T09:58:56.4403681Z [=                                      ] 4% Fetch remote repository...         
+2026-08-14T09:58:56.4617169Z [=                                      ] 5% Fetch remote repository...         
+2026-08-14T09:58:56.5020708Z [==                                     ] 5% Fetch remote repository...         
+2026-08-14T09:58:56.5331131Z [==                                     ] 6% Fetch remote repository...         
+2026-08-14T09:58:56.6066403Z [==                                     ] 7% Fetch remote repository...         
+2026-08-14T09:58:56.6103988Z [==                                     ] 7% Computing updates...               
+2026-08-14T09:58:56.6181835Z [===                                    ] 8% Computing updates...               
+2026-08-14T09:58:56.6226366Z [===                                    ] 10% Computing updates...              
+2026-08-14T09:58:56.6227406Z [=======================================] 100% Computing updates...             
+2026-08-14T09:58:56.6228130Z 
+2026-08-14T09:58:56.6420665Z Installed SDK components:
+2026-08-14T09:58:57.4545983Z   build-tools;34.0.0                 | 34.0.0        | Android SDK Build-Tools 34       | build-tools/34.0.0                
+2026-08-14T09:58:57.4546815Z   build-tools;35.0.0                 | 35.0.0        | Android SDK Build-Tools 35       | build-tools/35.0.0                
+2026-08-14T09:58:57.4547677Z   build-tools;35.0.1                 | 35.0.1        | Android SDK Build-Tools 35.0.1   | build-tools/35.0.1                
+2026-08-14T09:58:57.4548497Z   build-tools;36.0.0                 | 36.0.0        | Android SDK Build-Tools 36       | build-tools/36.0.0                
+2026-08-14T09:58:57.4549094Z   build-tools;36.1.0                 | 36.1.0        | Android SDK Build-Tools 36.1     | build-tools/36.1.0                
+2026-08-14T09:58:57.4549655Z   build-tools;37.0.0                 | 37.0.0        | Android SDK Build-Tools 37       | build-tools/37.0.0                
+2026-08-14T09:58:57.4550240Z   ndk;27.3.13750724                  | 27.3.13750724 | NDK (Side by side) 27.3.13750724 | ndk/27.3.13750724                 
+2026-08-14T09:58:57.4551172Z   platforms;android-36               | 2             | Android SDK Platform 36          | platforms/android-36              
+2026-08-14T09:58:57.4551790Z   platforms;android-36-ext18         | 1             | Android SDK Platform 36-ext18    | platforms/android-36-ext18        
+2026-08-14T09:58:57.4552609Z   platforms;android-36-ext19         | 1             | Android SDK Platform 36-ext19    | platforms/android-36-ext19        
+2026-08-14T09:58:57.4553247Z   platforms;android-36.1             | 1             | Android SDK Platform 36.1        | platforms/android-36.1            
+2026-08-14T09:58:57.4951964Z ##[group]Run subosito/flutter-action@v2
+2026-08-14T09:58:57.4952637Z with:
+2026-08-14T09:58:57.4952930Z   channel: stable
+2026-08-14T09:58:57.4953156Z   cache: true
+2026-08-14T09:58:57.4953403Z   architecture: X64
+2026-08-14T09:58:57.4953629Z   pub-cache-path: default
+2026-08-14T09:58:57.4953870Z   dry-run: false
+2026-08-14T09:58:57.4954133Z   git-source: https://github.com/flutter/flutter.git
+2026-08-14T09:58:57.4954410Z env:
+2026-08-14T09:58:57.4954594Z   CI: true
+2026-08-14T09:58:57.4954796Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:57.4954999Z   VERSION_CODE: 15
+2026-08-14T09:58:57.4955290Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.4955729Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.4956086Z   MAVEN_ARGS: -ntp
+2026-08-14T09:58:57.4956289Z ##[endgroup]
+2026-08-14T09:58:57.5015384Z ##[start-action display=Make yq tool available on Windows runners;id=__subosito_flutter-action.__run]
+2026-08-14T09:58:57.5025731Z ##[end-action id=__subosito_flutter-action.__run;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-08-14T09:58:57.5027831Z ##[start-action display=Make setup script executable;id=__subosito_flutter-action.__run_2]
+2026-08-14T09:58:57.5049592Z ##[group]Run chmod +x "$GITHUB_ACTION_PATH/setup.sh"
+2026-08-14T09:58:57.5049979Z [36;1mchmod +x "$GITHUB_ACTION_PATH/setup.sh"[0m
+2026-08-14T09:58:57.5074164Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-14T09:58:57.5074519Z env:
+2026-08-14T09:58:57.5074738Z   CI: true
+2026-08-14T09:58:57.5074957Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:57.5075189Z   VERSION_CODE: 15
+2026-08-14T09:58:57.5075515Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.5076143Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.5076522Z   MAVEN_ARGS: -ntp
+2026-08-14T09:58:57.5076759Z ##[endgroup]
+2026-08-14T09:58:57.5170759Z ##[end-action id=__subosito_flutter-action.__run_2;outcome=success;conclusion=success;duration_ms=14]
+2026-08-14T09:58:57.5173448Z ##[start-action display=Set action inputs;id=__subosito_flutter-action.flutter-action]
+2026-08-14T09:58:57.5243266Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh -p \
+2026-08-14T09:58:57.5243643Z [36;1m$GITHUB_ACTION_PATH/setup.sh -p \[0m
+2026-08-14T09:58:57.5243925Z [36;1m  -n '' \[0m
+2026-08-14T09:58:57.5244154Z [36;1m  -f '' \[0m
+2026-08-14T09:58:57.5244375Z [36;1m  -a 'X64' \[0m
+2026-08-14T09:58:57.5244597Z [36;1m  -k '' \[0m
+2026-08-14T09:58:57.5244811Z [36;1m  -c '' \[0m
+2026-08-14T09:58:57.5245017Z [36;1m  -l '' \[0m
+2026-08-14T09:58:57.5245242Z [36;1m  -d 'default' \[0m
+2026-08-14T09:58:57.5245551Z [36;1m  -g 'https://github.com/flutter/flutter.git' \[0m
+2026-08-14T09:58:57.5245886Z [36;1m  stable[0m
+2026-08-14T09:58:57.5264651Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-14T09:58:57.5265006Z env:
+2026-08-14T09:58:57.5265219Z   CI: true
+2026-08-14T09:58:57.5265456Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:57.5265738Z   VERSION_CODE: 15
+2026-08-14T09:58:57.5266172Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.5266633Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.5266994Z   MAVEN_ARGS: -ntp
+2026-08-14T09:58:57.5267220Z ##[endgroup]
+2026-08-14T09:58:57.8032878Z ##[end-action id=__subosito_flutter-action.flutter-action;outcome=success;conclusion=success;duration_ms=285]
+2026-08-14T09:58:57.8035479Z ##[start-action display=Cache Flutter;id=__subosito_flutter-action.cache-flutter]
+2026-08-14T09:58:57.8552470Z ##[group]Run actions/cache@v5
+2026-08-14T09:58:57.8552777Z with:
+2026-08-14T09:58:57.8553066Z   path: /opt/hostedtoolcache/flutter/stable-3.47.0-x64
+2026-08-14T09:58:57.8553525Z   key: flutter-linux-stable-3.47.0-x64-4cf24164269a5ebf0c16a028a00727d0e77bbb05
+2026-08-14T09:58:57.8553951Z   enableCrossOsArchive: false
+2026-08-14T09:58:57.8554387Z   fail-on-cache-miss: false
+2026-08-14T09:58:57.8554652Z   lookup-only: false
+2026-08-14T09:58:57.8554888Z   save-always: false
+2026-08-14T09:58:57.8555108Z env:
+2026-08-14T09:58:57.8555313Z   CI: true
+2026-08-14T09:58:57.8555521Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:57.8555753Z   VERSION_CODE: 15
+2026-08-14T09:58:57.8556067Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.8556532Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:57.8556902Z   MAVEN_ARGS: -ntp
+2026-08-14T09:58:57.8557123Z ##[endgroup]
+2026-08-14T09:58:58.1509747Z Cache not found for input keys: flutter-linux-stable-3.47.0-x64-4cf24164269a5ebf0c16a028a00727d0e77bbb05
+2026-08-14T09:58:58.1568404Z ##[end-action id=__subosito_flutter-action.cache-flutter;outcome=success;conclusion=success;duration_ms=353]
+2026-08-14T09:58:58.1571350Z ##[start-action display=Cache pub dependencies;id=__subosito_flutter-action.cache-pub]
+2026-08-14T09:58:58.3283122Z ##[group]Run actions/cache@v5
+2026-08-14T09:58:58.3283434Z with:
+2026-08-14T09:58:58.3283651Z   path: /home/runner/.pub-cache
+2026-08-14T09:58:58.3284264Z   key: flutter-pub-linux-stable-3.47.0-x64-4cf24164269a5ebf0c16a028a00727d0e77bbb05-50040ebe4c606aff3cbde8f84d78dd1ba92aae5de2fa7bb7208f1395da87c391
+2026-08-14T09:58:58.3284883Z   enableCrossOsArchive: false
+2026-08-14T09:58:58.3285176Z   fail-on-cache-miss: false
+2026-08-14T09:58:58.3285404Z   lookup-only: false
+2026-08-14T09:58:58.3285615Z   save-always: false
+2026-08-14T09:58:58.3285809Z env:
+2026-08-14T09:58:58.3285990Z   CI: true
+2026-08-14T09:58:58.3286175Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:58.3286426Z   VERSION_CODE: 15
+2026-08-14T09:58:58.3286716Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:58.3287252Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:58.3287584Z   MAVEN_ARGS: -ntp
+2026-08-14T09:58:58.3287778Z ##[endgroup]
+2026-08-14T09:58:58.5706435Z Cache not found for input keys: flutter-pub-linux-stable-3.47.0-x64-4cf24164269a5ebf0c16a028a00727d0e77bbb05-50040ebe4c606aff3cbde8f84d78dd1ba92aae5de2fa7bb7208f1395da87c391
+2026-08-14T09:58:58.5748481Z ##[end-action id=__subosito_flutter-action.cache-pub;outcome=success;conclusion=success;duration_ms=417]
+2026-08-14T09:58:58.5751473Z ##[start-action display=Run setup script;id=__subosito_flutter-action.__run_3]
+2026-08-14T09:58:58.5843646Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh \
+2026-08-14T09:58:58.5844016Z [36;1m$GITHUB_ACTION_PATH/setup.sh \[0m
+2026-08-14T09:58:58.5844476Z [36;1m  -n '3.47.0' \[0m
+2026-08-14T09:58:58.5844713Z [36;1m  -a 'x64' \[0m
+2026-08-14T09:58:58.5845019Z [36;1m  -c '/opt/hostedtoolcache/flutter/stable-3.47.0-x64' \[0m
+2026-08-14T09:58:58.5845395Z [36;1m  -d '/home/runner/.pub-cache' \[0m
+2026-08-14T09:58:58.5845666Z [36;1m  stable[0m
+2026-08-14T09:58:58.5869928Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-08-14T09:58:58.5870381Z env:
+2026-08-14T09:58:58.5870617Z   CI: true
+2026-08-14T09:58:58.5870850Z   VERSION_NAME: 1.2.3
+2026-08-14T09:58:58.5871097Z   VERSION_CODE: 15
+2026-08-14T09:58:58.5871424Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:58.5871896Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T09:58:58.5872395Z   MAVEN_ARGS: -ntp
+2026-08-14T09:58:58.5872758Z ##[endgroup]
+2026-08-14T09:58:58.8936042Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-08-14T09:58:58.8936810Z                                  Dload  Upload   Total   Spent    Left  Speed
+2026-08-14T09:58:58.8937132Z 
+2026-08-14T09:58:58.9401603Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-08-14T09:58:59.9139377Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-08-14T09:59:00.9139520Z   6 1499M    6 95.4M    0     0  93.4M      0  0:00:16  0:00:01  0:00:15 93.4M
+2026-08-14T09:59:01.9184024Z  18 1499M   18  271M    0     0   134M      0  0:00:11  0:00:02  0:00:09  134M
+2026-08-14T09:59:02.9143682Z  29 1499M   29  437M    0     0   144M      0  0:00:10  0:00:03  0:00:07  144M
+2026-08-14T09:59:03.9230255Z  40 1499M   40  608M    0     0   151M      0  0:00:09  0:00:04  0:00:05  151M
+2026-08-14T09:59:04.9156179Z  51 1499M   51  775M    0     0   154M      0  0:00:09  0:00:05  0:00:04  155M
+2026-08-14T09:59:05.9141508Z  62 1499M   62  931M    0     0   154M      0  0:00:09  0:00:06  0:00:03  167M
+2026-08-14T09:59:06.9215130Z  73 1499M   73 1101M    0     0   156M      0  0:00:09  0:00:07  0:00:02  165M
+2026-08-14T09:59:07.9142930Z  84 1499M   84 1269M    0     0   158M      0  0:00:09  0:00:08  0:00:01  166M
+2026-08-14T09:59:08.2808723Z  95 1499M   95 1436M    0     0   159M      0  0:00:09  0:00:09 --:--:--  165M
+2026-08-14T09:59:08.2809352Z 100 1499M  100 1499M    0     0   159M      0  0:00:09  0:00:09 --:--:--  166M
+2026-08-14T10:00:02.3107689Z ##[end-action id=__subosito_flutter-action.__run_3;outcome=success;conclusion=success;duration_ms=63735]
+2026-08-14T10:00:02.3164023Z ##[group]Run echo "***
+2026-08-14T10:00:02.3164497Z [36;1mecho "***[0m
+2026-08-14T10:00:02.3164842Z [36;1m***[0m
+2026-08-14T10:00:02.3165231Z [36;1m***" > ***/.env[0m
+2026-08-14T10:00:02.3188528Z shell: /usr/bin/bash -e {0}
+2026-08-14T10:00:02.3188816Z env:
+2026-08-14T10:00:02.3189027Z   CI: true
+2026-08-14T10:00:02.3189252Z   VERSION_NAME: 1.2.3
+2026-08-14T10:00:02.3189496Z   VERSION_CODE: 15
+2026-08-14T10:00:02.3189830Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.3190321Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.3190701Z   MAVEN_ARGS: -ntp
+2026-08-14T10:00:02.3191169Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.47.0-x64/flutter
+2026-08-14T10:00:02.3191542Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-14T10:00:02.3191809Z ##[endgroup]
+2026-08-14T10:00:02.3277556Z ##[group]Run echo "***
+2026-08-14T10:00:02.3293410Z [36;1mecho "***[0m
+2026-08-14T10:00:02.3293991Z [36;1m" | base64 -d > ***/android/***-release.keystore[0m
+2026-08-14T10:00:02.3314579Z shell: /usr/bin/bash -e {0}
+2026-08-14T10:00:02.3315041Z env:
+2026-08-14T10:00:02.3315370Z   CI: true
+2026-08-14T10:00:02.3315710Z   VERSION_NAME: 1.2.3
+2026-08-14T10:00:02.3316129Z   VERSION_CODE: 15
+2026-08-14T10:00:02.3316606Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.3317273Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.3317774Z   MAVEN_ARGS: -ntp
+2026-08-14T10:00:02.3318281Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.47.0-x64/flutter
+2026-08-14T10:00:02.3318813Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-14T10:00:02.3319219Z ##[endgroup]
+2026-08-14T10:00:02.3901999Z ##[group]Run cat > ***/android/key.properties << EOF
+2026-08-14T10:00:02.3902810Z [36;1mcat > ***/android/key.properties << EOF[0m
+2026-08-14T10:00:02.3903276Z [36;1mstoreFile=../***-release.keystore[0m
+2026-08-14T10:00:02.3903706Z [36;1mstorePassword=***[0m
+2026-08-14T10:00:02.3904100Z [36;1mkeyAlias=***[0m
+2026-08-14T10:00:02.3904474Z [36;1mkeyPassword=***[0m
+2026-08-14T10:00:02.3904845Z [36;1mEOF[0m
+2026-08-14T10:00:02.3927380Z shell: /usr/bin/bash -e {0}
+2026-08-14T10:00:02.3927761Z env:
+2026-08-14T10:00:02.3928087Z   CI: true
+2026-08-14T10:00:02.3928413Z   VERSION_NAME: 1.2.3
+2026-08-14T10:00:02.3928744Z   VERSION_CODE: 15
+2026-08-14T10:00:02.3929212Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.3929809Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.3930257Z   MAVEN_ARGS: -ntp
+2026-08-14T10:00:02.3931133Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.47.0-x64/flutter
+2026-08-14T10:00:02.3931602Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-14T10:00:02.3932002Z ##[endgroup]
+2026-08-14T10:00:02.4091560Z ##[group]Run flutter pub get
+2026-08-14T10:00:02.4091993Z [36;1mflutter pub get[0m
+2026-08-14T10:00:02.4111075Z shell: /usr/bin/bash -e {0}
+2026-08-14T10:00:02.4111560Z env:
+2026-08-14T10:00:02.4111850Z   CI: true
+2026-08-14T10:00:02.4112201Z   VERSION_NAME: 1.2.3
+2026-08-14T10:00:02.4112678Z   VERSION_CODE: 15
+2026-08-14T10:00:02.4113114Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.4113714Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:02.4114219Z   MAVEN_ARGS: -ntp
+2026-08-14T10:00:02.4114620Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.47.0-x64/flutter
+2026-08-14T10:00:02.4115102Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-14T10:00:02.4115477Z ##[endgroup]
+2026-08-14T10:00:08.1656119Z Resolving dependencies...
+2026-08-14T10:00:09.2680758Z Downloading packages...
+2026-08-14T10:00:16.5853336Z   _flutterfire_internals 1.3.71 (1.3.76 available)
+2026-08-14T10:00:16.5854236Z   agora_rtc_engine 6.5.4 (6.6.3 available)
+2026-08-14T10:00:16.5854745Z   app_links 6.4.1 (7.2.1 available)
+2026-08-14T10:00:16.5855309Z   app_links_platform_interface 2.0.2 (2.0.4 available)
+2026-08-14T10:00:16.5855859Z   async 2.13.0 (2.13.1 available)
+2026-08-14T10:00:16.5856305Z   cli_util 0.4.2 (0.5.2 available)
+2026-08-14T10:00:16.5856792Z   cross_file 0.3.5+2 (0.3.5+4 available)
+2026-08-14T10:00:16.5857354Z   cupertino_icons 1.0.8 (1.0.9 available)
+2026-08-14T10:00:16.5857811Z   dbus 0.7.12 (0.7.14 available)
+2026-08-14T10:00:16.5858301Z   dio 5.9.2 (5.11.0 available)
+2026-08-14T10:00:16.5858753Z   dio_web_adapter 2.1.2 (2.2.1 available)
+2026-08-14T10:00:16.5859239Z   emoji_picker_flutter 4.4.0 (4.5.3 available)
+2026-08-14T10:00:16.5859839Z   file_picker 8.3.7 (12.0.0 available)
+2026-08-14T10:00:16.5860303Z   file_selector_macos 0.9.4+4 (0.9.5 available)
+2026-08-14T10:00:16.5861141Z   firebase_core 4.9.0 (4.13.0 available)
+2026-08-14T10:00:16.5861664Z   firebase_core_platform_interface 7.0.1 (8.1.0 available)
+2026-08-14T10:00:16.5862515Z   firebase_core_web 3.7.0 (3.10.0 available)
+2026-08-14T10:00:16.5863033Z   firebase_messaging 16.2.2 (16.5.0 available)
+2026-08-14T10:00:16.5863622Z   firebase_messaging_platform_interface 4.7.11 (4.9.3 available)
+2026-08-14T10:00:16.5864291Z   firebase_messaging_web 4.1.7 (4.2.4 available)
+2026-08-14T10:00:16.5864913Z   flutter_contacts 2.0.2 (2.3.1 available)
+2026-08-14T10:00:16.5865412Z   flutter_image_compress 2.4.0 (2.5.1 available)
+2026-08-14T10:00:16.5866025Z   flutter_image_compress_common 1.0.6 (1.1.1 available)
+2026-08-14T10:00:16.5866666Z   flutter_image_compress_macos 1.0.3 (1.1.0 available)
+2026-08-14T10:00:16.5867200Z   flutter_image_compress_ohos 0.0.3 (0.0.3+1 available)
+2026-08-14T10:00:16.5867971Z   flutter_image_compress_platform_interface 1.0.5 (1.1.0 available)
+2026-08-14T10:00:16.5868639Z   flutter_image_compress_web 0.1.5 (0.1.5+1 available)
+2026-08-14T10:00:16.5869268Z   flutter_launcher_icons 0.13.1 (0.14.4 available)
+2026-08-14T10:00:16.5869917Z   flutter_local_notifications 20.1.0 (22.3.0 available)
+2026-08-14T10:00:16.5870601Z   flutter_local_notifications_linux 7.0.0 (8.0.1 available)
+2026-08-14T10:00:16.5871366Z   flutter_local_notifications_platform_interface 10.0.0 (12.2.0 available)
+2026-08-14T10:00:16.5872120Z   flutter_local_notifications_windows 2.0.1 (3.1.1 available)
+2026-08-14T10:00:16.5872889Z   flutter_plugin_android_lifecycle 2.0.31 (2.0.35 available)
+2026-08-14T10:00:16.5873564Z   flutter_svg 2.2.3 (2.3.0 available)
+2026-08-14T10:00:16.5874151Z   functions_client 2.5.0 (2.7.1 available)
+2026-08-14T10:00:16.5874652Z   gal 2.3.2 (2.3.3 available)
+2026-08-14T10:00:16.5875214Z   google_fonts 6.3.2 (8.2.1 available)
+2026-08-14T10:00:16.5875758Z   google_sign_in 6.3.0 (7.2.0 available)
+2026-08-14T10:00:16.5876385Z   google_sign_in_android 6.2.1 (7.2.16 available)
+2026-08-14T10:00:16.5877005Z   google_sign_in_ios 5.9.0 (6.3.0 available)
+2026-08-14T10:00:16.5877664Z   google_sign_in_platform_interface 2.5.0 (3.1.0 available)
+2026-08-14T10:00:16.5878697Z   google_sign_in_web 0.12.4+4 (1.1.3 available)
+2026-08-14T10:00:16.5879309Z   gotrue 2.20.0 (2.27.1 available)
+2026-08-14T10:00:16.5879804Z   image 4.8.0 (4.9.1 available)
+2026-08-14T10:00:16.5880352Z   image_picker 1.2.1 (1.2.3 available)
+2026-08-14T10:00:16.5880925Z   image_picker_android 0.8.13+1 (0.8.13+19 available)
+2026-08-14T10:00:16.5881564Z   image_picker_ios 0.8.13 (0.8.13+6 available)
+2026-08-14T10:00:16.5882224Z   image_picker_macos 0.2.2 (0.2.2+1 available)
+2026-08-14T10:00:16.5882860Z > intl 0.20.3 (was 0.20.2)
+2026-08-14T10:00:16.5883385Z   js 0.6.7 (0.7.2 available)
+2026-08-14T10:00:16.5883924Z > matcher 0.12.20 (was 0.12.19)
+2026-08-14T10:00:16.5884472Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-08-14T10:00:16.5885069Z > meta 1.19.0 (was 1.18.0)
+2026-08-14T10:00:16.5885553Z   package_info_plus 8.3.1 (10.2.1 available)
+2026-08-14T10:00:16.5886280Z   package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+2026-08-14T10:00:16.5886969Z   path_provider 2.1.5 (2.1.6 available)
+2026-08-14T10:00:16.5887536Z   path_provider_android 2.2.19 (2.3.1 available)
+2026-08-14T10:00:16.5888138Z   path_provider_foundation 2.4.2 (2.6.0 available)
+2026-08-14T10:00:16.5888847Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-08-14T10:00:16.5889460Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-08-14T10:00:16.5890152Z   permission_handler 12.0.1 (13.0.1 available)
+2026-08-14T10:00:16.5890755Z   permission_handler_android 13.0.1 (14.0.0 available)
+2026-08-14T10:00:16.5891443Z   permission_handler_apple 9.4.7 (9.6.1 available)
+2026-08-14T10:00:16.5892090Z   permission_handler_html 0.1.3+5 (0.1.4+1 available)
+2026-08-14T10:00:16.5892921Z   permission_handler_platform_interface 4.3.0 (4.4.0 available)
+2026-08-14T10:00:16.5893815Z   permission_handler_windows 0.2.1 (0.2.2 available)
+2026-08-14T10:00:16.5894833Z   phone_form_field 10.0.17 (10.0.18 available)
+2026-08-14T10:00:16.5895529Z   phone_numbers_parser 9.0.22 (9.0.25 available)
+2026-08-14T10:00:16.5896065Z   posix 6.5.0 (6.5.2 available)
+2026-08-14T10:00:16.5896618Z   postgrest 2.7.0 (2.9.1 available)
+2026-08-14T10:00:16.5897121Z   realtime_client 2.7.3 (2.13.0 available)
+2026-08-14T10:00:16.5897761Z   shared_preferences 2.5.3 (2.5.5 available)
+2026-08-14T10:00:16.5898325Z   shared_preferences_android 2.4.13 (2.4.27 available)
+2026-08-14T10:00:16.5898908Z   shared_preferences_foundation 2.5.4 (2.5.6 available)
+2026-08-14T10:00:16.5899489Z   shared_preferences_platform_interface 2.4.1 (2.4.2 available)
+2026-08-14T10:00:16.5900316Z   source_span 1.10.1 (1.10.2 available)
+2026-08-14T10:00:16.5900826Z   sqflite 2.4.2 (2.4.3 available)
+2026-08-14T10:00:16.5901370Z   sqflite_android 2.4.1 (2.4.3 available)
+2026-08-14T10:00:16.5901900Z   sqflite_common 2.5.6 (2.5.11 available)
+2026-08-14T10:00:16.5902674Z   sqflite_darwin 2.4.2 (2.4.3+1 available)
+2026-08-14T10:00:16.5903481Z   sqflite_platform_interface 2.4.0 (2.4.1 available)
+2026-08-14T10:00:16.5903988Z   storage_client 2.5.2 (2.8.0 available)
+2026-08-14T10:00:16.5904480Z   supabase 2.10.6 (2.16.0 available)
+2026-08-14T10:00:16.5905042Z   supabase_flutter 2.12.4 (2.17.1 available)
+2026-08-14T10:00:16.5905563Z   synchronized 3.4.0 (3.4.1+1 available)
+2026-08-14T10:00:16.5906081Z > test_api 0.7.12 (was 0.7.11) (0.7.13 available)
+2026-08-14T10:00:16.5906601Z   timezone 0.10.1 (0.11.1 available)
+2026-08-14T10:00:16.5907177Z   url_launcher_android 6.3.20 (6.3.32 available)
+2026-08-14T10:00:16.5907782Z   url_launcher_ios 6.3.4 (6.4.1 available)
+2026-08-14T10:00:16.5908306Z   url_launcher_macos 3.2.3 (3.2.5 available)
+2026-08-14T10:00:16.5908757Z   url_launcher_web 2.4.1 (2.4.3 available)
+2026-08-14T10:00:16.5909180Z   vector_graphics 1.1.19 (1.2.3 available)
+2026-08-14T10:00:16.5909579Z   vector_graphics_compiler 1.1.19 (1.3.0 available)
+2026-08-14T10:00:16.5910008Z > vector_math 2.4.2 (was 2.2.0)
+2026-08-14T10:00:16.5910507Z   vm_service 15.0.0 (15.2.0 available)
+2026-08-14T10:00:16.5911018Z   win32 5.15.0 (6.4.0 available)
+2026-08-14T10:00:16.5911919Z   xml 6.6.1 (7.0.1 available)
+2026-08-14T10:00:16.5912509Z   yet_another_json_isolate 2.1.0 (2.1.1 available)
+2026-08-14T10:00:16.5913085Z Changed 5 dependencies!
+2026-08-14T10:00:16.5913652Z 94 packages have newer versions incompatible with dependency constraints.
+2026-08-14T10:00:16.5914321Z Try `flutter pub outdated` for more information.
+2026-08-14T10:00:16.7896096Z Upgrading analysis_options.yaml to exclude build and platform directories.
+2026-08-14T10:00:18.0031830Z ##[group]Run flutter analyze
+2026-08-14T10:00:18.0032244Z [36;1mflutter analyze[0m
+2026-08-14T10:00:18.0055599Z shell: /usr/bin/bash -e {0}
+2026-08-14T10:00:18.0056008Z env:
+2026-08-14T10:00:18.0056321Z   CI: true
+2026-08-14T10:00:18.0056683Z   VERSION_NAME: 1.2.3
+2026-08-14T10:00:18.0057005Z   VERSION_CODE: 15
+2026-08-14T10:00:18.0057469Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:18.0058092Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:18.0058561Z   MAVEN_ARGS: -ntp
+2026-08-14T10:00:18.0058991Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.47.0-x64/flutter
+2026-08-14T10:00:18.0059487Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-14T10:00:18.0059829Z ##[endgroup]
+2026-08-14T10:00:35.4556886Z Analyzing ***...                                            
+2026-08-14T10:00:35.4560197Z 
+2026-08-14T10:00:35.4595769Z   error • Expected to find ';' • lib/screens/phone_setup_screen.dart:530:9 • expected_token
+2026-08-14T10:00:35.4604153Z warning • Dead code. Try removing the code, or fixing the code before it so that it can be reached • lib/screens/phone_setup_screen.dart:530:10 • dead_code
+2026-08-14T10:00:35.4605289Z   error • Expected an identifier • lib/screens/phone_setup_screen.dart:530:10 • missing_identifier
+2026-08-14T10:00:35.4606483Z   error • Expected to find ';' • lib/screens/phone_setup_screen.dart:530:10 • expected_token
+2026-08-14T10:00:35.4607740Z   error • Unexpected text ';'. Try removing the text • lib/screens/phone_setup_screen.dart:530:10 • unexpected_token
+2026-08-14T10:00:35.4608809Z   error • Expected an identifier • lib/screens/phone_setup_screen.dart:531:7 • missing_identifier
+2026-08-14T10:00:35.4609892Z   error • Unexpected text ';'. Try removing the text • lib/screens/phone_setup_screen.dart:531:7 • unexpected_token
+2026-08-14T10:00:35.4611334Z    info • Unnecessary empty statement. Try removing the empty statement or restructuring the code • lib/screens/phone_setup_screen.dart:531:8 • empty_statements
+2026-08-14T10:00:35.4612007Z 
+2026-08-14T10:00:35.4678582Z 8 issues found. (ran in 16.7s)
+2026-08-14T10:00:35.4738920Z ##[error]Process completed with exit code 1.
+2026-08-14T10:00:35.4806942Z ##[group]Run rm -f ***/.env
+2026-08-14T10:00:35.4807413Z [36;1mrm -f ***/.env[0m
+2026-08-14T10:00:35.4807852Z [36;1mrm -f ***/android/***-release.keystore[0m
+2026-08-14T10:00:35.4808351Z [36;1mrm -f ***/android/key.properties[0m
+2026-08-14T10:00:35.4831110Z shell: /usr/bin/bash -e {0}
+2026-08-14T10:00:35.4831527Z env:
+2026-08-14T10:00:35.4831821Z   CI: true
+2026-08-14T10:00:35.4832152Z   VERSION_NAME: 1.2.3
+2026-08-14T10:00:35.4832583Z   VERSION_CODE: 15
+2026-08-14T10:00:35.4833022Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:35.4833686Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-08-14T10:00:35.4834143Z   MAVEN_ARGS: -ntp
+2026-08-14T10:00:35.4834626Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.47.0-x64/flutter
+2026-08-14T10:00:35.4835105Z   PUB_CACHE: /home/runner/.pub-cache
+2026-08-14T10:00:35.4835474Z ##[endgroup]
+2026-08-14T10:00:35.5043619Z Post job cleanup.
+2026-08-14T10:00:35.5048875Z ##[start-action display=Cache pub dependencies;id=__c1c6d11f-47b7-4057-8555-9052ec2547af.cache-pub]
+2026-08-14T10:00:35.5051767Z ##[end-action id=__c1c6d11f-47b7-4057-8555-9052ec2547af.cache-pub;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-08-14T10:00:35.5054511Z ##[start-action display=Cache Flutter;id=__c1c6d11f-47b7-4057-8555-9052ec2547af.cache-flutter]
+2026-08-14T10:00:35.5057019Z ##[end-action id=__c1c6d11f-47b7-4057-8555-9052ec2547af.cache-flutter;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-08-14T10:00:35.5132480Z Post job cleanup.
+2026-08-14T10:00:35.7741632Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-14T10:00:35.7742940Z Post job cleanup.
+2026-08-14T10:00:35.8564948Z [command]/usr/bin/git version
+2026-08-14T10:00:35.8600983Z git version 2.54.0
+2026-08-14T10:00:35.8633947Z Temporarily overriding HOME='/home/runner/work/_temp/bb84a741-e737-459f-90b9-d87115581e7f' before making global git config changes
+2026-08-14T10:00:35.8635289Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-14T10:00:35.8637058Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Sandesh-Mobile-APP/Sandesh-Mobile-APP
+2026-08-14T10:00:35.9427710Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-14T10:00:35.9464200Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-14T10:00:35.9652886Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-14T10:00:35.9671956Z http.https://github.com/.extraheader
+2026-08-14T10:00:35.9680908Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-14T10:00:35.9707522Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-14T10:00:35.9881296Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-14T10:00:35.9908337Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-14T10:00:36.0537675Z Cleaning up orphan processes
+2026-08-14T10:00:36.0758615Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

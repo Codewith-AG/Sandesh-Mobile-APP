@@ -527,7 +527,6 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
               ),
             ),
           ),
-        ),
       );
     }
   }
