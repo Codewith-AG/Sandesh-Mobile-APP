@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- getTemporaryDirectory() (path_provider) maps to getCacheDir() on Android,
+         which is where the downloaded update_*.apk lives. Expose it (and the
+         other common dirs) so the system installer can read the APK via a
+         content:// URI. -->
+    <cache-path name="update_cache" path="." />
+    <files-path name="update_files" path="." />
+    <external-cache-path name="update_ext_cache" path="." />
+    <external-files-path name="update_ext_files" path="." />
+</paths>

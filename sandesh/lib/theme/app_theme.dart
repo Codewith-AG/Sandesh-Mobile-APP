@@ -3,11 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // ──────────────────────────── Color Palette ────────────────────────────
-  // Sandesh Teal & Nature Palette
-  static const Color primary = Color(0xFF2D9E8E);
+  // Sandesh "Yellowish-Green" & Nature Palette (matched to Sandesh_UI mockups:
+  // accent ≈ oklch(50-56% 0.12-0.13 150) → green, not teal)
+  static const Color primary = Color(0xFF2D8949);
   static const Color onPrimary = Color(0xFFFFFFFF);
-  static const Color primaryContainer = Color(0xFF5CC0AA);
-  static const Color onPrimaryContainer = Color(0xFF003830);
+  static const Color primaryContainer = Color(0xFF57B074);
+  static const Color onPrimaryContainer = Color(0xFF06371C);
   
   static const Color background = Color(0xFFF5F5EB);
   static const Color onBackground = Color(0xFF2C2C2C);
@@ -136,7 +137,7 @@ class AppTheme {
 
     const darkBackground = Color(0xFF000000);
     const darkSurface = Color(0xFF1E1E1E);
-    const darkPrimary = Color(0xFF5CC0AA);
+    const darkPrimary = Color(0xFF4CB86A);
     const darkOnPrimary = Color(0xFF000000);
     const darkSurfaceContainerLow = Color(0xFF111111);
     const darkOutline = Color(0xFF999999);

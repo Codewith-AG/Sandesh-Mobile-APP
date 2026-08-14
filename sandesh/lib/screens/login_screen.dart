@@ -217,11 +217,19 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ],
                       ),
-                      child: Center(
-                        child: Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 48,
-                          color: cs.primary,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 48,
+                              color: cs.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -349,7 +357,7 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
                     SvgPicture.string(_googleSvg, width: 24, height: 24),
                     const SizedBox(width: 14),
                     Text(
-                      'Continue with Google',
+                      'Sign in with Google',
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

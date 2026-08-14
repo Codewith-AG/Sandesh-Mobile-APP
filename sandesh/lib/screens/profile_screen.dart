@@ -16,7 +16,12 @@ import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? peerUsername;
-  const ProfileScreen({super.key, this.peerUsername});
+
+  /// Optional hook so a parent (e.g. ChatScreen) can start a real call when the
+  /// Audio/Video action buttons in the read-only "Contact Info" view are tapped.
+  /// isVideo == true → video call, false → audio call.
+  final void Function(bool isVideo)? onStartCall;
+  const ProfileScreen({super.key, this.peerUsername, this.onStartCall});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -341,6 +346,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Circular Audio/Video action button used in the read-only "Contact Info" view
+  // to match the Sandesh_UI chat-screen profile overlay mockups.
+  Widget _contactAction({
+    required IconData icon,
+    required String label,
+    required bool isVideo,
+    required ColorScheme cs,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: () {
+            Navigator.maybePop(context);
+            widget.onStartCall?.call(isVideo);
+          },
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+            child: Icon(icon, color: cs.onPrimary, size: 24),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: cs.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAvatar(ColorScheme cs) {
     Widget avatarContent;
 
@@ -448,6 +489,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: cs.onSurfaceVariant,
                         ),
                       ),
+                    ),
+                  ],
+                  if (_isReadOnly) ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _contactAction(
+                            icon: Icons.call_rounded,
+                            label: 'Audio',
+                            isVideo: false,
+                            cs: cs),
+                        const SizedBox(width: 32),
+                        _contactAction(
+                            icon: Icons.videocam_rounded,
+                            label: 'Video',
+                            isVideo: true,
+                            cs: cs),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 24),

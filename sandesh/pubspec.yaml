@@ -96,6 +96,7 @@ flutter:
 
   assets:
     - .env
+    - assets/logo.png
     - assets/images/red_mandala.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
