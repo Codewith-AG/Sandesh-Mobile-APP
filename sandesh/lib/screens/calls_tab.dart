@@ -30,25 +30,42 @@ class _CallsTabState extends State<CallsTab> {
   Future<void> _fetchCalls() async {
     try {
       final supabase = Supabase.instance.client;
+      // Calls are stored with lower-cased usernames, so always match in lower case.
+      final me = widget.myUsername.toLowerCase();
       final response = await supabase
           .from('calls')
           .select()
-          .or('caller_username.eq.${widget.myUsername},receiver_username.eq.${widget.myUsername}')
+          .or('caller_username.eq.$me,receiver_username.eq.$me')
           .order('started_at', ascending: false);
       
       final callsData = List<Map<String, dynamic>>.from(response);
-      final usernames = callsData.expand((c) => [c['caller_username'], c['receiver_username']]).where((u) => u != null).toSet().toList();
+      final usernames = callsData
+          .expand((c) => [c['caller_username'], c['receiver_username']])
+          .where((u) => u != null)
+          .map((u) => (u as String).toLowerCase())
+          .toSet()
+          .toList();
       
+      // Map lower-cased username -> profile row. Profiles store usernames with
+      // their original casing, so we match case-insensitively with ilike and
+      // key the map by the lower-cased username. (profiles has no display_name
+      // column, so we only request username + avatar_url.)
       Map<String, dynamic> profileMap = {};
       if (usernames.isNotEmpty) {
-        final profilesResp = await supabase.from('profiles').select('username, avatar_url, display_name').inFilter('username', usernames);
-        profileMap = {for (var p in profilesResp) p['username']: p};
+        final orFilter = usernames.map((u) => 'username.ilike.$u').join(',');
+        final profilesResp = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .or(orFilter);
+        profileMap = {
+          for (var p in profilesResp) (p['username'] as String).toLowerCase(): p
+        };
       }
 
       for (var call in callsData) {
-        final isOutgoing = call['caller_username'] == widget.myUsername;
-        final peerUsername = isOutgoing ? call['receiver_username'] : call['caller_username'];
-        call['peer_profile'] = profileMap[peerUsername];
+        final isOutgoing = call['caller_username'] == me;
+        final peerUsername = (isOutgoing ? call['receiver_username'] : call['caller_username']) as String;
+        call['peer_profile'] = profileMap[peerUsername.toLowerCase()];
       }
 
       if (mounted) {
@@ -117,8 +134,9 @@ class _CallsTabState extends State<CallsTab> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final call = _calls[index];
-          final isOutgoing = call['caller_username'] == widget.myUsername;
+          final isOutgoing = call['caller_username'] == widget.myUsername.toLowerCase();
           final peerUsername = isOutgoing ? call['receiver_username'] : call['caller_username'];
+          final peerName = call['peer_profile']?['username'] ?? peerUsername;
           final status = call['status'] as String;
           final callType = call['call_type'] as String;
           final startedAt = DateTime.tryParse(call['started_at'] ?? '')?.toLocal() ?? DateTime.now();
@@ -140,11 +158,11 @@ class _CallsTabState extends State<CallsTab> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
             leading: UserAvatar(
               imageUrl: call['peer_profile']?['avatar_url'], 
-              name: call['peer_profile']?['display_name'] ?? peerUsername,
+              name: peerName,
               radius: 24,
             ),
             title: Text(
-              peerUsername,
+              peerName,
               style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,

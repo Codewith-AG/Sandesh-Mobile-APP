@@ -67,6 +67,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   void initState() {
     super.initState();
     _loadMessages();
+    _syncGroupMessagesFromServer();
     _loadMemberCount();
     _subscribeToGroupChannel();
     _textController.addListener(() {
@@ -107,6 +108,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         isMe: (row['sender_username'] as String).toLowerCase() == widget.myUsername.toLowerCase(),
         timestamp: row['timestamp'] as int,
       )).toList();
+      // Ensure chronological order (oldest → newest) regardless of query order.
+      messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       if (mounted) {
         setState(() => _messages = messages);
         // Pre-load display names for all senders
@@ -115,6 +118,39 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
     } catch (e) {
       debugPrint('Error loading group messages: $e');
+    }
+  }
+
+  /// Pulls the full group message history from Supabase and stores it locally,
+  /// then refreshes the UI. Without this, a member only ever sees messages that
+  /// arrived via Realtime while they had this screen open (plus their own),
+  /// which is why group members previously couldn't see the conversation
+  /// history. RLS ("Members can read group messages") ensures a user only
+  /// receives messages for groups they belong to.
+  Future<void> _syncGroupMessagesFromServer() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('group_messages')
+          .select()
+          .eq('group_id', widget.groupId)
+          .order('timestamp', ascending: true);
+
+      for (final row in (rows as List)) {
+        await LocalDbService().insertGroupMessage({
+          'id': row['id'],
+          'group_id': row['group_id'],
+          'sender_username': row['sender_username'],
+          'text': row['text'],
+          'media_url': row['media_url'],
+          'file_name': row['file_name'],
+          'message_type': row['message_type'] ?? 'text',
+          'timestamp': row['timestamp'],
+        });
+      }
+
+      if (mounted) await _loadMessages();
+    } catch (e) {
+      debugPrint('Error syncing group messages from server: $e');
     }
   }
 

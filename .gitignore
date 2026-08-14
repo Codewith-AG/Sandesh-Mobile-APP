@@ -36,4 +36,7 @@ sandesh/supabase/.temp/
 
 # Tool files
 .antigravitycli/
+.postman/
+postman/
+*.postman*
 

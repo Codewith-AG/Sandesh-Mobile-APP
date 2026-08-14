@@ -67,12 +67,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final myProfile = await LocalDbService().getProfile();
       if (myProfile == null) return;
-      final myUsername = myProfile.username;
+      // Calls are stored with lower-cased usernames, so match in lower case.
+      final myUsername = myProfile.username.toLowerCase();
+      final peerLower = peer.toLowerCase();
 
       final response = await Supabase.instance.client
           .from('calls')
           .select()
-          .or('and(caller_username.eq.$myUsername,receiver_username.eq.$peer),and(caller_username.eq.$peer,receiver_username.eq.$myUsername)')
+          .or('and(caller_username.eq.$myUsername,receiver_username.eq.$peerLower),and(caller_username.eq.$peerLower,receiver_username.eq.$myUsername)')
           .order('started_at', ascending: false)
           .limit(10);
 

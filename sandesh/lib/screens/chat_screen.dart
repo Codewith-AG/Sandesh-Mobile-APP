@@ -481,6 +481,59 @@ class _ChatScreenState extends State<ChatScreen> {
     ));
   }
 
+  /// Starts an audio (isVideo=false) or video (isVideo=true) call with the
+  /// current peer. Shared by the app-bar call buttons and the Contact Info
+  /// (profile) overlay's Audio/Video actions so both behave identically.
+  Future<void> _startCall(bool isVideo) async {
+    final perms = isVideo
+        ? [Permission.camera, Permission.microphone]
+        : [Permission.microphone];
+    final statuses = await perms.request();
+    if (statuses.values.any((s) => s != PermissionStatus.granted)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(isVideo
+              ? 'Camera and Microphone permissions are required to make a call.'
+              : 'Microphone permission is required to make an audio call.'),
+        ));
+      }
+      return;
+    }
+
+    final result = await CallService().initiateCall(
+      receiverUsername: widget.receiverUsername,
+      callType: isVideo ? 'video' : 'audio',
+    );
+    if (!mounted) return;
+    if (result.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Call failed: ${result.error}'),
+        duration: const Duration(seconds: 6),
+      ));
+      return;
+    }
+
+    final sorted = [
+      CallService.sanitizeUsername(widget.myUsername),
+      CallService.sanitizeUsername(widget.receiverUsername)
+    ]..sort();
+    final channelName = 'call_${sorted[0]}_${sorted[1]}';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CallScreen(
+          myUsername: widget.myUsername,
+          peerUsername: widget.receiverUsername,
+          channelName: channelName,
+          token: result.token!.token,
+          agoraUid: result.token!.uid,
+          callType: isVideo ? 'video' : 'audio',
+          isOutgoing: true,
+        ),
+      ),
+    );
+  }
+
   void _showAttachmentSheet() {
     final cs = _cs;
     showModalBottomSheet(
@@ -780,7 +833,10 @@ class _ChatScreenState extends State<ChatScreen> {
             useSafeArea: true,
             builder: (_) => ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              child: ProfileScreen(peerUsername: widget.receiverUsername),
+              child: ProfileScreen(
+                peerUsername: widget.receiverUsername,
+                onStartCall: (isVideo) => _startCall(isVideo),
+              ),
             ),
           );
         },
@@ -809,89 +865,12 @@ class _ChatScreenState extends State<ChatScreen> {
         IconButton(
           icon: Icon(Icons.call_outlined, color: cs.primary, size: 24),
           tooltip: 'Audio Call',
-          onPressed: () async {
-            final statuses = await [Permission.microphone].request();
-            if (statuses[Permission.microphone] != PermissionStatus.granted) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Microphone permission is required to make an audio call.'),
-                ));
-              }
-              return;
-            }
-            final result = await CallService().initiateCall(
-              receiverUsername: widget.receiverUsername,
-              callType: 'audio',
-            );
-            if (!mounted) return;
-            if (result.error != null) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Call failed: ${result.error}'),
-                duration: const Duration(seconds: 6),
-              ));
-            } else {
-              final sorted = [CallService.sanitizeUsername(widget.myUsername), CallService.sanitizeUsername(widget.receiverUsername)]..sort();
-              final channelName = 'call_${sorted[0]}_${sorted[1]}';
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CallScreen(
-                    myUsername: widget.myUsername,
-                    peerUsername: widget.receiverUsername,
-                    channelName: channelName,
-                    token: result.token!.token,
-                    agoraUid: result.token!.uid,
-                    callType: 'audio',
-                    isOutgoing: true,
-                  ),
-                ),
-              );
-            }
-          },
+          onPressed: () => _startCall(false),
         ),
         IconButton(
           icon: Icon(Icons.videocam_outlined, color: cs.primary, size: 26),
           tooltip: 'Video Call',
-          onPressed: () async {
-            final statuses = await [Permission.camera, Permission.microphone].request();
-            if (statuses[Permission.camera] != PermissionStatus.granted ||
-                statuses[Permission.microphone] != PermissionStatus.granted) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Camera and Microphone permissions are required to make a call.'),
-                ));
-              }
-              return;
-            }
-            final result = await CallService().initiateCall(
-              receiverUsername: widget.receiverUsername,
-              callType: 'video',
-            );
-            if (!mounted) return;
-            if (result.error != null) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Call failed: ${result.error}'),
-                duration: const Duration(seconds: 6),
-              ));
-            } else {
-              final sorted = [CallService.sanitizeUsername(widget.myUsername), CallService.sanitizeUsername(widget.receiverUsername)]..sort();
-              final channelName = 'call_${sorted[0]}_${sorted[1]}';
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CallScreen(
-                    myUsername: widget.myUsername,
-                    peerUsername: widget.receiverUsername,
-                    channelName: channelName,
-                    token: result.token!.token,
-                    agoraUid: result.token!.uid,
-                    callType: 'video',
-                    isOutgoing: true,
-                  ),
-                ),
-              );
-            }
-          },
+          onPressed: () => _startCall(true),
         ),
         PopupMenuButton<String>(
           icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant, size: 24),
