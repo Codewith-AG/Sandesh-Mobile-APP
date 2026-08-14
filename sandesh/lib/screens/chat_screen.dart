@@ -774,10 +774,13 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       title: GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProfileScreen(peerUsername: widget.receiverUsername),
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            builder: (_) => ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: ProfileScreen(peerUsername: widget.receiverUsername),
             ),
           );
         },

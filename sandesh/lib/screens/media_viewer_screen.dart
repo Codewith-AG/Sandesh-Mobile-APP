@@ -55,9 +55,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D1A), // Matches the new dark surface of incoming call
+      backgroundColor: Colors.black, // Matches the new dark surface of incoming call
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0D1A).withValues(alpha: 0.7),
+        backgroundColor: Colors.black.withValues(alpha: 0.7),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),

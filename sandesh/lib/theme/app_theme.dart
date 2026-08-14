@@ -25,6 +25,7 @@ class AppTheme {
 
   static const Color error = Color(0xFFD94E3F);
   static const Color onError = Color(0xFFFFFFFF);
+  static const Color danger = error;
 
   // Fallbacks for older widgets
   static const Color textDark = onSurface;

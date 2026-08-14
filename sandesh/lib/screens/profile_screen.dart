@@ -37,6 +37,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// WhatsApp-style: locally saved contact name for peer profile view.
   String? _peerDisplayName;
 
+  /// Shared media between current user and peer
+  List<String> _sharedMediaUrls = [];
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +55,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   bool get _isReadOnly => widget.peerUsername != null;
+
+  Future<void> _loadSharedMedia(String peer) async {
+    try {
+      final myProfile = await LocalDbService().getProfile();
+      if (myProfile == null) return;
+      final myUsername = myProfile.username;
+
+      final res = await Supabase.instance.client
+          .from('messages')
+          .select('media_url')
+          .inFilter('message_type', ['image', 'video'])
+          .or('and(sender_username.eq.$myUsername,receiver_username.eq.$peer),and(sender_username.eq.$peer,receiver_username.eq.$myUsername)')
+          .order('timestamp', ascending: false)
+          .limit(12);
+
+      final urls = (res as List).map((e) => e['media_url'] as String?).where((e) => e != null).cast<String>().toList();
+      if (mounted) setState(() => _sharedMediaUrls = urls);
+    } catch (e) {
+      debugPrint('Error loading shared media: $e');
+    }
+  }
 
   Future<void> _loadProfile() async {
     if (_isReadOnly) {
@@ -122,6 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint('Peer profile load error: $e');
         _usernameController.text = peer;
       }
+      await _loadSharedMedia(peer);
       if (mounted) setState(() => _isLoading = false);
       return;
     }
@@ -457,6 +482,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
+
+                  if (_isReadOnly && _sharedMediaUrls.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Text(
+                        'SHARED MEDIA',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurfaceVariant,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        itemCount: _sharedMediaUrls.length,
+                        itemBuilder: (context, index) {
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: _sharedMediaUrls[index],
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(color: cs.surfaceContainerHigh),
+                              errorWidget: (context, url, error) => Container(
+                                color: cs.surfaceContainerHigh,
+                                child: Icon(Icons.broken_image, color: cs.onSurfaceVariant),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
 
                   if (!_isReadOnly) ...[
                     Padding(

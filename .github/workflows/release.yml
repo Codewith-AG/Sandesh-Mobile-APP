@@ -1,6 +1,9 @@
 name: 'Release Sandesh APK'
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       release_notes:
@@ -147,8 +150,8 @@ jobs:
             "apkAsset": "$NEW_APK_NAME",
             "sha256": "$SHA256",
             "size": $SIZE,
-            "mandatory": ${{ inputs.mandatory }},
-            "releaseNotes": "${{ inputs.release_notes }}"
+            "mandatory": ${{ inputs.mandatory || 'false' }},
+            "releaseNotes": "${{ inputs.release_notes || 'Bug fixes and performance improvements' }}"
           }
           EOF
 
@@ -159,7 +162,7 @@ jobs:
           token: ${{ secrets.RELEASE_PAT }}
           tag_name: v${{ env.VERSION_NAME }}+${{ env.VERSION_CODE }}
           name: Sandesh v${{ env.VERSION_NAME }}
-          body: ${{ inputs.release_notes }}
+          body: ${{ inputs.release_notes || 'Bug fixes and performance improvements' }}
           files: |
             sandesh/sandesh-arm64.apk
             sandesh/update.json

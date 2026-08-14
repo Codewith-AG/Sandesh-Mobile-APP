@@ -125,7 +125,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         : '?';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D1A),
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),

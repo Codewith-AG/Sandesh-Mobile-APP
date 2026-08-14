@@ -7,6 +7,7 @@ import '../main.dart';
 import '../services/update_preferences.dart';
 import 'profile_screen.dart';
 import 'update_screen.dart';
+import 'notification_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -103,6 +104,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _toggleDarkMode,
             activeThumbColor: cs.primary,
             activeTrackColor: cs.primaryContainer,
+          ),
+          const Divider(),
+          const SizedBox(height: 16),
+          // ── Notifications section ──────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              'NOTIFICATIONS',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.notifications_none_rounded, color: cs.primary),
+            title: Text('Notification Settings', style: GoogleFonts.inter(fontSize: 16)),
+            subtitle: Text('Manage message, group, and call alerts',
+                style: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 14)),
+            trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
+              );
+            },
           ),
           const Divider(),
           const SizedBox(height: 16),
