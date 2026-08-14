@@ -200,19 +200,56 @@ class CallService {
       debugPrint('CallService: failed to log call history: $e');
     }
 
+    // Persist to LOCAL call history (Calls tab reads this so history survives
+    // offline and is never lost when the cloud `calls` row is cleaned up).
+    await _saveLocalCallHistory(
+      peer: to,
+      direction: 'outgoing',
+      callType: callType,
+      status: 'outgoing',
+      ts: ts,
+    );
+  }
+
+  /// Writes a call to the local SQLite history AND drops a call bubble into the
+  /// 1:1 chat with [peer], so the call shows up both in the Calls tab and the
+  /// chat screen. Fire-and-forget safe: never throws.
+  Future<void> _saveLocalCallHistory({
+    required String peer,
+    required String direction,
+    required String callType,
+    required String status,
+    required int ts,
+  }) async {
+    final to = peer.toLowerCase();
     try {
+      await LocalDbService().insertCallLog({
+        'id': '${_myUsername}_${direction}_call_$ts',
+        'peer_username': to,
+        'direction': direction,
+        'call_type': callType,
+        'status': status,
+        'duration': 0,
+        'timestamp': ts,
+      });
+    } catch (e) {
+      debugPrint('CallService: failed to save local call log: $e');
+    }
+
+    try {
+      final bool isOutgoing = direction == 'outgoing';
       final msg = Message(
-        id: '${_myUsername}_call_$ts',
-        senderUsername: _myUsername,
-        receiverUsername: to,
+        id: '${_myUsername}_${direction}_call_$ts',
+        senderUsername: isOutgoing ? _myUsername : to,
+        receiverUsername: isOutgoing ? to : _myUsername,
         text: jsonEncode({
-          'status': 'outgoing',
+          'status': status,
           'duration': 0,
           'call_type': callType,
         }),
         messageType: MessageType.call,
         callType: callType,
-        isMe: true,
+        isMe: isOutgoing,
         timestamp: ts,
       );
       await LocalDbService().insertMessage(msg);
@@ -251,6 +288,14 @@ class CallService {
       _purgeOldInvites();
       if (_recentInvites.containsKey(event.channelName)) return;
       _recentInvites[event.channelName] = DateTime.now();
+      // Persist this incoming call to local history (Calls tab + chat bubble).
+      _saveLocalCallHistory(
+        peer: message.senderUsername,
+        direction: 'incoming',
+        callType: event.callType,
+        status: 'incoming',
+        ts: DateTime.now().millisecondsSinceEpoch,
+      );
       // Let main.dart / root listener show IncomingCallScreen
       if (!_incomingCtrl.isClosed) _incomingCtrl.add(event);
     } else {

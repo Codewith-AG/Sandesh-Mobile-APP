@@ -561,15 +561,22 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     try {
       final localContacts = await LocalDbService().getContacts();
       if (localContacts.isEmpty) return 0;
+
+      // Match profiles CASE-INSENSITIVELY. Contacts are stored lower-cased, but
+      // profiles.username keeps its original casing (e.g. "Rahul Pandey"), so a
+      // case-sensitive `inFilter` would silently miss them — that mismatch is
+      // exactly why a contact's avatar showed on the chat/calls screens (which
+      // query profiles live) but NOT on the home list (which uses this cache).
       final usernames = localContacts
-          .expand((c) => [c.username, c.username.toLowerCase()])
+          .map((c) => c.username.toLowerCase())
           .toSet()
           .toList();
+      final orFilter = usernames.map((u) => 'username.ilike.$u').join(',');
 
       final response = await _client
           .from('profiles')
           .select('username, bio, avatar_url')
-          .inFilter('username', usernames);
+          .or(orFilter);
 
       final users = response as List<dynamic>;
       for (final user in users) {

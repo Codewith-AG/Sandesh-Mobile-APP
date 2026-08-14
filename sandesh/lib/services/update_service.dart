@@ -332,6 +332,63 @@ class UpdateService {
     }
   }
 
+  /// Fully automatic update when the "Auto-update" toggle is ON: scan →
+  /// download → validate → install, WITHOUT showing any in-app prompt.
+  ///
+  /// This is the foreground path used while the app is open. It is more
+  /// reliable than [performAutoUpdate] (which only enqueues a background
+  /// WorkManager job); if it can't proceed right now — e.g. "Wi-Fi only" is on
+  /// and the device is on mobile data, or the foreground download fails — it
+  /// falls back to scheduling the background WorkManager job so the update
+  /// still completes later.
+  ///
+  /// NOTE: Android does not allow a normal (non-privileged) app to install an
+  /// APK completely silently — the OS package-installer confirmation is shown
+  /// by the system and cannot be suppressed. This method removes every *app*
+  /// prompt (no "Update available" / "Update ready" dialogs) and, if the
+  /// one-time "install unknown apps" permission is missing, sends the user to
+  /// grant it once. After that, updates install hands-off automatically.
+  Future<void> autoUpdateNow() async {
+    // Make sure we actually have an update to install.
+    if (availableUpdate == null) {
+      final checkResult = await checkForUpdate();
+      if (checkResult != UpdateCheckResult.updateAvailable) return;
+    }
+    if (availableUpdate == null) return;
+
+    // Respect the toggle — caller should have checked, but double-check here.
+    final autoUpdate = await _preferences.autoUpdateEnabled;
+    if (!autoUpdate) return;
+
+    final wifiOnly = await _preferences.wifiOnlyEnabled;
+
+    // If Wi-Fi-only is on and we're not on Wi-Fi, don't burn mobile data:
+    // hand off to the background worker which waits for an unmetered network.
+    if (wifiOnly && !(await isWifiAvailable())) {
+      debugPrint('[UpdateService] autoUpdateNow: Wi-Fi required — deferring to background worker');
+      await performAutoUpdate();
+      return;
+    }
+
+    // Download + validate in the foreground.
+    final ok = await downloadUpdate(ignoreWifi: !wifiOnly);
+    if (!ok || state.value != UpdateState.readyToInstall) {
+      debugPrint('[UpdateService] autoUpdateNow: foreground download failed — deferring to background worker');
+      await performAutoUpdate();
+      return;
+    }
+
+    // Auto-install with NO app-level confirmation dialog.
+    if (!await canRequestInstall()) {
+      // One-time OS permission needed. Send the user to grant it; the APK
+      // stays ready so the very next auto-check installs hands-off.
+      debugPrint('[UpdateService] autoUpdateNow: requesting one-time install permission');
+      await openInstallPermissionSettings();
+      return;
+    }
+    await installUpdate();
+  }
+
   /// Full auto-update flow using Android WorkManager.
   /// WorkManager will handle WiFi constraints, retries, downloading, validation, and installation.
   Future<void> performAutoUpdate() async {

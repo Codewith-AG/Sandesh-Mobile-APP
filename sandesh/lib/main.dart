@@ -306,8 +306,11 @@ class _SandeshAppState extends State<SandeshApp> with WidgetsBindingObserver {
       final autoUpdate = await prefs.autoUpdateEnabled;
 
       if (autoUpdate) {
-        // Auto-update: download and install in background
-        UpdateService().performAutoUpdate();
+        // Auto-update toggle is ON: scan → download → install automatically,
+        // with NO in-app prompt. Runs in the foreground while the app is open
+        // and falls back to the background WorkManager job if it can't proceed
+        // right now (e.g. Wi-Fi-only + on mobile data).
+        UpdateService().autoUpdateNow();
       } else {
         // Manual mode: show dialog if not previously dismissed for this version
         final dismissed = await prefs.dismissedVersionCode;

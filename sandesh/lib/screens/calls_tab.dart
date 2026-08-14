@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import 'chat_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/call_service.dart';
+import '../services/local_db_service.dart';
 import 'call_screen.dart'; 
 
 class CallsTab extends StatefulWidget {
@@ -29,48 +30,44 @@ class _CallsTabState extends State<CallsTab> {
 
   Future<void> _fetchCalls() async {
     try {
-      final supabase = Supabase.instance.client;
-      // Calls are stored with lower-cased usernames, so always match in lower case.
-      final me = widget.myUsername.toLowerCase();
-      final response = await supabase
-          .from('calls')
-          .select()
-          .or('caller_username.eq.$me,receiver_username.eq.$me')
-          .order('started_at', ascending: false);
-      
-      final callsData = List<Map<String, dynamic>>.from(response);
-      final usernames = callsData
-          .expand((c) => [c['caller_username'], c['receiver_username']])
-          .where((u) => u != null)
-          .map((u) => (u as String).toLowerCase())
+      // Primary source is now the LOCAL call history (saved on this phone),
+      // so the Calls tab works offline and history is never lost when the
+      // cloud `calls` rows are cleaned up.
+      final logs = await LocalDbService().getCallLogs();
+
+      // Best-effort: enrich each peer with their profile avatar (matched
+      // case-insensitively). Failures here never block showing the history.
+      final peers = logs
+          .map((c) => (c['peer_username'] as String).toLowerCase())
           .toSet()
           .toList();
-      
-      // Map lower-cased username -> profile row. Profiles store usernames with
-      // their original casing, so we match case-insensitively with ilike and
-      // key the map by the lower-cased username. (profiles has no display_name
-      // column, so we only request username + avatar_url.)
       Map<String, dynamic> profileMap = {};
-      if (usernames.isNotEmpty) {
-        final orFilter = usernames.map((u) => 'username.ilike.$u').join(',');
-        final profilesResp = await supabase
-            .from('profiles')
-            .select('username, avatar_url')
-            .or(orFilter);
-        profileMap = {
-          for (var p in profilesResp) (p['username'] as String).toLowerCase(): p
-        };
+      if (peers.isNotEmpty) {
+        try {
+          final supabase = Supabase.instance.client;
+          final orFilter = peers.map((u) => 'username.ilike.$u').join(',');
+          final profilesResp = await supabase
+              .from('profiles')
+              .select('username, avatar_url')
+              .or(orFilter);
+          profileMap = {
+            for (var p in profilesResp) (p['username'] as String).toLowerCase(): p
+          };
+        } catch (e) {
+          debugPrint('Calls: profile avatar enrich failed (non-fatal): $e');
+        }
       }
 
-      for (var call in callsData) {
-        final isOutgoing = call['caller_username'] == me;
-        final peerUsername = (isOutgoing ? call['receiver_username'] : call['caller_username']) as String;
-        call['peer_profile'] = profileMap[peerUsername.toLowerCase()];
-      }
+      final enriched = logs.map((c) {
+        final m = Map<String, dynamic>.from(c);
+        m['peer_profile'] =
+            profileMap[(c['peer_username'] as String).toLowerCase()];
+        return m;
+      }).toList();
 
       if (mounted) {
         setState(() {
-          _calls = callsData;
+          _calls = enriched;
           _isLoading = false;
         });
       }
@@ -134,12 +131,17 @@ class _CallsTabState extends State<CallsTab> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final call = _calls[index];
-          final isOutgoing = call['caller_username'] == widget.myUsername.toLowerCase();
-          final peerUsername = isOutgoing ? call['receiver_username'] : call['caller_username'];
-          final peerName = call['peer_profile']?['username'] ?? peerUsername;
-          final status = call['status'] as String;
-          final callType = call['call_type'] as String;
-          final startedAt = DateTime.tryParse(call['started_at'] ?? '')?.toLocal() ?? DateTime.now();
+          final isOutgoing =
+              (call['direction'] as String? ?? 'outgoing') == 'outgoing';
+          final String peerUsername = call['peer_username'] as String;
+          final peerName =
+              (call['peer_profile']?['username'] as String?) ?? peerUsername;
+          final status = call['status'] as String? ??
+              (isOutgoing ? 'outgoing' : 'incoming');
+          final callType = call['call_type'] as String? ?? 'audio';
+          final startedAt = DateTime.fromMillisecondsSinceEpoch(
+              (call['timestamp'] as int?) ??
+                  DateTime.now().millisecondsSinceEpoch);
 
           Color iconColor;
           IconData statusIcon;

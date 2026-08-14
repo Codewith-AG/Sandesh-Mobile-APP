@@ -28,7 +28,34 @@ class LocalDbService {
       path,
       version: 1,
       onCreate: _onCreate,
+      // Non-destructive schema top-up: creates tables added after the initial
+      // release (e.g. call_logs) without bumping the DB filename, so existing
+      // users keep their messages/contacts.
+      onOpen: (db) async {
+        await _ensureCallLogsTable(db);
+      },
     );
+  }
+
+  /// Local persisted call history (Calls tab + in-chat call bubbles).
+  /// Created idempotently on every open so it exists for both fresh installs
+  /// and users upgrading from a build that predates this table.
+  Future<void> _ensureCallLogsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS call_logs (
+        id TEXT PRIMARY KEY,
+        peer_username TEXT NOT NULL,
+        direction TEXT NOT NULL DEFAULT 'outgoing',
+        call_type TEXT NOT NULL DEFAULT 'audio',
+        status TEXT NOT NULL DEFAULT 'outgoing',
+        duration INTEGER NOT NULL DEFAULT 0,
+        timestamp INTEGER NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_calllog_peer ON call_logs(peer_username)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_calllog_ts ON call_logs(timestamp)');
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -520,6 +547,46 @@ class LocalDbService {
     final db = await database;
     await db.delete('group_messages',
         where: 'group_id = ?', whereArgs: [groupId]);
+  }
+
+  // ──────────────────────────── Call History ────────────────────────────
+
+  /// Inserts (or replaces) a local call-history entry.
+  /// [log] keys: id, peer_username, direction, call_type, status, duration, timestamp.
+  Future<void> insertCallLog(Map<String, dynamic> log) async {
+    final db = await database;
+    final map = Map<String, dynamic>.from(log);
+    map['peer_username'] = (map['peer_username'] as String).toLowerCase();
+    await db.insert('call_logs', map,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// All locally-saved call history, newest first (Calls tab).
+  Future<List<Map<String, dynamic>>> getCallLogs({int limit = 200}) async {
+    final db = await database;
+    return db.query('call_logs', orderBy: 'timestamp DESC', limit: limit);
+  }
+
+  /// Call history with a single peer (used inside the 1:1 chat, if needed).
+  Future<List<Map<String, dynamic>>> getCallLogsWith(String peerUsername,
+      {int limit = 100}) async {
+    final db = await database;
+    return db.query('call_logs',
+        where: 'peer_username = ?',
+        whereArgs: [peerUsername.toLowerCase()],
+        orderBy: 'timestamp DESC',
+        limit: limit);
+  }
+
+  Future<void> deleteCallLogsWith(String peerUsername) async {
+    final db = await database;
+    await db.delete('call_logs',
+        where: 'peer_username = ?', whereArgs: [peerUsername.toLowerCase()]);
+  }
+
+  Future<void> clearCallLogs() async {
+    final db = await database;
+    await db.delete('call_logs');
   }
 
   // ──────────────────────────── Maintenance ────────────────────────────

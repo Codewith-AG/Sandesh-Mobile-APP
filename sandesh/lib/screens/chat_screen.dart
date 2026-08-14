@@ -15,6 +15,7 @@ import '../services/media_upload_service.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'profile_screen.dart';
 import 'media_viewer_screen.dart';
+import 'camera_screen.dart';
 import 'call_screen.dart';
 import '../services/call_service.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -1270,7 +1271,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildInputBar() {
     final cs = _cs;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
         border: Border(top: BorderSide(color: cs.outlineVariant, width: 1)),
@@ -1280,27 +1281,27 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            IconButton(
-              icon: Icon(Icons.add, color: cs.onSurfaceVariant, size: 24),
-              onPressed: _isSendingMedia ? null : _showAttachmentSheet,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 48),
-            ),
-            const SizedBox(width: 8),
+            // ── The typing pill: emoji · roomy text field · attach · camera ──
             Expanded(
               child: Container(
-                constraints: const BoxConstraints(maxHeight: 120),
+                // Roomier: taller minimum, grows up to ~6 lines before scrolling.
+                constraints: const BoxConstraints(minHeight: 52, maxHeight: 140),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(26),
                   border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     IconButton(
-                      icon: Icon(_showEmojiPicker ? Icons.keyboard_outlined : Icons.emoji_emotions_outlined,
-                          color: cs.onSurfaceVariant, size: 20),
+                      icon: Icon(
+                          _showEmojiPicker
+                              ? Icons.keyboard_outlined
+                              : Icons.emoji_emotions_outlined,
+                          color: cs.onSurfaceVariant,
+                          size: 24),
                       onPressed: () => setState(() {
                         _showEmojiPicker = !_showEmojiPicker;
                         if (_showEmojiPicker) {
@@ -1310,59 +1311,96 @@ class _ChatScreenState extends State<ChatScreen> {
                         }
                       }),
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 44, minHeight: 48),
+                      constraints:
+                          const BoxConstraints(minWidth: 40, minHeight: 44),
                     ),
                     Expanded(
                       child: TextField(
                         controller: _textController,
                         focusNode: _focusNode,
-                        maxLines: null,
+                        minLines: 1,
+                        maxLines: 6,
+                        keyboardType: TextInputType.multiline,
                         textInputAction: TextInputAction.newline,
-                        style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
-                        onTap: () { if (_showEmojiPicker) setState(() => _showEmojiPicker = false); },
+                        textCapitalization: TextCapitalization.sentences,
+                        style: GoogleFonts.inter(
+                            fontSize: 16, color: cs.onSurface, height: 1.35),
+                        onTap: () {
+                          if (_showEmojiPicker) {
+                            setState(() => _showEmojiPicker = false);
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: 'Type a message...',
-                          hintStyle: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 16),
-                          border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                          isDense: true,
+                          hintStyle: GoogleFonts.inter(
+                              color: cs.onSurfaceVariant, fontSize: 16),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets.fromLTRB(4, 14, 4, 14),
+                          isDense: false,
                         ),
                       ),
                     ),
+                    // Attachments (gallery / video / document / camera sheet)
                     IconButton(
-                      icon: Icon(Icons.attach_file_rounded, color: cs.onSurfaceVariant, size: 20),
+                      icon: Icon(Icons.attach_file_rounded,
+                          color: cs.onSurfaceVariant, size: 22),
                       onPressed: _isSendingMedia ? null : _showAttachmentSheet,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+                      constraints:
+                          const BoxConstraints(minWidth: 40, minHeight: 44),
                     ),
+                    // Camera — opens the in-app camera capture screen.
                     IconButton(
-                      icon: Icon(Icons.camera_alt_outlined, color: cs.onSurfaceVariant, size: 20),
-                      onPressed: _isSendingMedia ? null : () => _sendImage(ImageSource.camera),
+                      icon: Icon(Icons.camera_alt_rounded,
+                          color: cs.primary, size: 23),
+                      tooltip: 'Camera',
+                      onPressed: _isSendingMedia ? null : _openCamera,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+                      constraints:
+                          const BoxConstraints(minWidth: 40, minHeight: 44),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 2),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            // ── Send / mic button ──
             Container(
-              width: 48, height: 48,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: cs.primary,
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))
-                ]
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2))
+                ],
               ),
               child: IconButton(
                 icon: _isSendingMedia
-                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: cs.onPrimary, strokeWidth: 2))
-                    : Icon(_hasText ? Icons.send_rounded : Icons.mic_none_rounded, color: cs.onPrimary, size: 20),
-                onPressed: _isSendingMedia ? null : (_hasText ? _sendMessage : () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice messages coming soon')));
-                }),
+                    ? SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            color: cs.onPrimary, strokeWidth: 2))
+                    : Icon(_hasText ? Icons.send_rounded : Icons.mic_none_rounded,
+                        color: cs.onPrimary, size: 22),
+                onPressed: _isSendingMedia
+                    ? null
+                    : (_hasText
+                        ? _sendMessage
+                        : () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Voice messages coming soon')));
+                          }),
                 padding: EdgeInsets.zero,
               ),
             ),
@@ -1370,6 +1408,60 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  /// Opens the in-app camera capture screen. On a successful capture the photo
+  /// is shown in the existing preview dialog and then uploaded + sent through
+  /// the normal media pipeline.
+  ///
+  /// NOTE: unlike [_sendImage], this does NOT call Navigator.pop() at the start
+  /// — the old camera button reused [_sendImage] whose first line popped the
+  /// route, which (when triggered from the input bar rather than the attachment
+  /// sheet) closed the whole chat screen instead of opening the camera.
+  Future<void> _openCamera() async {
+    // Camera + mic permissions (mic lets the same screen capture video too).
+    final statuses = await [Permission.camera].request();
+    if (statuses[Permission.camera] != PermissionStatus.granted) {
+      if (mounted) _showError('Camera permission is required to take photos.');
+      return;
+    }
+
+    final String? path = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const CameraScreen()),
+    );
+    if (path == null || path.isEmpty) return;
+    if (!mounted) return;
+
+    final confirmed = await _showImagePreview(File(path));
+    if (confirmed != true) return;
+
+    setState(() {
+      _isSendingMedia = true;
+      _uploadProgress = 0;
+    });
+    try {
+      final url = await MediaUploadService().uploadChatImage(File(path));
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final msg = Message(
+        id: '${widget.myUsername}_$timestamp',
+        senderUsername: widget.myUsername,
+        receiverUsername: widget.receiverUsername,
+        mediaUrl: url,
+        localPath: path,
+        messageType: MessageType.image,
+        isMe: true,
+        timestamp: timestamp,
+      );
+      if (mounted) {
+        setState(() => _messages.add(msg));
+        _scrollToBottom();
+      }
+      await SupabaseBroadcastService().sendMessage(msg);
+    } catch (e) {
+      if (mounted) _showError('Failed to send photo: $e');
+    } finally {
+      if (mounted) setState(() => _isSendingMedia = false);
+    }
   }
 }
 
