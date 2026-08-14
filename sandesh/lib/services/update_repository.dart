@@ -12,7 +12,8 @@ class UpdateRepository {
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(minutes: 5),
+    receiveTimeout: const Duration(minutes: 10), // GitHub CDN can be slow
+    sendTimeout: const Duration(seconds: 30),
   ));
 
   /// Fetch the latest release from GitHub and parse update.json.

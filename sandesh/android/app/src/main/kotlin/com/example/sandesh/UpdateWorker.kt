@@ -242,27 +242,75 @@ class UpdateWorker(
     }
 
     /**
+     * Resolve the final download URL by manually following cross-host redirects.
+     * Java's HttpURLConnection silently drops redirects to a different host
+     * (e.g. github.com → objects.githubusercontent.com), which causes an
+     * "HttpsException connection closed" and an empty download.
+     */
+    private fun resolveRedirect(startUrl: String, maxHops: Int = 10): String {
+        var url = startUrl
+        repeat(maxHops) {
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "HEAD"
+            conn.instanceFollowRedirects = false
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 15_000
+            try {
+                conn.connect()
+                val code = conn.responseCode
+                if (code in 300..399) {
+                    val location = conn.getHeaderField("Location") ?: return url
+                    // Resolve relative locations against the current URL
+                    url = if (location.startsWith("http")) location
+                          else URL(URL(url), location).toString()
+                } else {
+                    return url
+                }
+            } finally {
+                conn.disconnect()
+            }
+        }
+        return url // give up, return whatever we have
+    }
+
+    /**
      * Resumable download into [partFile] using HTTP Range requests.
      * Returns true only when the full file has been written. Returns false on a
      * recoverable network/server error or if the worker was stopped — in that
      * case the .part file is left on disk so the next run resumes from its length.
      */
     private suspend fun downloadWithResume(downloadUrl: String, partFile: File): Boolean {
+        // Follow cross-host redirects first (HttpURLConnection won't do it automatically).
+        val resolvedUrl = try {
+            resolveRedirect(downloadUrl)
+        } catch (e: Exception) {
+            Log.w("UpdateWorker", "Redirect resolution failed, using original URL: $e")
+            downloadUrl
+        }
+
         var existing = if (partFile.exists()) partFile.length() else 0L
 
-        val connection = URL(downloadUrl).openConnection() as HttpURLConnection
+        val connection = URL(resolvedUrl).openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
         connection.connectTimeout = 15000
-        connection.readTimeout = 60000
-        connection.instanceFollowRedirects = true
+        connection.readTimeout = 90_000  // increased — CDN can be slow to start streaming
+        connection.instanceFollowRedirects = false  // we already resolved; don't follow again
+        connection.setRequestProperty("User-Agent", "Sandesh-Updater/1.0")
         if (existing > 0) {
-            // Ask the server to continue from where we stopped.
             connection.setRequestProperty("Range", "bytes=$existing-")
         }
 
         try {
             connection.connect()
             val code = connection.responseCode
+
+            // If server issued yet another redirect at this layer, restart from scratch.
+            if (code in 300..399) {
+                val newLocation = connection.getHeaderField("Location")
+                Log.w("UpdateWorker", "Unexpected redirect to $newLocation — retrying")
+                connection.disconnect()
+                return false
+            }
 
             val append: Boolean
             when (code) {

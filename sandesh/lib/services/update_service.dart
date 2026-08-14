@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -212,10 +213,10 @@ class UpdateService {
         return UpdateValidationResult(valid: false, error: 'APK file not found');
       }
 
-      // 1. SHA-256 verification
-      final bytes = await file.readAsBytes();
-      final digest = sha256.convert(bytes);
-      if (digest.toString().toLowerCase() != availableUpdate!.sha256.toLowerCase()) {
+      // 1. SHA-256 verification — offload to an isolate so it doesn't block
+      //    the UI thread and can handle large (50–100 MB) APKs without OOM.
+      final computedDigest = await compute(_sha256OfFile, file.path);
+      if (computedDigest.toLowerCase() != availableUpdate!.sha256.toLowerCase()) {
         await _deleteFile(file);
         return UpdateValidationResult(
           valid: false,
@@ -395,4 +396,11 @@ class UpdateService {
       if (await file.exists()) await file.delete();
     } catch (_) {}
   }
+}
+
+/// Top-level function required by [compute] — runs SHA-256 in a separate isolate
+/// to avoid blocking the UI thread and to handle large APKs without OOM.
+String _sha256OfFile(String filePath) {
+  final bytes = File(filePath).readAsBytesSync();
+  return sha256.convert(bytes).toString();
 }
