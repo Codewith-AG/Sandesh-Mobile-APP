@@ -316,7 +316,7 @@ class _CallScreenState extends State<CallScreen> {
           child: Center(
             child: Text(
               initial,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 64,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.primary,
@@ -361,7 +361,7 @@ class _CallScreenState extends State<CallScreen> {
             const SizedBox(height: 8),
             Text(
               widget.peerUsername,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -374,7 +374,7 @@ class _CallScreenState extends State<CallScreen> {
                   : _isOutgoing
                       ? 'Calling...'
                       : 'Connecting...',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 16,
                 color: Colors.white70,
               ),
@@ -420,11 +420,11 @@ class _CallScreenState extends State<CallScreen> {
               width: 68,
               height: 68,
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444),
+                color: AppTheme.danger,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFEF4444).withValues(alpha: 0.45),
+                    color: AppTheme.danger.withValues(alpha: 0.45),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
@@ -491,7 +491,7 @@ class _ControlBtn extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: Colors.white70,

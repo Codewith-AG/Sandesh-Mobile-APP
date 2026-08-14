@@ -42,7 +42,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text('App Updates', style: GoogleFonts.outfit()),
+        title: Text('App Updates', style: GoogleFonts.inter()),
         backgroundColor: Colors.transparent,
       ),
       body: ValueListenableBuilder<UpdateState>(
@@ -78,11 +78,11 @@ class _UpdateScreenState extends State<UpdateScreen> {
             Icon(Icons.system_update, size: 48, color: cs.primary),
             const SizedBox(height: 16),
             Text('Sandesh',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text('Current version: $_currentVersion',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 14, color: cs.onSurfaceVariant)),
           ],
         ),
@@ -109,7 +109,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
               Icon(Icons.check_circle_outline, size: 48, color: cs.primary),
               const SizedBox(height: 16),
               Text("You're up to date!",
-                  style: GoogleFonts.outfit(fontSize: 16, color: cs.primary)),
+                  style: GoogleFonts.inter(fontSize: 16, color: cs.primary)),
             ],
           ),
         ),
@@ -123,11 +123,11 @@ class _UpdateScreenState extends State<UpdateScreen> {
             const SizedBox(height: 16),
             Text(_updateService.lastError ?? 'Error checking for updates.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 14, color: cs.error)),
+                style: GoogleFonts.inter(fontSize: 14, color: cs.error)),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => _updateService.checkForUpdate(forceCheck: true),
-              child: Text('Retry', style: GoogleFonts.outfit()),
+              child: Text('Retry', style: GoogleFonts.inter()),
             )
           ],
         ),
@@ -146,7 +146,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
         padding: const EdgeInsets.all(24.0),
         child: ElevatedButton(
           onPressed: () => _updateService.checkForUpdate(forceCheck: true),
-          child: Text('Check for updates', style: GoogleFonts.outfit()),
+          child: Text('Check for updates', style: GoogleFonts.inter()),
         ),
       ),
     );
@@ -166,19 +166,19 @@ class _UpdateScreenState extends State<UpdateScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('New Version Available',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 20, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text('Version: ${info.versionName} (${info.versionCode})',
-                style: GoogleFonts.outfit(fontSize: 14)),
+                style: GoogleFonts.inter(fontSize: 14)),
             if (info.releaseNotes.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text("What's new:",
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                       fontSize: 16, fontWeight: FontWeight.w500)),
               const SizedBox(height: 8),
               Text(info.releaseNotes,
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                       fontSize: 14, color: cs.onSurfaceVariant)),
             ],
             const SizedBox(height: 24),
@@ -198,7 +198,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
             style: ElevatedButton.styleFrom(
                 backgroundColor: cs.primary, foregroundColor: cs.onPrimary),
             onPressed: () => _startDownload(),
-            child: Text('Download', style: GoogleFonts.outfit()),
+            child: Text('Download', style: GoogleFonts.inter()),
           )
         ],
       );
@@ -217,10 +217,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Downloading ${(progress * 100).toStringAsFixed(0)}%',
-                        style: GoogleFonts.outfit()),
+                        style: GoogleFonts.inter()),
                     TextButton(
                       onPressed: () => _updateService.cancelDownload(),
-                      child: Text('Cancel', style: GoogleFonts.outfit()),
+                      child: Text('Cancel', style: GoogleFonts.inter()),
                     )
                   ],
                 )
@@ -233,7 +233,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
         children: [
           const CircularProgressIndicator(),
           const SizedBox(height: 8),
-          Text('Validating update...', style: GoogleFonts.outfit()),
+          Text('Validating update...', style: GoogleFonts.inter()),
         ],
       ));
     } else if (state == UpdateState.readyToInstall) {
@@ -244,7 +244,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
             style: ElevatedButton.styleFrom(
                 backgroundColor: cs.primary, foregroundColor: cs.onPrimary),
             onPressed: () => _installUpdate(),
-            child: Text('Install', style: GoogleFonts.outfit()),
+            child: Text('Install', style: GoogleFonts.inter()),
           )
         ],
       );
@@ -254,7 +254,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
         children: [
           const CircularProgressIndicator(),
           const SizedBox(height: 8),
-          Text('Installing...', style: GoogleFonts.outfit()),
+          Text('Installing...', style: GoogleFonts.inter()),
         ],
       ));
     }
@@ -300,7 +300,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
               SnackBar(
                 content: Text(
                   'Install permission not granted. You can enable it in Settings.',
-                  style: GoogleFonts.outfit(),
+                  style: GoogleFonts.inter(),
                 ),
               ),
             );

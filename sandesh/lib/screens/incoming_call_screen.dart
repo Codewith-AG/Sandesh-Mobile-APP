@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/call_service.dart';
+import '../theme/app_theme.dart';
 import 'call_screen.dart';
 
 class IncomingCallScreen extends StatefulWidget {
@@ -159,7 +160,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                           height: 120,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                            color: AppTheme.primary.withValues(alpha: 0.12),
                           ),
                         ),
                       ),
@@ -171,14 +172,14 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                           height: 120,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                            color: AppTheme.primary.withValues(alpha: 0.2),
                           ),
                         ),
                       ),
                       // Avatar
                       CircleAvatar(
                         radius: 60,
-                        backgroundColor: const Color(0xFF7C3AED),
+                        backgroundColor: AppTheme.primary,
                         child: Text(
                           initial,
                           style: GoogleFonts.inter(
@@ -221,13 +222,13 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                   _ActionButton(
                     icon: Icons.call_end_rounded,
                     label: 'Decline',
-                    color: const Color(0xFFEF4444),
+                    color: AppTheme.danger,
                     onTap: _handling ? null : _reject,
                   ),
                   _ActionButton(
                     icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded,
                     label: 'Accept',
-                    color: const Color(0xFF22C55E),
+                    color: AppTheme.primary,
                     onTap: _handling ? null : _accept,
                   ),
                 ],

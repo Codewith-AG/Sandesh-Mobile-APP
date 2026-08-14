@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../widgets/user_avatar.dart';
+import '../theme/app_theme.dart';
 import 'chat_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/call_service.dart';
@@ -114,7 +115,7 @@ class _CallsTabState extends State<CallsTab> {
             iconColor = status == 'answered' ? cs.primary : cs.onSurfaceVariant;
             statusIcon = Icons.call_made_rounded;
           } else {
-            iconColor = status == 'missed' || status == 'declined' ? cs.error : cs.primary;
+            iconColor = status == 'missed' || status == 'declined' ? AppTheme.danger : cs.primary;
             statusIcon = Icons.call_received_rounded;
           }
 
@@ -132,7 +133,7 @@ class _CallsTabState extends State<CallsTab> {
               style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: status == 'missed' && !isOutgoing ? cs.error : cs.onSurface,
+                color: status == 'missed' && !isOutgoing ? AppTheme.danger : cs.onSurface,
               ),
             ),
             subtitle: Row(
