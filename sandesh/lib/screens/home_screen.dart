@@ -256,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               const SizedBox(height: 24),
               Text(
                 'New Conversation',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   color: cs.onSurface,
@@ -265,17 +265,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                   fontSize: 16,
                   color: cs.onSurface,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Enter username or phone number',
-                  hintStyle: GoogleFonts.outfit(color: cs.onSurfaceVariant),
+                  hintStyle: GoogleFonts.inter(color: cs.onSurfaceVariant),
                   filled: true,
                   fillColor: cs.surfaceContainerHigh,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(999),
                     borderSide: BorderSide.none,
                   ),
                   prefixIcon: Icon(Icons.person_outline_rounded,
@@ -290,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cs.primary,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                   onPressed: () async {
@@ -322,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   },
                   child: Text(
                     'Start Chat',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: cs.onPrimary,
@@ -360,14 +360,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
-        title: Text('Delete conversation', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
-        content: Text('Are you sure want to delete this conversation!', style: GoogleFonts.outfit(color: cs.onSurfaceVariant)),
+        title: Text('Delete ${_selectedUsernames.length == 1 ? "conversation" : "conversations"}', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface)),
+        content: Text('Are you sure you want to delete ${_selectedUsernames.length == 1 ? "this conversation" : "these ${_selectedUsernames.length} conversations"}?', style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter(color: cs.outline))),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: cs.error),
-            child: Text('Delete', style: GoogleFonts.outfit(color: cs.onError)),
+            child: Text('Delete', style: GoogleFonts.inter(color: cs.onError)),
           ),
         ],
       ),
@@ -412,6 +412,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: _isSelectionMode ? cs.surfaceContainerHigh : null,
         leading: _isSelectionMode
             ? IconButton(
                 icon: const Icon(Icons.close_rounded),
@@ -437,16 +438,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         title: _isSelectionMode
-            ? Text('${_selectedUsernames.length} Selected', style: GoogleFonts.outfit(color: cs.onSurface, fontWeight: FontWeight.w700))
+            ? Text('${_selectedUsernames.length} Selected', style: GoogleFonts.inter(color: cs.onSurface, fontWeight: FontWeight.w700))
             : (_isSearching
                 ? TextField(
                     controller: _searchController,
                     autofocus: true,
-                    style: GoogleFonts.outfit(color: cs.onSurface, fontSize: 16),
+                    style: GoogleFonts.inter(color: cs.onSurface, fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'Search chats...',
                       border: InputBorder.none,
-                      hintStyle: GoogleFonts.outfit(color: cs.onSurfaceVariant),
+                      hintStyle: GoogleFonts.inter(color: cs.onSurfaceVariant),
                     ),
                     onChanged: (value) {
                       setState(() {
@@ -456,10 +457,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   )
                 : Text(
                     'Sandesh',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                       fontWeight: FontWeight.w800,
                       fontSize: 28,
-                      color: cs.onSurface,
+                      color: cs.primary,
                       letterSpacing: -0.01,
                     ),
                   )),
@@ -496,6 +497,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+            color: cs.surfaceContainerLowest,
+            elevation: 8,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             onSelected: (value) async {
               if (value == 'settings') {
                 Navigator.push(
@@ -514,25 +518,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24)),
                       title: Text('Logout',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                               fontWeight: FontWeight.w700,
                               color: dcs.onSurface)),
                       content: Text(
                           'Are you sure you want to logout? Your chat history will be preserved locally.',
                           style:
-                              GoogleFonts.outfit(color: dcs.onSurfaceVariant)),
+                              GoogleFonts.inter(color: dcs.onSurfaceVariant)),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
                           child: Text('Cancel',
-                              style: GoogleFonts.outfit(color: dcs.outline)),
+                              style: GoogleFonts.inter(color: dcs.outline)),
                         ),
                         ElevatedButton(
                           onPressed: () => Navigator.pop(ctx, true),
                           style: ElevatedButton.styleFrom(
                               backgroundColor: dcs.error),
                           child: Text('Logout',
-                              style: GoogleFonts.outfit(color: dcs.onError)),
+                              style: GoogleFonts.inter(color: dcs.onError)),
                         ),
                       ],
                     );
@@ -558,12 +562,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'settings',
-                child: Text('Settings', style: GoogleFonts.outfit()),
+                child: Text('Settings', style: GoogleFonts.inter()),
               ),
               PopupMenuItem(
                 value: 'logout',
                 child: Text('Log Out',
-                    style: GoogleFonts.outfit(color: cs.error)),
+                    style: GoogleFonts.inter(color: cs.error)),
               ),
             ],
           ),
@@ -572,12 +576,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         bottom: TabBar(
           controller: _tabController,
           labelStyle:
-              GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15),
+              GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15),
           unselectedLabelStyle:
-              GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 15),
+              GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 15),
           labelColor: cs.primary,
           unselectedLabelColor: cs.onSurfaceVariant,
-          indicatorColor: cs.primary,
+          indicator: UnderlineTabIndicator(
+            borderSide: BorderSide(width: 3.0, color: cs.primary),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+          ),
           indicatorSize: TabBarIndicatorSize.label,
           dividerHeight: 0.5,
           dividerColor: cs.outlineVariant.withValues(alpha: 0.3),
@@ -635,34 +642,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       floatingActionButton: FloatingActionButton(
         onPressed: _currentTab == 0
             ? _addContactDialog
-            : () async {
-                // Capture navigator BEFORE await Navigator.push to avoid
-                // BuildContext-across-async-gap lint.
-                final nav = Navigator.of(context);
-                final group = await nav.push<Group>(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        CreateGroupScreen(myUsername: _myUsername),
-                  ),
-                );
-                if (group != null) {
-                  await _loadGroups();
-                  if (mounted) {
-                    nav.push(
+            : _currentTab == 1
+                ? () async {
+                    // Capture navigator BEFORE await Navigator.push to avoid
+                    // BuildContext-across-async-gap lint.
+                    final nav = Navigator.of(context);
+                    final group = await nav.push<Group>(
                       MaterialPageRoute(
-                        builder: (_) => GroupChatScreen(
-                          myUsername: _myUsername,
-                          groupId: group.id,
-                          groupName: group.name,
-                        ),
+                        builder: (_) =>
+                            CreateGroupScreen(myUsername: _myUsername),
                       ),
-                    ).then((_) => _loadGroups());
+                    );
+                    if (group != null) {
+                      await _loadGroups();
+                      if (mounted) {
+                        nav.push(
+                          MaterialPageRoute(
+                            builder: (_) => GroupChatScreen(
+                              myUsername: _myUsername,
+                              groupId: group.id,
+                              groupName: group.name,
+                            ),
+                          ),
+                        ).then((_) => _loadGroups());
+                      }
+                    }
                   }
-                }
-              },
+                : _addContactDialog,
         elevation: 3,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Icon(
-          _currentTab == 0 ? Icons.edit_square : Icons.group_add_rounded,
+          _currentTab == 0
+              ? Icons.chat_bubble_rounded
+              : _currentTab == 1
+                  ? Icons.group_add_rounded
+                  : Icons.add_call,
           size: 24,
         ),
       ),
@@ -687,13 +703,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 24),
           Text('No conversations yet',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   color: cs.onSurface)),
           const SizedBox(height: 8),
           Text('Tap the button below to start chatting',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 16, color: cs.onSurfaceVariant)),
         ],
       ),
@@ -717,13 +733,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 24),
           Text('No groups yet',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   color: cs.onSurface)),
           const SizedBox(height: 8),
           Text('Tap the button below to create a group',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 16, color: cs.onSurfaceVariant)),
         ],
       ),
@@ -735,7 +751,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final avatarWidget = UserAvatar(
       imageUrl: contact.avatarUrl.startsWith('http') ? contact.avatarUrl : null,
       name: contact.displayName.isNotEmpty ? contact.displayName : contact.username,
-      radius: 28,
+      radius: 24,
     );
 
     final isSelected = _selectedUsernames.contains(contact.username);
@@ -801,16 +817,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 : contact.username,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 18,
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
                                 color: cs.onSurface),
                           ),
                         ),
                         if (contact.lastMessageTime != null)
                           Text(
                             _formatTime(contact.lastMessageTime),
-                            style: GoogleFonts.outfit(
+                            style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: cs.outline),
@@ -822,8 +838,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       contact.lastMessage ?? 'Tap to start chatting',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(
-                          fontSize: 15,
+                      style: GoogleFonts.inter(
+                          fontSize: 14,
                           color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w400),
                     ),
@@ -864,7 +880,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Row(
             children: [
               CircleAvatar(
-                radius: 28,
+                radius: 24,
                 backgroundColor: cs.primaryContainer.withValues(alpha: 0.3),
                 backgroundImage: group.avatarUrl.startsWith('http')
                     ? NetworkImage(group.avatarUrl)
@@ -875,7 +891,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         group.name.isNotEmpty
                             ? group.name[0].toUpperCase()
                             : 'G',
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.inter(
                             color: cs.primary,
                             fontWeight: FontWeight.w700,
                             fontSize: 22),
@@ -894,16 +910,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             group.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 18,
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
                                 color: cs.onSurface),
                           ),
                         ),
                         if (group.lastMessageTime != null)
                           Text(
                             _formatTime(group.lastMessageTime),
-                            style: GoogleFonts.outfit(
+                            style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: cs.outline),
@@ -917,8 +933,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           : '${group.members.length} members',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(
-                          fontSize: 15,
+                      style: GoogleFonts.inter(
+                          fontSize: 14,
                           color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w400),
                     ),

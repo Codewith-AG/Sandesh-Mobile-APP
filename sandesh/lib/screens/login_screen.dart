@@ -94,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen>
             SnackBar(
               content: Text(
                 'Sign-in failed: ${msg.replaceAll('Exception:', '').trim()}',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
               ),
               backgroundColor: cs.error,
               behavior: SnackBarBehavior.floating,
@@ -185,218 +185,80 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: cs.surface,
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(height: size.height * 0.08),
-
-                  // ── App Icon ──
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(32),
-                      border: Border.all(
-                        color: cs.surfaceContainerHighest,
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cs.primary.withValues(alpha: 0.12),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
+        child: Center(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: cs.outlineVariant,
+                          width: 1.5,
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.chat_bubble_rounded,
-                        size: 42,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── Brand Name ──
-                  Text(
-                    'Sandesh',
-                    style: GoogleFonts.outfit(
-                      fontSize: 40,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                      letterSpacing: -0.02,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Private messaging, built for trust.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w400,
-                      height: 1.5,
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  // ── Feature pills row ──
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _FeaturePill(icon: Icons.lock_outline_rounded, label: 'Encrypted'),
-                      SizedBox(width: 10),
-                      _FeaturePill(icon: Icons.bolt_rounded, label: 'Instant'),
-                      SizedBox(width: 10),
-                      _FeaturePill(icon: Icons.do_not_disturb_on_outlined, label: 'No Ads'),
-                    ],
-                  ),
-
-                  const SizedBox(height: 36),
-
-                  // ── Sign-in card ──
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(32),
-                      border: Border.all(
-                          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                          width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cs.primary.withValues(alpha: 0.08),
-                          blurRadius: 32,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Get started',
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                            letterSpacing: -0.01,
+                        boxShadow: [
+                          BoxShadow(
+                            color: cs.primary.withValues(alpha: 0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
                           ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 48,
+                          color: cs.primary,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Sign in with your Google account to continue.',
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            color: cs.onSurfaceVariant,
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-
-                        // ── Google Sign-In Button ──
-                        _GoogleSignInButton(
-                          isLoading: _isLoading,
-                          onPressed: _isLoading ? null : _signInWithGoogle,
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // ── Security note ──
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.verified_user_outlined,
-                              size: 14,
-                              color: cs.outline,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'End-to-end encrypted · Zero server storage',
-                              style: GoogleFonts.outfit(
-                                fontSize: 12,
-                                color: cs.outline,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── Terms ──
-                  Text(
-                    'By continuing, you agree to our Terms of Service\nand Privacy Policy.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: cs.outlineVariant,
-                      fontWeight: FontWeight.w500,
-                      height: 1.6,
+                    const SizedBox(height: 24),
+                    Text(
+                      'Sandesh',
+                      style: GoogleFonts.inter(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: size.height * 0.04),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Connect with everyone.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _GoogleSignInButton(
+                        isLoading: _isLoading,
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─── Feature Pill ──────────────────────────────────────────────────────────────
-
-class _FeaturePill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _FeaturePill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: cs.surfaceContainerHighest, width: 1.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: cs.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.outfit(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurface,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -459,14 +321,14 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
         child: Container(
           height: 56,
           decoration: BoxDecoration(
-            color: cs.surfaceContainerLowest,
+            color: cs.surface,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: cs.surfaceContainerHighest, width: 1.5),
+            border: Border.all(color: cs.outlineVariant, width: 1.0),
             boxShadow: [
               BoxShadow(
-                color: cs.primary.withValues(alpha: 0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -477,7 +339,7 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.onSurface),
                     ),
                   ),
                 )
@@ -488,7 +350,7 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton>
                     const SizedBox(width: 14),
                     Text(
                       'Continue with Google',
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: cs.onSurface,

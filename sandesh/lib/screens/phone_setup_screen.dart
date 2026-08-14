@@ -66,7 +66,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
         SnackBar(
           content: Text(
             'Please enter a valid phone number',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+            style: GoogleFonts.inter(fontWeight: FontWeight.w500),
           ),
           backgroundColor: cs.error,
           behavior: SnackBarBehavior.floating,
@@ -150,7 +150,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
           SnackBar(
             content: Text(
               'Error: ${e.toString()}',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
             ),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
@@ -172,48 +172,8 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: cs.surface,
-        body: Stack(
-          children: [
-            // Background gradient orbs
-            Positioned(
-              top: -60,
-              left: -40,
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      cs.primary.withValues(alpha: 0.22),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -80,
-              right: -60,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      cs.primary.withValues(alpha: 0.18),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Content
-            SafeArea(
-              child: SingleChildScrollView(
+        body: SafeArea(
+          child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: FadeTransition(
                   opacity: _fadeAnimation,
@@ -253,7 +213,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                         Text(
                           'Hi, ${widget.googleName.split(' ').first}! 👋',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                             fontSize: 30,
                             fontWeight: FontWeight.w800,
                             color: cs.onSurface,
@@ -263,7 +223,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                         Text(
                           'One last step — add your phone number\nso your contacts can find you.',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                             fontSize: 15,
                             color: cs.onSurfaceVariant,
                             height: 1.6,
@@ -319,7 +279,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                           children: [
                                             Text(
                                               'Your Name',
-                                              style: GoogleFonts.outfit(
+                                              style: GoogleFonts.inter(
                                                 fontSize: 11,
                                                 color: cs.onSurfaceVariant,
                                                 fontWeight: FontWeight.w500,
@@ -328,7 +288,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                             const SizedBox(height: 2),
                                             Text(
                                               widget.googleName,
-                                              style: GoogleFonts.outfit(
+                                              style: GoogleFonts.inter(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w600,
                                                 color: cs.onSurface,
@@ -346,7 +306,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                         ),
                                         child: Text(
                                           'Google',
-                                          style: GoogleFonts.outfit(
+                                          style: GoogleFonts.inter(
                                             fontSize: 11,
                                             color: cs.primary,
                                             fontWeight: FontWeight.w700,
@@ -361,7 +321,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                 // Phone field label
                                 Text(
                                   'Phone Number',
-                                  style: GoogleFonts.outfit(
+                                  style: GoogleFonts.inter(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: cs.onSurfaceVariant,
@@ -408,14 +368,14 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                     controller: _phoneController,
                                     countrySelectorNavigator:
                                         const CountrySelectorNavigator.dialog(),
-                                    style: GoogleFonts.outfit(
+                                    style: GoogleFonts.inter(
                                       fontSize: 15,
                                       color: cs.onSurface,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     decoration: InputDecoration(
                                       hintText: '98765 43210',
-                                      hintStyle: GoogleFonts.outfit(
+                                      hintStyle: GoogleFonts.inter(
                                         color: cs.onSurfaceVariant,
                                         fontSize: 15,
                                       ),
@@ -456,7 +416,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                         const SizedBox(width: 8),
                                         Text(
                                           'Formatted: $_e164Phone',
-                                          style: GoogleFonts.outfit(
+                                          style: GoogleFonts.inter(
                                             fontSize: 13,
                                             color: Colors.green,
                                             fontWeight: FontWeight.w600,
@@ -517,7 +477,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                                                 children: [
                                                   Text(
                                                     'Set Up My Account',
-                                                    style: GoogleFonts.outfit(
+                                                    style: GoogleFonts.inter(
                                                       fontSize: 16,
                                                       fontWeight: FontWeight.w700,
                                                       color: cs.onPrimary,
@@ -552,7 +512,7 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                             const SizedBox(width: 6),
                             Text(
                               'Your number is only used to find your contacts',
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: cs.onSurfaceVariant,
                               ),
@@ -566,9 +526,8 @@ class _PhoneSetupScreenState extends State<PhoneSetupScreen>
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
-}

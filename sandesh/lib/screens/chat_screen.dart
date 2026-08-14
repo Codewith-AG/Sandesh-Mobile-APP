@@ -45,6 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
   StreamSubscription<Message>? _messageSubscription;
   bool _showEmojiPicker = false;
   bool _isSendingMedia = false;
+  bool _hasText = false;
   double _uploadProgress = 0;
   String _receiverAvatarUrl = '';
 
@@ -77,6 +78,12 @@ class _ChatScreenState extends State<ChatScreen> {
         .messageStream
         .listen(_handleNewMessage);
     _scrollController.addListener(_onScroll);
+    _textController.addListener(() {
+      final hasText = _textController.text.trim().isNotEmpty;
+      if (_hasText != hasText) {
+        if (mounted) setState(() => _hasText = hasText);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadMessages();
@@ -415,13 +422,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   ElevatedButton.icon(
                     onPressed: () => Navigator.pop(ctx, false),
                     icon: const Icon(Icons.close, color: Colors.white),
-                    label: Text('Cancel', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600)),
+                    label: Text('Cancel', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600)),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.black54, shape: const StadiumBorder()),
                   ),
                   ElevatedButton.icon(
                     onPressed: () => Navigator.pop(ctx, true),
                     icon: const Icon(Icons.send_rounded, color: Colors.white),
-                    label: Text('Send', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700)),
+                    label: Text('Send', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(backgroundColor: _cs.primary, shape: const StadiumBorder()),
                   ),
                 ],
@@ -446,20 +453,20 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
-        title: Text('Send Video?', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
+        title: Text('Send Video?', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface)),
         content: Row(
           children: [
             Icon(Icons.videocam_outlined, size: 40, color: cs.primary),
             const SizedBox(width: 12),
-            Expanded(child: Text('The video will be compressed and sent.', style: GoogleFonts.outfit(color: cs.onSurfaceVariant))),
+            Expanded(child: Text('The video will be compressed and sent.', style: GoogleFonts.inter(color: cs.onSurfaceVariant))),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter(color: cs.outline))),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: cs.primary),
-            child: Text('Send', style: GoogleFonts.outfit(color: cs.onPrimary, fontWeight: FontWeight.w700)),
+            child: Text('Send', style: GoogleFonts.inter(color: cs.onPrimary, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -468,7 +475,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.outfit()),
+      content: Text(msg, style: GoogleFonts.inter()),
       backgroundColor: _cs.error,
       behavior: SnackBarBehavior.floating,
     ));
@@ -524,7 +531,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Icon(icon, color: cs.onSurface, size: 26),
           ),
           const SizedBox(height: 8),
-          Text(label, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: cs.onSurfaceVariant)),
+          Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: cs.onSurfaceVariant)),
         ],
       ),
     );
@@ -569,10 +576,10 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
-        title: Text('Clear Chat', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
-        content: Text('Are you sure you want to delete all messages? This cannot be undone locally.', style: GoogleFonts.outfit(color: cs.onSurfaceVariant)),
+        title: Text('Clear Chat', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface)),
+        content: Text('Are you sure you want to delete all messages? This cannot be undone locally.', style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.inter(color: cs.outline))),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -584,7 +591,7 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: cs.error),
-            child: Text('Clear', style: GoogleFonts.outfit(color: cs.onError)),
+            child: Text('Clear', style: GoogleFonts.inter(color: cs.onError)),
           ),
         ],
       ),
@@ -601,18 +608,18 @@ class _ChatScreenState extends State<ChatScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(
           isCurrentlyBlocked ? 'Unblock User' : 'Block User',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface),
         ),
         content: Text(
           isCurrentlyBlocked
               ? 'Unblock ${_displayName ?? widget.receiverUsername}? You will start receiving messages from this user again.'
               : 'Block ${_displayName ?? widget.receiverUsername}? Blocked contacts will no longer be able to send you messages or call you.',
-          style: GoogleFonts.outfit(color: cs.onSurfaceVariant, height: 1.5),
+          style: GoogleFonts.inter(color: cs.onSurfaceVariant, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline)),
+            child: Text('Cancel', style: GoogleFonts.inter(color: cs.outline)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -624,7 +631,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${_displayName ?? widget.receiverUsername} unblocked',
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
                       backgroundColor: Colors.green.shade600,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -638,7 +645,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${_displayName ?? widget.receiverUsername} blocked',
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
                       backgroundColor: cs.error,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -652,7 +659,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             child: Text(
               isCurrentlyBlocked ? 'Unblock' : 'Block',
-              style: GoogleFonts.outfit(color: cs.onError),
+              style: GoogleFonts.inter(color: cs.onError),
             ),
           ),
         ],
@@ -665,7 +672,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _cs = Theme.of(context).colorScheme;
     final items = _buildMessageListWithDates();
     return Scaffold(
-      backgroundColor: _cs.surface,
+      backgroundColor: _cs.surfaceContainerLow,
       appBar: _buildAppBar(),
       body: SafeArea(
         child: Column(
@@ -706,7 +713,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     Expanded(
                       child: Text(
                         'You blocked this contact',
-                        style: GoogleFonts.outfit(color: _cs.error, fontWeight: FontWeight.w500, fontSize: 14),
+                        style: GoogleFonts.inter(color: _cs.error, fontWeight: FontWeight.w500, fontSize: 14),
                       ),
                     ),
                     TextButton(
@@ -718,7 +725,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         backgroundColor: _cs.error.withValues(alpha: 0.1),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
-                      child: Text('Unblock', style: GoogleFonts.outfit(color: _cs.error, fontWeight: FontWeight.w600, fontSize: 13)),
+                      child: Text('Unblock', style: GoogleFonts.inter(color: _cs.error, fontWeight: FontWeight.w600, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -784,7 +791,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Text(
                     _displayName ?? widget.receiverUsername,
-                    style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface),
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -893,12 +900,12 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
           itemBuilder: (context) => [
-            PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.outfit())),
+            PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.inter())),
             PopupMenuItem(
               value: 'block',
               child: Text(
                 _isBlocked ? 'Unblock User' : 'Block User',
-                style: GoogleFonts.outfit(color: _isBlocked ? Colors.green.shade600 : null),
+                style: GoogleFonts.inter(color: _isBlocked ? Colors.green.shade600 : null),
               ),
             ),
           ],
@@ -927,7 +934,7 @@ class _ChatScreenState extends State<ChatScreen> {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: cs.outlineVariant),
         ),
-        child: Text(label, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+        child: Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
       ),
     );
   }
@@ -972,16 +979,17 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       decoration: BoxDecoration(
-        color: isMe ? cs.primary : cs.surfaceContainerHighest,
+        color: isMe ? cs.primary : cs.surface,
+        border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
-          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+          topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(message.text ?? '', style: GoogleFonts.outfit(
+          Text(message.text ?? '', style: GoogleFonts.inter(
               color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, height: 1.4)),
           const SizedBox(height: 6),
           _buildTimestamp(timeString, isMe, cs),
@@ -1021,10 +1029,11 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       decoration: BoxDecoration(
-        color: isMe ? cs.primary : cs.surfaceContainerHighest,
+        color: isMe ? cs.primary : cs.surface,
+        border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
-          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+          topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
         ),
       ),
       child: Column(
@@ -1045,9 +1054,9 @@ class _ChatScreenState extends State<ChatScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.outfit(
+                  Text(title, style: GoogleFonts.inter(
                       color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, fontWeight: FontWeight.w600)),
-                  Text(subtitle, style: GoogleFonts.outfit(
+                  Text(subtitle, style: GoogleFonts.inter(
                       color: isMe ? cs.onPrimary.withValues(alpha: 0.8) : cs.onSurfaceVariant, fontSize: 13)),
                 ],
               ),
@@ -1107,8 +1116,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return ClipRRect(
       borderRadius: BorderRadius.only(
-        topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
-        bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+        topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+        bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
       ),
       child: GestureDetector(
         onTap: () {
@@ -1153,10 +1162,11 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Container(
         width: 220,
         decoration: BoxDecoration(
-          color: isMe ? cs.primary : cs.surfaceContainerHighest,
+          color: isMe ? cs.primary : cs.surface,
+          border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
-            bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+            topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
           ),
         ),
         child: Padding(
@@ -1183,7 +1193,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Icon(Icons.videocam_outlined, size: 16, color: isMe ? cs.onPrimary : cs.onSurfaceVariant),
                   const SizedBox(width: 6),
-                  Text('Video', style: GoogleFonts.outfit(
+                  Text('Video', style: GoogleFonts.inter(
                       fontSize: 14, color: isMe ? cs.onPrimary : cs.onSurface, fontWeight: FontWeight.w500)),
                   const Spacer(),
                   _buildTimestamp(timeString, isMe, cs),
@@ -1201,10 +1211,11 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       decoration: BoxDecoration(
-        color: isMe ? cs.primary : cs.surfaceContainerHighest,
+        color: isMe ? cs.primary : cs.surface,
+        border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
-          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+          topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
         ),
       ),
       child: Column(
@@ -1226,7 +1237,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Flexible(
                 child: Text(message.fileName ?? 'Document',
                     maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 14, fontWeight: FontWeight.w600,
                         color: isMe ? cs.onPrimary : cs.onSurface)),
               ),
@@ -1243,7 +1254,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(timeString, style: GoogleFonts.outfit(
+        Text(timeString, style: GoogleFonts.inter(
             color: isMe ? cs.onPrimary.withValues(alpha: 0.8) : cs.onSurfaceVariant,
             fontSize: 11, fontWeight: FontWeight.w500)),
         if (isMe) ...[
@@ -1264,7 +1275,7 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(timeString, style: GoogleFonts.outfit(color: Colors.white, fontSize: 11)),
+          Text(timeString, style: GoogleFonts.inter(color: Colors.white, fontSize: 11)),
           if (isMe) ...[
             const SizedBox(width: 4),
             const Icon(Icons.done_all, size: 14, color: Colors.white),
@@ -1292,7 +1303,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 constraints: const BoxConstraints(maxHeight: 120),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Row(
@@ -1318,11 +1329,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         focusNode: _focusNode,
                         maxLines: null,
                         textInputAction: TextInputAction.newline,
-                        style: GoogleFonts.outfit(fontSize: 16, color: cs.onSurface),
+                        style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
                         onTap: () { if (_showEmojiPicker) setState(() => _showEmojiPicker = false); },
                         decoration: InputDecoration(
                           hintText: 'Type a message...',
-                          hintStyle: GoogleFonts.outfit(color: cs.onSurfaceVariant, fontSize: 16),
+                          hintStyle: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 16),
                           border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(vertical: 14),
                           isDense: true,
@@ -1350,8 +1361,10 @@ class _ChatScreenState extends State<ChatScreen> {
               child: IconButton(
                 icon: _isSendingMedia
                     ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: cs.onPrimary, strokeWidth: 2))
-                    : Icon(Icons.send_rounded, color: cs.onPrimary, size: 22),
-                onPressed: _isSendingMedia ? null : _sendMessage,
+                    : Icon(_hasText ? Icons.send_rounded : Icons.mic_none_rounded, color: cs.onPrimary, size: 22),
+                onPressed: _isSendingMedia ? null : (_hasText ? _sendMessage : () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice messages coming soon')));
+                }),
                 padding: EdgeInsets.zero,
               ),
             ),
@@ -1395,11 +1408,11 @@ class _LastSeenSubtitleState extends State<_LastSeenSubtitle> {
     return Row(children: [
       if (widget.isOnline) ...[
         Container(width: 8, height: 8,
-            decoration: BoxDecoration(color: Colors.green.shade400, shape: BoxShape.circle)),
+            decoration: BoxDecoration(color: widget.cs.primary, shape: BoxShape.circle)),
         const SizedBox(width: 4),
-        Text('Online', style: GoogleFonts.outfit(fontSize: 13, color: Colors.green.shade500, fontWeight: FontWeight.w500)),
+        Text('Online', style: GoogleFonts.inter(fontSize: 13, color: widget.cs.primary, fontWeight: FontWeight.w500)),
       ] else ...[
-        Text(_ChatScreenState._formatLastSeen(widget.lastSeen), style: GoogleFonts.outfit(fontSize: 13, color: widget.cs.onSurfaceVariant, fontWeight: FontWeight.w400)),
+        Text(_ChatScreenState._formatLastSeen(widget.lastSeen), style: GoogleFonts.inter(fontSize: 13, color: widget.cs.onSurfaceVariant, fontWeight: FontWeight.w400)),
       ],
     ]);
   }

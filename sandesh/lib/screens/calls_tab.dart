@@ -3,7 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../widgets/user_avatar.dart';
-import 'chat_screen.dart'; 
+import 'chat_screen.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../services/call_service.dart';
+import 'call_screen.dart'; 
 
 class CallsTab extends StatefulWidget {
   final String myUsername;
@@ -77,7 +80,7 @@ class _CallsTabState extends State<CallsTab> {
             const SizedBox(height: 16),
             Text(
               'No call history',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: cs.onSurfaceVariant,
@@ -122,11 +125,11 @@ class _CallsTabState extends State<CallsTab> {
             leading: UserAvatar(
               imageUrl: null, 
               name: peerUsername,
-              radius: 26,
+              radius: 24,
             ),
             title: Text(
               peerUsername,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: status == 'missed' && !isOutgoing ? cs.error : cs.onSurface,
@@ -138,8 +141,8 @@ class _CallsTabState extends State<CallsTab> {
                 const SizedBox(width: 4),
                 Text(
                   _formatDate(startedAt),
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
                     color: cs.onSurfaceVariant,
                   ),
                 ),
@@ -147,16 +150,51 @@ class _CallsTabState extends State<CallsTab> {
             ),
             trailing: IconButton(
               icon: Icon(typeIcon, color: cs.primary),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ChatScreen(
-                      myUsername: widget.myUsername,
-                      receiverUsername: peerUsername,
-                    ),
-                  ),
+              onPressed: () async {
+                final isVideo = callType == 'video';
+                final perms = isVideo 
+                    ? [Permission.camera, Permission.microphone] 
+                    : [Permission.microphone];
+                final statuses = await perms.request();
+                
+                if (statuses.values.any((s) => s != PermissionStatus.granted)) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Permissions required to make a call.'),
+                    ));
+                  }
+                  return;
+                }
+                
+                final result = await CallService().initiateCall(
+                  receiverUsername: peerUsername,
+                  callType: isVideo ? 'video' : 'audio',
                 );
+                
+                if (!context.mounted) return;
+                
+                if (result.error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Call failed: ${result.error}'),
+                  ));
+                } else {
+                  final sorted = [CallService.sanitizeUsername(widget.myUsername), CallService.sanitizeUsername(peerUsername)]..sort();
+                  final channelName = 'call_${sorted[0]}_${sorted[1]}';
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CallScreen(
+                        myUsername: widget.myUsername,
+                        peerUsername: peerUsername,
+                        channelName: channelName,
+                        token: result.token!.token,
+                        agoraUid: result.token!.uid,
+                        callType: isVideo ? 'video' : 'audio',
+                        isOutgoing: true,
+                      ),
+                    ),
+                  );
+                }
               },
             ),
             onTap: () {

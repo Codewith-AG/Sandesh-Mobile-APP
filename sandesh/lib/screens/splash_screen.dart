@@ -129,81 +129,76 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Background image
-          Image.asset(
-            'assets/images/red_mandala.jpg',
-            fit: BoxFit.cover,
-          ),
-          // Light overlay for text readability
-          Container(
-            color: Colors.black.withValues(alpha: 0.3),
-          ),
-          // Content
-          SafeArea(
-            child: Column(
-              children: [
-                const Spacer(flex: 3),
-                FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 110,
-                          height: 110,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              width: 2,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: cs.outlineVariant,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: cs.primary.withValues(alpha: 0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
                             ),
-                          ),
-                          child: const Icon(
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
                             Icons.chat_bubble_outline_rounded,
-                            size: 56,
-                            color: Colors.white,
+                            size: 48,
+                            color: cs.primary,
                           ),
                         ),
-                        const SizedBox(height: 28),
-                        Text(
-                          'Sandesh',
-                          style: GoogleFonts.urbanist(
-                            fontSize: 46,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 1.5,
-                          ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Sandesh',
+                        style: GoogleFonts.inter(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w700,
+                          color: cs.primary,
+                          letterSpacing: -0.5,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                const Spacer(flex: 3),
-                // Loading indicator
-                FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white70),
-                    ),
+              ),
+              const SizedBox(height: 64),
+              // Loading indicator
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                   ),
                 ),
-                const SizedBox(height: 48),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

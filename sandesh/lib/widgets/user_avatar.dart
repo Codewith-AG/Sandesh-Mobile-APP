@@ -30,10 +30,10 @@ class UserAvatar extends StatelessWidget {
 
     final fallbackWidget = CircleAvatar(
       radius: radius,
-      backgroundColor: cs.surfaceContainerHigh,
+      backgroundColor: cs.outlineVariant,
       child: Text(
         fallbackLetter,
-        style: GoogleFonts.outfit(
+        style: GoogleFonts.inter(
           color: cs.primary,
           fontWeight: FontWeight.w700,
           fontSize: _getFontSize(radius),
@@ -46,7 +46,7 @@ class UserAvatar extends StatelessWidget {
     if (imageUrl != null && imageUrl!.isNotEmpty && imageUrl!.startsWith('http')) {
       avatar = CircleAvatar(
         radius: radius,
-        backgroundColor: cs.surfaceContainerHigh,
+        backgroundColor: cs.outlineVariant,
         child: ClipOval(
           child: CachedNetworkImage(
             imageUrl: imageUrl!,

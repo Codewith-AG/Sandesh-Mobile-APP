@@ -303,7 +303,7 @@ class _CallScreenState extends State<CallScreen> {
           width: 144,
           height: 144,
           decoration: BoxDecoration(
-            color: AppTheme.surfaceContainerHigh,
+            color: AppTheme.surfaceVariant,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
