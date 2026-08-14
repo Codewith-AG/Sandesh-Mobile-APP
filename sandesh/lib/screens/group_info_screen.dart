@@ -138,24 +138,24 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20)),
           title: Text('Leave Group',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontWeight: FontWeight.w700, color: dcs.onSurface)),
           content: Text(
             'Are you sure you want to leave "${_group?.name ?? widget.groupName}"? You won\'t receive new messages from this group.',
-            style: GoogleFonts.outfit(color: dcs.onSurfaceVariant),
+            style: GoogleFonts.inter(color: dcs.onSurfaceVariant),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text('Cancel',
-                  style: GoogleFonts.outfit(color: dcs.outline)),
+                  style: GoogleFonts.inter(color: dcs.outline)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style:
                   ElevatedButton.styleFrom(backgroundColor: dcs.error),
               child: Text('Leave',
-                  style: GoogleFonts.outfit(color: dcs.onError)),
+                  style: GoogleFonts.inter(color: dcs.onError)),
             ),
           ],
         );
@@ -180,7 +180,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('You left the group',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
@@ -195,7 +195,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error leaving group: $e',
-                style: GoogleFonts.outfit()),
+                style: GoogleFonts.inter()),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -214,24 +214,24 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20)),
           title: Text('Delete Group',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontWeight: FontWeight.w700, color: dcs.onSurface)),
           content: Text(
             'This will permanently delete the group "${_group?.name ?? widget.groupName}" for all members. This action cannot be undone.',
-            style: GoogleFonts.outfit(color: dcs.onSurfaceVariant),
+            style: GoogleFonts.inter(color: dcs.onSurfaceVariant),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text('Cancel',
-                  style: GoogleFonts.outfit(color: dcs.outline)),
+                  style: GoogleFonts.inter(color: dcs.outline)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style:
                   ElevatedButton.styleFrom(backgroundColor: dcs.error),
               child: Text('Delete',
-                  style: GoogleFonts.outfit(color: dcs.onError)),
+                  style: GoogleFonts.inter(color: dcs.onError)),
             ),
           ],
         );
@@ -254,7 +254,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Group deleted',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
@@ -269,7 +269,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error deleting group: $e',
-                style: GoogleFonts.outfit()),
+                style: GoogleFonts.inter()),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -289,24 +289,24 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20)),
           title: Text('Remove Member',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontWeight: FontWeight.w700, color: dcs.onSurface)),
           content: Text(
             'Remove $displayName from the group?',
-            style: GoogleFonts.outfit(color: dcs.onSurfaceVariant),
+            style: GoogleFonts.inter(color: dcs.onSurfaceVariant),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text('Cancel',
-                  style: GoogleFonts.outfit(color: dcs.outline)),
+                  style: GoogleFonts.inter(color: dcs.outline)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style:
                   ElevatedButton.styleFrom(backgroundColor: dcs.error),
               child: Text('Remove',
-                  style: GoogleFonts.outfit(color: dcs.onError)),
+                  style: GoogleFonts.inter(color: dcs.onError)),
             ),
           ],
         );
@@ -338,7 +338,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$displayName removed',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
@@ -351,7 +351,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         final cs = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e', style: GoogleFonts.outfit()),
+            content: Text('Error: $e', style: GoogleFonts.inter()),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -383,7 +383,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$displayName is now an admin',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
@@ -396,7 +396,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         final cs = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e', style: GoogleFonts.outfit()),
+            content: Text('Error: $e', style: GoogleFonts.inter()),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -416,7 +416,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Uploading group photo…',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -449,7 +449,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Group photo updated',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
           ),
@@ -461,7 +461,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content:
-                Text('Error updating photo: $e', style: GoogleFonts.outfit()),
+                Text('Error updating photo: $e', style: GoogleFonts.inter()),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -491,7 +491,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('All your contacts are already in this group',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12)),
@@ -514,7 +514,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20)),
               title: Text('Add Members',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                       fontWeight: FontWeight.w700,
                       color: dcs.onSurface)),
               content: SizedBox(
@@ -544,7 +544,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                                     .startsWith('http')
                             ? Text(
                                 name[0].toUpperCase(),
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.inter(
                                   fontWeight: FontWeight.w600,
                                   color: dcs.primary,
                                 ),
@@ -552,12 +552,12 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                             : null,
                       ),
                       title: Text(name,
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                               fontWeight: FontWeight.w500,
                               color: dcs.onSurface)),
                       subtitle: contact.displayName.isNotEmpty
                           ? Text('@${contact.username}',
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: dcs.onSurfaceVariant))
                           : null,
@@ -594,7 +594,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
                   child: Text('Cancel',
-                      style: GoogleFonts.outfit(color: dcs.outline)),
+                      style: GoogleFonts.inter(color: dcs.outline)),
                 ),
                 ElevatedButton(
                   onPressed: selected.isEmpty
@@ -604,7 +604,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                       backgroundColor: dcs.primary),
                   child: Text(
                       'Add${selected.isNotEmpty ? ' (${selected.length})' : ''}',
-                      style: GoogleFonts.outfit(color: dcs.onPrimary)),
+                      style: GoogleFonts.inter(color: dcs.onPrimary)),
                 ),
               ],
             );
@@ -646,7 +646,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               content: Text(
                   '${selected.length} member${selected.length > 1 ? 's' : ''} added',
                   style:
-                      GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                      GoogleFonts.inter(fontWeight: FontWeight.w500)),
               backgroundColor: Colors.green.shade600,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -660,7 +660,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error adding members: $e',
-                  style: GoogleFonts.outfit()),
+                  style: GoogleFonts.inter()),
               backgroundColor: cs.error,
               behavior: SnackBarBehavior.floating,
             ),
@@ -690,7 +690,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         (group?.name ?? widget.groupName).isNotEmpty
             ? (group?.name ?? widget.groupName)[0].toUpperCase()
             : '?',
-        style: GoogleFonts.outfit(
+        style: GoogleFonts.inter(
           fontSize: 40,
           fontWeight: FontWeight.w600,
           color: cs.primary,
@@ -716,7 +716,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         backgroundColor: cs.surfaceContainerHigh,
         child: Text(
           displayName[0].toUpperCase(),
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w600,
             color: cs.primary,
             fontSize: 16,
@@ -728,7 +728,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           Flexible(
             child: Text(
               isMe ? '$displayName (You)' : displayName,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontWeight: FontWeight.w500,
                 fontSize: 15,
                 color: cs.onSurface,
@@ -747,7 +747,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
               ),
               child: Text(
                 'Admin',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: cs.primary,
@@ -761,7 +761,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       subtitle: displayName != username
           ? Text(
               '@$username',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 12,
                 color: cs.onSurfaceVariant,
               ),
@@ -781,10 +781,10 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 if (!isAdmin)
                   PopupMenuItem(
                       value: 'make_admin',
-                      child: Text('Make admin', style: GoogleFonts.outfit())),
+                      child: Text('Make admin', style: GoogleFonts.inter())),
                 PopupMenuItem(
                     value: 'remove',
-                    child: Text('Remove', style: GoogleFonts.outfit())),
+                    child: Text('Remove', style: GoogleFonts.inter())),
               ],
             )
           : null,
@@ -799,7 +799,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
       padding: const EdgeInsets.only(left: 28, top: 24, bottom: 8),
       child: Text(
         title,
-        style: GoogleFonts.outfit(
+        style: GoogleFonts.inter(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: cs.onSurfaceVariant,
@@ -821,7 +821,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         elevation: 0,
         title: Text(
           'Group Info',
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
               fontWeight: FontWeight.w700, color: cs.onSurface),
         ),
         iconTheme: IconThemeData(color: cs.onSurface),
@@ -864,7 +864,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                   Center(
                     child: Text(
                       _group?.name ?? widget.groupName,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                         color: cs.onSurface,
@@ -876,7 +876,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                   Center(
                     child: Text(
                       '${_members.length} member${_members.length != 1 ? 's' : ''}',
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                         fontSize: 14,
                         color: cs.onSurfaceVariant,
                       ),
@@ -900,7 +900,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                           children: [
                             Text(
                               'Description',
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: cs.onSurfaceVariant,
@@ -910,7 +910,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                             const SizedBox(height: 6),
                             Text(
                               _group!.description,
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                 fontSize: 14,
                                 color: cs.onSurface,
                                 height: 1.4,
@@ -943,7 +943,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                       ),
                       title: Text(
                         'Add Member',
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                           color: cs.primary,
@@ -975,7 +975,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                             color: cs.error),
                         label: Text(
                           'Leave Group',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: cs.error,
@@ -1007,7 +1007,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                               color: cs.onError),
                           label: Text(
                             'Delete Group',
-                            style: GoogleFonts.outfit(
+                            style: GoogleFonts.inter(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: cs.onError,

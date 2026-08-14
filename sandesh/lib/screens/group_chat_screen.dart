@@ -33,6 +33,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final _focusNode = FocusNode();
   List<Message> _messages = [];
   bool _showEmojiPicker = false;
+  bool _hasText = false;
 
   /// Supabase Realtime channel for this group
   RealtimeChannel? _groupChannel;
@@ -68,6 +69,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _loadMessages();
     _loadMemberCount();
     _subscribeToGroupChannel();
+    _textController.addListener(() {
+      final hasText = _textController.text.trim().isNotEmpty;
+      if (_hasText != hasText) {
+        if (mounted) setState(() => _hasText = hasText);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadMessages();
@@ -291,7 +298,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.outfit()),
+      content: Text(msg, style: GoogleFonts.inter()),
       backgroundColor: _cs.error,
       behavior: SnackBarBehavior.floating,
     ));
@@ -319,10 +326,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
-        title: Text('Clear Chat', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: cs.onSurface)),
-        content: Text('Are you sure you want to delete all group messages locally? This cannot be undone.', style: GoogleFonts.outfit(color: cs.onSurfaceVariant)),
+        title: Text('Clear Chat', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface)),
+        content: Text('Are you sure you want to delete all group messages locally? This cannot be undone.', style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.outfit(color: cs.outline))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.inter(color: cs.outline))),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -336,7 +343,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: cs.error),
-            child: Text('Clear', style: GoogleFonts.outfit(color: cs.onError)),
+            child: Text('Clear', style: GoogleFonts.inter(color: cs.onError)),
           ),
         ],
       ),
@@ -431,13 +438,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 children: [
                   Text(
                     widget.groupName,
-                    style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface),
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     _memberCount > 0 ? '$_memberCount members' : 'Group',
-                    style: GoogleFonts.outfit(fontSize: 13, color: cs.onSurfaceVariant, fontWeight: FontWeight.w400),
+                    style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant, fontWeight: FontWeight.w400),
                   ),
                 ],
               ),
@@ -465,8 +472,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             }
           },
           itemBuilder: (context) => [
-            PopupMenuItem(value: 'info', child: Text('Group Info', style: GoogleFonts.outfit())),
-            PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.outfit())),
+            PopupMenuItem(value: 'info', child: Text('Group Info', style: GoogleFonts.inter())),
+            PopupMenuItem(value: 'clear', child: Text('Clear Chat', style: GoogleFonts.inter())),
           ],
         ),
         const SizedBox(width: 4),
@@ -502,7 +509,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: cs.outlineVariant),
         ),
-        child: Text(label, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+        child: Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
       ),
     );
   }
@@ -527,7 +534,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           child: Text(
             message.text ?? '',
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
                 color: _cs.onSurfaceVariant),
@@ -560,10 +567,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       decoration: BoxDecoration(
-        color: isMe ? cs.primary : cs.surfaceContainerHighest,
+        color: isMe ? cs.primary : cs.surface,
+        border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(24), topRight: const Radius.circular(24),
-          bottomLeft: Radius.circular(isMe ? 24 : 8), bottomRight: Radius.circular(isMe ? 8 : 24),
+          topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
         ),
       ),
       child: Column(
@@ -573,7 +581,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           if (showSenderName && !isMe) ...[
             Text(
               senderName,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: senderColor,
@@ -583,7 +591,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             ),
             const SizedBox(height: 4),
           ],
-          Text(message.text ?? '', style: GoogleFonts.outfit(
+          Text(message.text ?? '', style: GoogleFonts.inter(
               color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, height: 1.4)),
           const SizedBox(height: 6),
           Align(
@@ -599,7 +607,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(timeString, style: GoogleFonts.outfit(
+        Text(timeString, style: GoogleFonts.inter(
             color: isMe ? cs.onPrimary.withValues(alpha: 0.8) : cs.onSurfaceVariant,
             fontSize: 11, fontWeight: FontWeight.w500)),
         if (isMe) ...[
@@ -630,7 +638,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 constraints: const BoxConstraints(maxHeight: 120),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Row(
@@ -656,11 +664,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                         focusNode: _focusNode,
                         maxLines: null,
                         textInputAction: TextInputAction.newline,
-                        style: GoogleFonts.outfit(fontSize: 16, color: cs.onSurface),
+                        style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
                         onTap: () { if (_showEmojiPicker) setState(() => _showEmojiPicker = false); },
                         decoration: InputDecoration(
                           hintText: 'Type a message...',
-                          hintStyle: GoogleFonts.outfit(color: cs.onSurfaceVariant, fontSize: 16),
+                          hintStyle: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 16),
                           border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(vertical: 14),
                           isDense: true,
@@ -680,8 +688,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                icon: Icon(Icons.send_rounded, color: cs.onPrimary, size: 22),
-                onPressed: _sendMessage,
+                icon: Icon(_hasText ? Icons.send_rounded : Icons.mic_none_rounded, color: cs.onPrimary, size: 22),
+                onPressed: _hasText ? _sendMessage : () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice messages coming soon')));
+                },
                 padding: EdgeInsets.zero,
               ),
             ),

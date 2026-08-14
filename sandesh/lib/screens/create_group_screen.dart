@@ -106,7 +106,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
         SnackBar(
           content: Text(
             'Select at least one member',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+            style: GoogleFonts.inter(fontWeight: FontWeight.w500),
           ),
           backgroundColor: cs.error,
           behavior: SnackBarBehavior.floating,
@@ -174,7 +174,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
           SnackBar(
             content: Text(
               'Error creating group: ${e.toString()}',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
             ),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
@@ -200,7 +200,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
         ),
         title: Text(
           'New Group',
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
             fontWeight: FontWeight.w800,
             fontSize: 24,
             color: cs.onSurface,
@@ -221,7 +221,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
                 ),
                 child: Text(
                   '${_selectedUsernames.length} selected',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: cs.primary,
@@ -302,14 +302,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
                 Expanded(
                   child: TextFormField(
                     controller: _nameController,
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: cs.onSurface,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Group name',
-                      hintStyle: GoogleFonts.outfit(
+                      hintStyle: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
                         color: cs.onSurfaceVariant.withValues(alpha: 0.6),
@@ -359,13 +359,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
             TextFormField(
               controller: _descController,
               maxLines: 2,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 15,
                 color: cs.onSurface,
               ),
               decoration: InputDecoration(
                 hintText: 'Group description (optional)',
-                hintStyle: GoogleFonts.outfit(
+                hintStyle: GoogleFonts.inter(
                   fontSize: 15,
                   color: cs.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
@@ -443,7 +443,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
       child: InputChip(
         label: Text(
           label,
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: cs.onSecondaryContainer,
@@ -476,14 +476,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
       child: Container(
         decoration: BoxDecoration(
           color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(999),
         ),
         child: TextField(
           controller: _searchController,
-          style: GoogleFonts.outfit(fontSize: 15, color: cs.onSurface),
+          style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Search contacts...',
-            hintStyle: GoogleFonts.outfit(
+            hintStyle: GoogleFonts.inter(
               color: cs.onSurfaceVariant.withValues(alpha: 0.6),
               fontSize: 15,
             ),
@@ -545,7 +545,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
               _searchQuery.isNotEmpty
                   ? 'No contacts match your search'
                   : 'No contacts yet',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: cs.onSurface,
@@ -556,7 +556,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
               _searchQuery.isNotEmpty
                   ? 'Try a different name or number'
                   : 'Add contacts first to create a group',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 14,
                 color: cs.onSurfaceVariant,
               ),
@@ -611,7 +611,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
                           : contact.username,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
                         color: cs.onSurface,
@@ -623,7 +623,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
                         contact.username,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.inter(
                           fontSize: 13,
                           color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w400,
@@ -705,7 +705,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
       child: Center(
         child: Text(
           label,
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
             color: cs.primary,
             fontWeight: FontWeight.w700,
             fontSize: 20,
@@ -737,7 +737,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
       backgroundColor: cs.primaryContainer.withValues(alpha: 0.15),
       child: Text(
         label,
-        style: GoogleFonts.outfit(
+        style: GoogleFonts.inter(
           color: cs.primary,
           fontWeight: FontWeight.w700,
           fontSize: radius * 0.9,
@@ -755,6 +755,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
         onPressed: _isCreating ? null : _createGroup,
         elevation: 4,
         backgroundColor: cs.primary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         icon: _isCreating
             ? SizedBox(
                 width: 20,
@@ -767,7 +768,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen>
             : Icon(Icons.check_rounded, color: cs.onPrimary),
         label: Text(
           _isCreating ? 'Creating...' : 'Create Group',
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w700,
             color: cs.onPrimary,
