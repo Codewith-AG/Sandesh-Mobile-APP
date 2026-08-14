@@ -632,7 +632,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     SnackBar(
                       content: Text('${_displayName ?? widget.receiverUsername} unblocked',
                           style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-                      backgroundColor: Colors.green.shade600,
+                      backgroundColor: AppTheme.primary,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -655,7 +655,7 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isCurrentlyBlocked ? Colors.green.shade600 : cs.error,
+              backgroundColor: isCurrentlyBlocked ? AppTheme.primary : cs.error,
             ),
             child: Text(
               isCurrentlyBlocked ? 'Unblock' : 'Block',
@@ -905,7 +905,7 @@ class _ChatScreenState extends State<ChatScreen> {
               value: 'block',
               child: Text(
                 _isBlocked ? 'Unblock User' : 'Block User',
-                style: GoogleFonts.inter(color: _isBlocked ? Colors.green.shade600 : null),
+                style: GoogleFonts.inter(color: _isBlocked ? AppTheme.primary : null),
               ),
             ),
           ],

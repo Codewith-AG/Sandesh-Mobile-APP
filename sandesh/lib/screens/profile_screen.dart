@@ -222,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SnackBar(
             content: Text('Profile saved!',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            backgroundColor: Colors.green.shade600,
+            backgroundColor: AppTheme.primary,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
