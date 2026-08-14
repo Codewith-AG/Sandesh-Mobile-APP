@@ -550,6 +550,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 32),
                   ],
 
+                  if (_isReadOnly && _calls.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Text(
+                        'CALL HISTORY',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurfaceVariant,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: _calls.map((call) {
+                          final isOutgoing = call['caller_username'] != widget.peerUsername;
+                          final status = call['status'] as String;
+                          final callType = call['call_type'] as String;
+                          final startedAt = DateTime.tryParse(call['started_at'] ?? '')?.toLocal() ?? DateTime.now();
+
+                          Color iconColor;
+                          IconData statusIcon;
+
+                          if (isOutgoing) {
+                            iconColor = status == 'answered' ? cs.primary : cs.onSurfaceVariant;
+                            statusIcon = Icons.call_made_rounded;
+                          } else {
+                            iconColor = status == 'missed' || status == 'declined' ? Theme.of(context).colorScheme.error : cs.primary;
+                            statusIcon = Icons.call_received_rounded;
+                          }
+
+                          final typeIcon = callType == 'video' ? Icons.videocam_rounded : Icons.call_rounded;
+                          
+                          return ListTile(
+                            leading: Container(
+                              width: 40, height: 40,
+                              decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
+                              child: Icon(typeIcon, color: cs.onSurface, size: 20),
+                            ),
+                            title: Text(
+                              isOutgoing ? 'Outgoing ${callType == 'video' ? 'Video' : 'Audio'} Call' : (status == 'missed' ? 'Missed ${callType == 'video' ? 'Video' : 'Audio'} Call' : 'Incoming ${callType == 'video' ? 'Video' : 'Audio'} Call'),
+                              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: status == 'missed' && !isOutgoing ? Theme.of(context).colorScheme.error : cs.onSurface),
+                            ),
+                            subtitle: Row(
+                              children: [
+                                Icon(statusIcon, size: 14, color: iconColor),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "${startedAt.day}/${startedAt.month}/${startedAt.year} ${startedAt.hour}:${startedAt.minute.toString().padLeft(2, '0')}",
+                                  style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                            trailing: Icon(typeIcon, color: cs.primary, size: 20),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+
                   if (!_isReadOnly) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),

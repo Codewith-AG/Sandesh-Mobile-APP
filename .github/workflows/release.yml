@@ -112,15 +112,7 @@ jobs:
 
       - name: Flutter Analyze
         working-directory: sandesh
-        run: |
-          flutter analyze > analyze_log.txt || true
-          git config --global user.email "bot@example.com"
-          git config --global user.name "Bot"
-          git checkout -b debug-logs
-          git add analyze_log.txt
-          git commit -m "debug: analyze log"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Codewith-AG/Sandesh-Mobile-APP.git
-          git push origin debug-logs --force
+        run: flutter analyze
 
       - name: Flutter Test
         working-directory: sandesh
