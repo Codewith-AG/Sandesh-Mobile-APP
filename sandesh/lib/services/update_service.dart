@@ -303,7 +303,7 @@ class UpdateService {
     }
   }
 
-  /// Install the validated APK via native PackageInstaller.
+  /// Install the validated APK via the system installer (ACTION_VIEW + FileProvider).
   Future<void> installUpdate() async {
     if (state.value != UpdateState.readyToInstall || _downloadedApkPath == null) return;
 
@@ -320,9 +320,11 @@ class UpdateService {
         'installApk',
         {'apkPath': _downloadedApkPath},
       );
-      debugPrint('[UpdateService] Install result: $result');
-      // The actual install result comes via PackageInstallerReceiver.
-      // The method returns immediately after committing the session.
+      debugPrint('[UpdateService] Install launched: $result');
+      // ACTION_VIEW hands off to the system installer. If the user approves,
+      // the app restarts. If dismissed, the APK remains on disk and the user
+      // can tap Install again — reset state so the button is available.
+      state.value = UpdateState.readyToInstall;
     } catch (e) {
       debugPrint('[UpdateService] Install error: $e');
       lastError = 'Installation failed: $e';

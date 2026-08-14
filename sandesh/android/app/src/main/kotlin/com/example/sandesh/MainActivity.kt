@@ -1,19 +1,17 @@
 package com.example.sandesh
 
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
-import java.io.FileInputStream
 import java.security.MessageDigest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,49 +131,23 @@ class MainActivity: FlutterActivity() {
             throw java.io.IOException("APK file missing or empty at $apkPath")
         }
 
-        val packageInstaller = packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        // Declare the target package and exact size so PackageInstaller doesn't
-        // reject the session (a common cause of "install failed after download").
-        params.setAppPackageName(packageName)
-        params.setSize(file.length())
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+        // Use ACTION_VIEW + a FileProvider content URI so the system installer
+        // can read the APK. PackageInstaller sessions with USER_ACTION_NOT_REQUIRED
+        // fail silently on Android 12+ because BroadcastReceivers are blocked
+        // from launching activities in the background (background-activity-launch
+        // restrictions). Handing the URI directly to the system installer from
+        // this foreground Activity avoids that restriction entirely.
+        val apkUri = FileProvider.getUriForFile(
+            this,
+            "${applicationContext.packageName}.fileprovider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-
-        val sessionId = packageInstaller.createSession(params)
-        val session = packageInstaller.openSession(sessionId)
-
-        try {
-            FileInputStream(file).use { inStream ->
-                session.openWrite("sandesh_update", 0, file.length()).use { outStream ->
-                    val buffer = ByteArray(65536)
-                    var bytesRead: Int
-                    while (inStream.read(buffer).also { bytesRead = it } != -1) {
-                        outStream.write(buffer, 0, bytesRead)
-                    }
-                    session.fsync(outStream)
-                }
-            }
-
-            val intent = Intent(this, PackageInstallerReceiver::class.java).apply {
-                action = PackageInstallerReceiver.ACTION_INSTALL_COMPLETE
-            }
-            val pendingIntent = PendingIntent.getBroadcast(
-                this,
-                sessionId,
-                intent,
-                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            session.commit(pendingIntent.intentSender)
-        } catch (e: Exception) {
-            // Abandon the session so a failed attempt doesn't block the next one.
-            try { session.abandon() } catch (_: Exception) {}
-            throw e
-        } finally {
-            session.close()
-        }
+        startActivity(intent)
     }
 
     private fun getInstalledSignatures(): String? {
@@ -222,9 +194,6 @@ class MainActivity: FlutterActivity() {
     private fun scheduleBackgroundUpdate(downloadUrl: String, sha256: String, versionCode: Long, wifiOnly: Boolean) {
         val workManager = WorkManager.getInstance(this)
 
-        // Use KEEP policy: if a work with the same unique name is already running/enqueued,
-        // it won't be replaced — preventing duplicate downloads.
-        // Tag encodes version so newer version triggers REPLACE via the version tag check below.
         val constraintsBuilder = Constraints.Builder()
             .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
 
@@ -249,10 +218,15 @@ class MainActivity: FlutterActivity() {
             .addTag("version_$versionCode")
             .build()
 
-        // REPLACE ensures a newer versionCode always supersedes an older enqueued download.
+        // Use a version-scoped unique name + KEEP policy:
+        //   - KEEP: if a download for this version is already running/enqueued,
+        //     it is NOT cancelled when the app relaunches (fixes the bug where
+        //     every launch reset an in-progress background download).
+        //   - Version-scoped name: a new version gets a fresh unique name so
+        //     it always starts a new download regardless of the old one.
         workManager.enqueueUniqueWork(
-            "sandesh_update",
-            ExistingWorkPolicy.REPLACE,
+            "sandesh_update_v$versionCode",
+            ExistingWorkPolicy.KEEP,
             workRequest
         )
     }

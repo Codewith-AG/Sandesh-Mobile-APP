@@ -3,7 +3,6 @@ package com.example.sandesh
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -187,9 +186,9 @@ class UpdateWorker(
                 return Result.success()
             }
 
-            // Install APK
-            installApk(apkFile)
-            apkFile.delete()
+            // Install APK — from background, use a notification that launches
+            // the installer from a foreground context (avoids Android 12+ BAL block).
+            showInstallNotification(context, apkFile)
             return Result.success()
 
         } catch (e: Exception) {
@@ -398,39 +397,59 @@ class UpdateWorker(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun installApk(file: File) {
-        val packageInstaller = context.packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        // Declaring the package + exact size up front avoids INSTALL_FAILED_INVALID_APK
-        // / session-size errors that caused installs to fail after download.
-        params.setAppPackageName(context.packageName)
-        params.setSize(file.length())
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+    /**
+     * Post a "Tap to install" notification. When tapped, Android launches an
+     * ACTION_VIEW intent with a FileProvider content URI — this happens from a
+     * foreground context (the notification tap), so it is NOT blocked by
+     * Android 12+ background-activity-launch (BAL) restrictions.
+     */
+    private fun showInstallNotification(context: Context, apkFile: File) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val channelId = "update_channel"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "App Updates",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            )
+            notificationManager.createNotificationChannel(channel)
         }
 
-        val sessionId = packageInstaller.createSession(params)
-        val session = packageInstaller.openSession(sessionId)
-
-        FileInputStream(file).use { inStream ->
-            session.openWrite("sandesh_background_update", 0, file.length()).use { outStream ->
-                inStream.copyTo(outStream)
-                session.fsync(outStream)
-            }
-        }
-
-        val intent = Intent(context, PackageInstallerReceiver::class.java).apply {
-            action = PackageInstallerReceiver.ACTION_INSTALL_COMPLETE
-        }
-        val pendingIntent = PendingIntent.getBroadcast(
+        // Build the ACTION_VIEW intent that the system installer understands.
+        val apkUri = androidx.core.content.FileProvider.getUriForFile(
             context,
-            sessionId,
-            intent,
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            "${context.packageName}.fileprovider",
+            apkFile
+        )
+        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val pendingInstallIntent = android.app.PendingIntent.getActivity(
+            context,
+            0,
+            installIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
-        session.commit(pendingIntent.intentSender)
-        session.close()
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.Notification.Builder(context, channelId)
+        } else {
+            @Suppress("DEPRECATION")
+            android.app.Notification.Builder(context)
+        }
+
+        val notification = builder
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle("Sandesh Update Ready")
+            .setContentText("Tap to install the latest version of Sandesh")
+            .setContentIntent(pendingInstallIntent)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(1001, notification)
     }
 
     private fun showAppNotification(context: Context, title: String, message: String) {
