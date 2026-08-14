@@ -36,9 +36,24 @@ class _CallsTabState extends State<CallsTab> {
           .or('caller_username.eq.${widget.myUsername},receiver_username.eq.${widget.myUsername}')
           .order('started_at', ascending: false);
       
+      final callsData = List<Map<String, dynamic>>.from(response);
+      final usernames = callsData.expand((c) => [c['caller_username'], c['receiver_username']]).where((u) => u != null).toSet().toList();
+      
+      Map<String, dynamic> profileMap = {};
+      if (usernames.isNotEmpty) {
+        final profilesResp = await supabase.from('profiles').select('username, avatar_url, display_name').inFilter('username', usernames);
+        profileMap = {for (var p in profilesResp) p['username']: p};
+      }
+
+      for (var call in callsData) {
+        final isOutgoing = call['caller_username'] == widget.myUsername;
+        final peerUsername = isOutgoing ? call['receiver_username'] : call['caller_username'];
+        call['peer_profile'] = profileMap[peerUsername];
+      }
+
       if (mounted) {
         setState(() {
-          _calls = List<Map<String, dynamic>>.from(response);
+          _calls = callsData;
           _isLoading = false;
         });
       }
@@ -124,8 +139,8 @@ class _CallsTabState extends State<CallsTab> {
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
             leading: UserAvatar(
-              imageUrl: null, 
-              name: peerUsername,
+              imageUrl: call['peer_profile']?['avatar_url'], 
+              name: call['peer_profile']?['display_name'] ?? peerUsername,
               radius: 24,
             ),
             title: Text(

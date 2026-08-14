@@ -1301,6 +1301,13 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            IconButton(
+              icon: Icon(Icons.add, color: cs.onSurfaceVariant, size: 24),
+              onPressed: _isSendingMedia ? null : _showAttachmentSheet,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 48),
+            ),
+            const SizedBox(width: 8),
             Expanded(
               child: Container(
                 constraints: const BoxConstraints(maxHeight: 120),
@@ -1314,7 +1321,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     IconButton(
                       icon: Icon(_showEmojiPicker ? Icons.keyboard_outlined : Icons.emoji_emotions_outlined,
-                          color: cs.onSurfaceVariant, size: 24),
+                          color: cs.onSurfaceVariant, size: 20),
                       onPressed: () => setState(() {
                         _showEmojiPicker = !_showEmojiPicker;
                         if (_showEmojiPicker) {
@@ -1324,7 +1331,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         }
                       }),
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                      constraints: const BoxConstraints(minWidth: 44, minHeight: 48),
                     ),
                     Expanded(
                       child: TextField(
@@ -1344,10 +1351,16 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.attach_file_rounded, color: cs.onSurfaceVariant, size: 24),
+                      icon: Icon(Icons.attach_file_rounded, color: cs.onSurfaceVariant, size: 20),
                       onPressed: _isSendingMedia ? null : _showAttachmentSheet,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 44, minHeight: 48),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.camera_alt_outlined, color: cs.onSurfaceVariant, size: 20),
+                      onPressed: _isSendingMedia ? null : () => _sendImage(ImageSource.camera),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
                     ),
                     const SizedBox(width: 4),
                   ],
@@ -1360,11 +1373,14 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: BoxDecoration(
                 color: cs.primary,
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))
+                ]
               ),
               child: IconButton(
                 icon: _isSendingMedia
                     ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: cs.onPrimary, strokeWidth: 2))
-                    : Icon(_hasText ? Icons.send_rounded : Icons.mic_none_rounded, color: cs.onPrimary, size: 22),
+                    : Icon(_hasText ? Icons.send_rounded : Icons.mic_none_rounded, color: cs.onPrimary, size: 20),
                 onPressed: _isSendingMedia ? null : (_hasText ? _sendMessage : () {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice messages coming soon')));
                 }),

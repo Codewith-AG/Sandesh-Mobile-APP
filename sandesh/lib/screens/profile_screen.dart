@@ -40,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Shared media between current user and peer
   List<String> _sharedMediaUrls = [];
+  List<Map<String, dynamic>> _calls = [];
 
   @override
   void initState() {
@@ -56,6 +57,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   bool get _isReadOnly => widget.peerUsername != null;
+
+    Future<void> _loadCalls(String peer) async {
+    try {
+      final myProfile = await LocalDbService().getProfile();
+      if (myProfile == null) return;
+      final myUsername = myProfile.username;
+
+      final response = await Supabase.instance.client
+          .from('calls')
+          .select()
+          .or('and(caller_username.eq.$myUsername,receiver_username.eq.$peer),and(caller_username.eq.$peer,receiver_username.eq.$myUsername)')
+          .order('started_at', ascending: false)
+          .limit(10);
+
+      if (mounted) {
+        setState(() => _calls = List<Map<String, dynamic>>.from(response));
+      }
+    } catch (e) {
+      debugPrint('Error loading calls: $e');
+    }
+  }
 
   Future<void> _loadSharedMedia(String peer) async {
     try {
@@ -148,6 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _usernameController.text = peer;
       }
       await _loadSharedMedia(peer);
+          await _loadCalls(peer);
       if (mounted) setState(() => _isLoading = false);
       return;
     }
