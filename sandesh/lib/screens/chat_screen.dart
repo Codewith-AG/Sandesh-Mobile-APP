@@ -1426,6 +1426,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    if (!mounted) return;
+
     final String? path = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => const CameraScreen()),
     );
