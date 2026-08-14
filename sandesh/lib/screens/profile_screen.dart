@@ -248,7 +248,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SnackBar(
             content: Text('Profile saved!',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            backgroundColor: AppTheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -581,7 +581,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: _logout,
                     ),
                     const Divider(height: 1),
-                  ],      ],
+                  ],
                 ],
               ),
             ),

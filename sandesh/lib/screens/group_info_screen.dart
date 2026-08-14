@@ -450,7 +450,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           SnackBar(
             content: Text('Group photo updated',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            backgroundColor: AppTheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -647,7 +647,7 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                   '${selected.length} member${selected.length > 1 ? 's' : ''} added',
                   style:
                       GoogleFonts.inter(fontWeight: FontWeight.w500)),
-              backgroundColor: AppTheme.primary,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
