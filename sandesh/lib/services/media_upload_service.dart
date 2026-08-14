@@ -19,7 +19,7 @@ class MediaUploadService {
   static const int _maxAvatarBytes = 2 * 1024 * 1024;     // 2 MB
   static const int _maxImageBytes = 10 * 1024 * 1024;     // 10 MB
   static const int _maxVideoBytes = 60 * 1024 * 1024;     // 60 MB
-  static const int _maxDocBytes = 30 * 1024 * 1024;       // 30 MB
+  static const int _maxDocBytes = 64 * 1024 * 1024;       // 64 MB — any file type
 
   // Signed-URL lifetime for chat media. 24h is long enough for the receiver to
   // come online + auto-download, short enough to stop public link sharing.
@@ -196,10 +196,9 @@ class MediaUploadService {
   Future<String> uploadDocument(File file, String fileName) async {
     _checkSize(file, _maxDocBytes, 'Document');
 
+    // Any file type is allowed (up to 64 MB). We no longer restrict by
+    // extension — unknown types fall back to a generic binary content type.
     final ext = p.extension(fileName).toLowerCase();
-    if (!_allowedDocExts.contains(ext)) {
-      throw Exception('File type "$ext" is not allowed.');
-    }
     final contentType = _contentTypeForExt(ext);
 
     final id = _uuidLikeId();

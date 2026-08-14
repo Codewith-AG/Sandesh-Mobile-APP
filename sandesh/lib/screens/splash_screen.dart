@@ -161,11 +161,20 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 48,
-                            color: cs.primary,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(22.5),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Center(
+                              child: Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 48,
+                                color: cs.primary,
+                              ),
+                            ),
                           ),
                         ),
                       ),

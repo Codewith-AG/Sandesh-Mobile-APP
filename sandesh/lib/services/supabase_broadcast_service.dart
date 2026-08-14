@@ -12,6 +12,15 @@ import 'media_upload_service.dart';
 import 'package:gal/gal.dart';
 import 'call_service.dart';
 
+/// Emitted on [SupabaseBroadcastService.statusStream] when a delivery receipt
+/// for one of OUR sent messages arrives (delivered / read). The open chat
+/// screen listens and repaints the ticks for [messageId].
+class MessageStatusUpdate {
+  final String messageId;
+  final String status; // 'delivered' | 'read'
+  const MessageStatusUpdate(this.messageId, this.status);
+}
+
 class SupabaseBroadcastService with WidgetsBindingObserver {
   static final SupabaseBroadcastService _instance =
       SupabaseBroadcastService._internal();
@@ -43,6 +52,24 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   final StreamController<Message> _messageStreamController =
       StreamController<Message>.broadcast();
   Stream<Message> get messageStream => _messageStreamController.stream;
+
+  /// Realtime channel that listens for delivery receipts of OUR sent messages.
+  RealtimeChannel? _receiptsChannel;
+
+  /// Realtime channel that listens for delete-for-everyone signals aimed at us.
+  RealtimeChannel? _deletionsChannel;
+
+  /// Emits status updates ('delivered' | 'read') for messages WE sent, so an
+  /// open chat screen can repaint the tick marks (✓ / ✓✓ / blue ✓✓).
+  final StreamController<MessageStatusUpdate> _statusStreamController =
+      StreamController<MessageStatusUpdate>.broadcast();
+  Stream<MessageStatusUpdate> get statusStream => _statusStreamController.stream;
+
+  /// Emits the message id of any message that was deleted-for-everyone by its
+  /// sender, so an open chat/group screen can remove it from the list live.
+  final StreamController<String> _deletionStreamController =
+      StreamController<String>.broadcast();
+  Stream<String> get deletionStream => _deletionStreamController.stream;
 
   // ──────────────────────────── Helpers ────────────────────────────
 
@@ -198,8 +225,195 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     // STEP 1: Sync messages that arrived while we were offline
     syncPendingMessages();
 
+    // #4 / #1: subscribe to delivery receipts + delete-for-everyone signals
+    // and reconcile anything that happened while we were offline.
+    _subscribeToReceipts();
+    _subscribeToDeletions();
+    syncPendingReceipts();
+    syncPendingDeletions();
+
     // STEP 4: Get FCM token and save it to Supabase
     _syncFcmToken();
+  }
+
+  // ──────────────────────────── #4 Read Receipts ────────────────────────────
+
+  /// Upserts a receipt row telling the ORIGINAL sender that we (the reader)
+  /// have received/read their message. RLS only allows writing rows where
+  /// `reader_username = us`, so this is safe.
+  Future<void> _sendReceipt(
+      String messageId, String senderUsername, String status) async {
+    if (_myUsername.isEmpty) return;
+    try {
+      await _client.from('message_receipts').upsert({
+        'message_id': messageId,
+        'sender_username': senderUsername.toLowerCase(),
+        'reader_username': _myUsername,
+        'status': status,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'message_id,reader_username');
+    } catch (e) {
+      debugPrint('sendReceipt($status) error: $e');
+    }
+  }
+
+  Future<void> sendDeliveredReceipt(String messageId, String senderUsername) =>
+      _sendReceipt(messageId, senderUsername, 'delivered');
+
+  Future<void> sendReadReceipt(String messageId, String senderUsername) =>
+      _sendReceipt(messageId, senderUsername, 'read');
+
+  /// Applies a receipt row addressed to us (the sender): updates the local
+  /// message status and notifies any open chat screen so the ticks repaint.
+  void _applyReceipt(Map<String, dynamic> row) {
+    final id = row['message_id'] as String?;
+    final status = row['status'] as String?;
+    if (id == null || status == null) return;
+    LocalDbService().updateMessageStatus(id, status);
+    if (!_statusStreamController.isClosed) {
+      _statusStreamController.add(MessageStatusUpdate(id, status));
+    }
+  }
+
+  void _subscribeToReceipts() {
+    if (_receiptsChannel != null) {
+      _client.removeChannel(_receiptsChannel!);
+      _receiptsChannel = null;
+    }
+    _receiptsChannel = _client
+        .channel('public:message_receipts:$_myUsername')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'message_receipts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'sender_username',
+            value: _myUsername,
+          ),
+          callback: (payload) => _applyReceipt(payload.newRecord),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'message_receipts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'sender_username',
+            value: _myUsername,
+          ),
+          callback: (payload) => _applyReceipt(payload.newRecord),
+        )
+        .subscribe();
+  }
+
+  /// Catches up on receipts that were written while we were offline.
+  Future<void> syncPendingReceipts() async {
+    try {
+      final rows = await _client
+          .from('message_receipts')
+          .select()
+          .eq('sender_username', _myUsername);
+      for (final row in (rows as List<dynamic>)) {
+        _applyReceipt(Map<String, dynamic>.from(row as Map));
+      }
+    } catch (e) {
+      debugPrint('syncPendingReceipts error: $e');
+    }
+  }
+
+  // ──────────────────────────── #1 Delete for Everyone ────────────────────────────
+
+  /// Deletes one of OUR OWN 1:1 messages for everyone. Records the deletion in
+  /// `message_deletions` (so the peer removes it live/on next launch), tries to
+  /// remove the cloud copy if still undelivered, and deletes it locally.
+  Future<void> deleteMessageForEveryone(Message message) async {
+    try {
+      await _client.from('message_deletions').insert({
+        'message_id': message.id,
+        'sender_username': _myUsername,
+        'receiver_username': message.receiverUsername.toLowerCase(),
+        'is_group': false,
+      });
+    } catch (e) {
+      debugPrint('deleteMessageForEveryone signal error: $e');
+    }
+    try {
+      await _client.from('messages').delete().eq('id', message.id);
+    } catch (_) {}
+    await LocalDbService().deleteMessageById(message.id);
+  }
+
+  /// Deletes one of OUR OWN group messages for everyone. Removes the cloud row
+  /// (RLS allows the sender), records a group deletion signal, and deletes it
+  /// locally.
+  Future<void> deleteGroupMessageForEveryone(
+      String messageId, String groupId) async {
+    try {
+      await _client.from('group_messages').delete().eq('id', messageId);
+    } catch (e) {
+      debugPrint('deleteGroupMessageForEveryone cloud error: $e');
+    }
+    try {
+      await _client.from('message_deletions').insert({
+        'message_id': messageId,
+        'sender_username': _myUsername,
+        'receiver_username': groupId,
+        'is_group': true,
+      });
+    } catch (_) {}
+    await LocalDbService().deleteGroupMessageById(messageId);
+  }
+
+  void _applyDeletion(Map<String, dynamic> row) {
+    final id = row['message_id'] as String?;
+    if (id == null) return;
+    final isGroup = row['is_group'] == true;
+    if (isGroup) {
+      LocalDbService().deleteGroupMessageById(id);
+    } else {
+      LocalDbService().deleteMessageById(id);
+    }
+    if (!_deletionStreamController.isClosed) {
+      _deletionStreamController.add(id);
+    }
+  }
+
+  void _subscribeToDeletions() {
+    if (_deletionsChannel != null) {
+      _client.removeChannel(_deletionsChannel!);
+      _deletionsChannel = null;
+    }
+    // 1:1 deletions are addressed to us via receiver_username = our username.
+    _deletionsChannel = _client
+        .channel('public:message_deletions:$_myUsername')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'message_deletions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'receiver_username',
+            value: _myUsername,
+          ),
+          callback: (payload) => _applyDeletion(payload.newRecord),
+        )
+        .subscribe();
+  }
+
+  /// Catches up on delete-for-everyone signals aimed at us while offline.
+  Future<void> syncPendingDeletions() async {
+    try {
+      final rows = await _client
+          .from('message_deletions')
+          .select()
+          .eq('receiver_username', _myUsername);
+      for (final row in (rows as List<dynamic>)) {
+        _applyDeletion(Map<String, dynamic>.from(row as Map));
+      }
+    } catch (e) {
+      debugPrint('syncPendingDeletions error: $e');
+    }
   }
 
   Future<void> _syncFcmToken() async {
@@ -317,6 +531,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
         messageType: MessageTypeX.fromString(payload['message_type'] as String?),
         isMe: false,
         timestamp: payload['timestamp'] as int,
+        replyToId: payload['reply_to_id'] as String?,
+        replyToSender: payload['reply_to_sender'] as String?,
+        replyToText: payload['reply_to_text'] as String?,
+        replyToType: payload['reply_to_type'] as String?,
       );
 
       // ── Call signaling — do NOT save to DB, route to CallService ────────
@@ -327,6 +545,17 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
       // Save to local vault
       await LocalDbService().insertMessage(message);
+
+      // ── #4 Receipts: acknowledge delivery to the sender ──────────────────
+      // If the user is currently looking at this exact chat, the message is
+      // effectively read the instant it arrives, so send a 'read' receipt.
+      // Otherwise it is merely 'delivered'. The sender listens on
+      // message_receipts and advances the tick marks accordingly.
+      if (activeChatUser?.toLowerCase() == message.senderUsername.toLowerCase()) {
+        sendReadReceipt(message.id, message.senderUsername);
+      } else {
+        sendDeliveredReceipt(message.id, message.senderUsername);
+      }
 
       // ── Auto-Download & Auto-Delete (Receiver side only) ──────────────────
       // For image and video messages with a network URL, immediately download
@@ -452,6 +681,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
           'file_name': message.fileName,
           'message_type': message.messageType.value,
           'timestamp': message.timestamp,
+          'reply_to_id': message.replyToId,
+          'reply_to_sender': message.replyToSender,
+          'reply_to_text': message.replyToText,
+          'reply_to_type': message.replyToType,
         });
         debugPrint('[sendMessage] Inserted on attempt $attempt — webhook will trigger FCM');
         insertOk = true;
@@ -779,8 +1012,22 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       _client.removeChannel(_inboxChannel!);
       _inboxChannel = null;
     }
+    if (_receiptsChannel != null) {
+      _client.removeChannel(_receiptsChannel!);
+      _receiptsChannel = null;
+    }
+    if (_deletionsChannel != null) {
+      _client.removeChannel(_deletionsChannel!);
+      _deletionsChannel = null;
+    }
     if (!_messageStreamController.isClosed) {
       _messageStreamController.close();
+    }
+    if (!_statusStreamController.isClosed) {
+      _statusStreamController.close();
+    }
+    if (!_deletionStreamController.isClosed) {
+      _deletionStreamController.close();
     }
     _initialized = false;
   }

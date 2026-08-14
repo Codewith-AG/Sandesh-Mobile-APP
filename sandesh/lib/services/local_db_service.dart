@@ -33,6 +33,7 @@ class LocalDbService {
       // users keep their messages/contacts.
       onOpen: (db) async {
         await _ensureCallLogsTable(db);
+        await _ensureMessageExtraColumns(db);
       },
     );
   }
@@ -56,6 +57,30 @@ class LocalDbService {
         'CREATE INDEX IF NOT EXISTS idx_calllog_peer ON call_logs(peer_username)');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_calllog_ts ON call_logs(timestamp)');
+  }
+
+  /// Idempotently adds the reply/status columns (added after v8) to the
+  /// messages and group_messages tables. Runs on every open so existing
+  /// installs are upgraded without wiping data. SQLite has no
+  /// "ADD COLUMN IF NOT EXISTS", so we probe PRAGMA table_info first.
+  Future<void> _ensureMessageExtraColumns(Database db) async {
+    Future<void> ensure(String table, String col, String type) async {
+      final info = await db.rawQuery('PRAGMA table_info($table)');
+      final exists = info.any((c) => c['name'] == col);
+      if (!exists) {
+        await db.execute('ALTER TABLE $table ADD COLUMN $col $type');
+      }
+    }
+
+    for (final t in ['messages', 'group_messages']) {
+      await ensure(t, 'reply_to_id', 'TEXT');
+      await ensure(t, 'reply_to_sender', 'TEXT');
+      await ensure(t, 'reply_to_text', 'TEXT');
+      await ensure(t, 'reply_to_type', 'TEXT');
+      await ensure(t, 'status', 'TEXT');
+    }
+    // group_messages also gets local_path for parity with 1:1 media handling.
+    await ensure('group_messages', 'local_path', 'TEXT');
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -192,6 +217,35 @@ class LocalDbService {
       where: 'id = ?',
       whereArgs: [messageId],
     );
+  }
+
+  /// Updates the delivery status ('sent' | 'delivered' | 'read') of an OWN
+  /// message. Never downgrades: read > delivered > sent.
+  Future<void> updateMessageStatus(String messageId, String status) async {
+    final db = await database;
+    const rank = {'sent': 0, 'delivered': 1, 'read': 2};
+    final rows = await db.query('messages',
+        columns: ['status'], where: 'id = ?', whereArgs: [messageId], limit: 1);
+    if (rows.isNotEmpty) {
+      final current = rows.first['status'] as String?;
+      if (current != null && (rank[current] ?? -1) >= (rank[status] ?? 0)) {
+        return; // don't downgrade
+      }
+    }
+    await db.update('messages', {'status': status},
+        where: 'id = ?', whereArgs: [messageId]);
+  }
+
+  /// Deletes a single 1:1 message by id (used by delete-for-everyone / for-me).
+  Future<void> deleteMessageById(String messageId) async {
+    final db = await database;
+    await db.delete('messages', where: 'id = ?', whereArgs: [messageId]);
+  }
+
+  /// Deletes a single group message by id (used by delete-for-everyone / for-me).
+  Future<void> deleteGroupMessageById(String messageId) async {
+    final db = await database;
+    await db.delete('group_messages', where: 'id = ?', whereArgs: [messageId]);
   }
 
   Future<void> deleteChatHistory(String myUsername, String chatWithUsername) async {

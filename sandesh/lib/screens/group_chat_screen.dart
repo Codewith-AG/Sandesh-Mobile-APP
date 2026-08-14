@@ -1,13 +1,22 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart' hide Config;
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/message_model.dart';
 import '../services/local_db_service.dart';
+import '../services/media_upload_service.dart';
+import '../services/supabase_broadcast_service.dart';
 // app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'group_info_screen.dart';
+import 'media_viewer_screen.dart';
+import '../widgets/linkified_text.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String myUsername;
@@ -34,6 +43,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   List<Message> _messages = [];
   bool _showEmojiPicker = false;
   bool _hasText = false;
+  bool _isSendingMedia = false;
+  double _uploadProgress = 0;
 
   /// Supabase Realtime channel for this group
   RealtimeChannel? _groupChannel;
@@ -46,6 +57,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   /// Cached ColorScheme — set at the top of build() so all helper methods can use it.
   late ColorScheme _cs;
+
+  /// #1 Selection mode — ids of messages currently multi-selected.
+  final Set<String> _selectedIds = {};
+  bool get _selectionMode => _selectedIds.isNotEmpty;
+
+  /// #2 The message currently being replied to (null when not replying).
+  Message? _replyTo;
+
+  /// #1 Listens for delete-for-everyone signals (group) from the service.
+  StreamSubscription<String>? _deletionSub;
 
   /// Deterministic color palette for group sender names
   static const List<Color> _senderColors = [
@@ -70,6 +91,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _syncGroupMessagesFromServer();
     _loadMemberCount();
     _subscribeToGroupChannel();
+    // #1: mirror delete-for-everyone signals that reach this device.
+    _deletionSub = SupabaseBroadcastService().deletionStream.listen((id) {
+      if (!mounted) return;
+      setState(() {
+        _messages.removeWhere((m) => m.id == id);
+        _selectedIds.remove(id);
+      });
+    });
     _textController.addListener(() {
       final hasText = _textController.text.trim().isNotEmpty;
       if (_hasText != hasText) {
@@ -88,6 +117,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       Supabase.instance.client.removeChannel(_groupChannel!);
       _groupChannel = null;
     }
+    _deletionSub?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -104,9 +134,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         senderUsername: row['sender_username'] as String,
         receiverUsername: widget.groupId,
         text: row['text'] as String?,
+        mediaUrl: row['media_url'] as String?,
+        fileName: row['file_name'] as String?,
+        localPath: row['local_path'] as String?,
         messageType: MessageTypeX.fromString(row['message_type'] as String?),
         isMe: (row['sender_username'] as String).toLowerCase() == widget.myUsername.toLowerCase(),
         timestamp: row['timestamp'] as int,
+        replyToId: row['reply_to_id'] as String?,
+        replyToSender: row['reply_to_sender'] as String?,
+        replyToText: row['reply_to_text'] as String?,
+        replyToType: row['reply_to_type'] as String?,
       )).toList();
       // Ensure chronological order (oldest → newest) regardless of query order.
       messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -145,6 +182,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           'file_name': row['file_name'],
           'message_type': row['message_type'] ?? 'text',
           'timestamp': row['timestamp'],
+          'reply_to_id': row['reply_to_id'],
+          'reply_to_sender': row['reply_to_sender'],
+          'reply_to_text': row['reply_to_text'],
+          'reply_to_type': row['reply_to_type'],
         });
       }
 
@@ -211,6 +252,23 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           ),
           callback: _handleGroupMessage,
         )
+        .onPostgresChanges(
+          // #1: when a member deletes their group message for everyone the
+          // cloud row is removed — mirror that removal live for everyone.
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'group_messages',
+          callback: (payload) {
+            final id = payload.oldRecord['id'] as String?;
+            if (id == null) return;
+            LocalDbService().deleteGroupMessageById(id);
+            if (!mounted) return;
+            setState(() {
+              _messages.removeWhere((m) => m.id == id);
+              _selectedIds.remove(id);
+            });
+          },
+        )
         .subscribe((status, [error]) {
       debugPrint('Group channel status: $status${error != null ? " | $error" : ""}');
     });
@@ -229,9 +287,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       senderUsername: senderUsername,
       receiverUsername: widget.groupId, // group_id stored in receiver field
       text: row['text'] as String?,
+      mediaUrl: row['media_url'] as String?,
+      fileName: row['file_name'] as String?,
       messageType: MessageTypeX.fromString(row['message_type'] as String?),
       isMe: false,
       timestamp: row['timestamp'] as int,
+      replyToId: row['reply_to_id'] as String?,
+      replyToSender: row['reply_to_sender'] as String?,
+      replyToText: row['reply_to_text'] as String?,
+      replyToType: row['reply_to_type'] as String?,
     );
 
     // Save locally
@@ -241,8 +305,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         'group_id': widget.groupId,
         'sender_username': message.senderUsername,
         'text': message.text,
+        'media_url': message.mediaUrl,
+        'file_name': message.fileName,
         'message_type': message.messageType.value,
         'timestamp': message.timestamp,
+        'reply_to_id': message.replyToId,
+        'reply_to_sender': message.replyToSender,
+        'reply_to_text': message.replyToText,
+        'reply_to_type': message.replyToType,
       });
     } catch (e) {
       debugPrint('Error saving incoming group message locally: $e');
@@ -272,6 +342,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     if (text.isEmpty) return;
     _textController.clear();
 
+    final reply = _replyTo;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final msg = Message(
       id: '${widget.myUsername}_$timestamp',
@@ -281,9 +352,18 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       messageType: MessageType.text,
       isMe: true,
       timestamp: timestamp,
+      replyToId: reply?.id,
+      replyToSender: reply == null
+          ? null
+          : (reply.isMe ? widget.myUsername : reply.senderUsername),
+      replyToText: reply == null ? null : _replyPreviewText(reply),
+      replyToType: reply?.messageType.value,
     );
 
-    setState(() => _messages.add(msg));
+    setState(() {
+      _messages.add(msg);
+      _replyTo = null;
+    });
     _scrollToBottom();
 
     // Save locally
@@ -295,6 +375,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         'text': msg.text,
         'message_type': msg.messageType.value,
         'timestamp': msg.timestamp,
+        'reply_to_id': msg.replyToId,
+        'reply_to_sender': msg.replyToSender,
+        'reply_to_text': msg.replyToText,
+        'reply_to_type': msg.replyToType,
       });
     } catch (e) {
       debugPrint('Error saving group message locally: $e');
@@ -309,11 +393,455 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         'text': msg.text,
         'message_type': msg.messageType.value,
         'timestamp': msg.timestamp,
+        'reply_to_id': msg.replyToId,
+        'reply_to_sender': msg.replyToSender,
+        'reply_to_text': msg.replyToText,
+        'reply_to_type': msg.replyToType,
       });
     } catch (e) {
       debugPrint('Error sending group message to Supabase: $e');
       if (mounted) _showError('Failed to send message: $e');
     }
+  }
+
+  /// #2/#3: short human-readable preview of a message for the reply chip.
+  String _replyPreviewText(Message m) {
+    switch (m.messageType) {
+      case MessageType.image:
+        return '📷 Photo';
+      case MessageType.video:
+        return '🎥 Video';
+      case MessageType.document:
+        return '📄 ${m.fileName ?? 'Document'}';
+      default:
+        return m.text ?? '';
+    }
+  }
+
+  void _startReply(Message m) {
+    if (m.messageType == MessageType.system) return;
+    setState(() {
+      _replyTo = m;
+      _selectedIds.clear();
+    });
+    _focusNode.requestFocus();
+  }
+
+  // ──────────────────────────── #1 Selection ────────────────────────────
+
+  void _toggleSelect(Message m) {
+    setState(() {
+      if (_selectedIds.contains(m.id)) {
+        _selectedIds.remove(m.id);
+      } else {
+        _selectedIds.add(m.id);
+      }
+    });
+  }
+
+  void _clearSelection() => setState(() => _selectedIds.clear());
+
+  List<Message> get _selectedMessages =>
+      _messages.where((m) => _selectedIds.contains(m.id)).toList();
+
+  void _copySelected() {
+    final text = _selectedMessages
+        .map((m) => m.text ?? '')
+        .where((t) => t.isNotEmpty)
+        .join('\n');
+    if (text.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: text));
+    }
+    _clearSelection();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Copied', style: GoogleFonts.inter()),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  void _showDeleteSelectedSheet() {
+    final cs = _cs;
+    final selected = _selectedMessages;
+    if (selected.isEmpty) return;
+    final allMine = selected.every((m) => m.isMe);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 8),
+            if (allMine)
+              ListTile(
+                leading: Icon(Icons.delete_forever_outlined, color: cs.error),
+                title: Text('Delete for everyone',
+                    style: GoogleFonts.inter(
+                        color: cs.error, fontWeight: FontWeight.w600)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final ids = selected.map((m) => m.id).toSet();
+                  for (final id in ids) {
+                    await SupabaseBroadcastService()
+                        .deleteGroupMessageForEveryone(id, widget.groupId);
+                  }
+                  if (mounted) {
+                    setState(() {
+                      _messages.removeWhere((m) => ids.contains(m.id));
+                      _selectedIds.clear();
+                    });
+                  }
+                },
+              ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: cs.onSurface),
+              title: Text('Delete for me',
+                  style: GoogleFonts.inter(color: cs.onSurface)),
+              onTap: () async {
+                Navigator.pop(context);
+                final ids = selected.map((m) => m.id).toSet();
+                for (final id in ids) {
+                  await LocalDbService().deleteGroupMessageById(id);
+                }
+                if (mounted) {
+                  setState(() {
+                    _messages.removeWhere((m) => ids.contains(m.id));
+                    _selectedIds.clear();
+                  });
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.close, color: cs.onSurfaceVariant),
+              title: Text('Cancel',
+                  style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
+              onTap: () => Navigator.pop(context),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The small quoted-reply chip shown INSIDE a group bubble.
+  Widget _buildReplyChip(Message message, bool isMe) {
+    if (message.replyToId == null) return const SizedBox.shrink();
+    final cs = _cs;
+    final onBubble = isMe ? cs.onPrimary : cs.onSurface;
+    final accent = isMe ? cs.onPrimary : cs.primary;
+    final who = (message.replyToSender != null &&
+            message.replyToSender!.toLowerCase() ==
+                widget.myUsername.toLowerCase())
+        ? 'You'
+        : _getSenderDisplayName(message.replyToSender ?? '');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: (isMe ? cs.onPrimary : cs.primary).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border(left: BorderSide(color: accent, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(who,
+              style: GoogleFonts.inter(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: accent)),
+          const SizedBox(height: 2),
+          Text(message.replyToText ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: onBubble.withValues(alpha: 0.85))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReplyPreviewBar() {
+    final cs = _cs;
+    final r = _replyTo!;
+    final who = r.isMe ? 'You' : _getSenderDisplayName(r.senderUsername);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        border: Border(
+          top: BorderSide(color: cs.outlineVariant),
+          left: BorderSide(color: cs.primary, width: 4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Replying to $who',
+                    style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary)),
+                const SizedBox(height: 2),
+                Text(_replyPreviewText(r),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.close, size: 20, color: cs.onSurfaceVariant),
+            onPressed: () => setState(() => _replyTo = null),
+          ),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildSelectionAppBar() {
+    final cs = _cs;
+    final selected = _selectedMessages;
+    final anyText = selected.any((m) => m.text != null && m.text!.isNotEmpty);
+    return AppBar(
+      backgroundColor: cs.surfaceContainerLowest,
+      leading: IconButton(
+        icon: Icon(Icons.close, color: cs.onSurface),
+        onPressed: _clearSelection,
+      ),
+      title: Text('${_selectedIds.length}',
+          style: GoogleFonts.inter(
+              fontWeight: FontWeight.w700, color: cs.onSurface)),
+      actions: [
+        if (selected.length == 1)
+          IconButton(
+            tooltip: 'Reply',
+            icon: Icon(Icons.reply_rounded, color: cs.onSurface),
+            onPressed: () => _startReply(selected.first),
+          ),
+        if (anyText)
+          IconButton(
+            tooltip: 'Copy',
+            icon: Icon(Icons.copy_rounded, color: cs.onSurface),
+            onPressed: _copySelected,
+          ),
+        IconButton(
+          tooltip: 'Delete',
+          icon: Icon(Icons.delete_outline, color: cs.onSurface),
+          onPressed: _showDeleteSelectedSheet,
+        ),
+        const SizedBox(width: 4),
+      ],
+    );
+  }
+
+  // ──────────────────────────── Media Sending (#5) ────────────────────────────
+
+  /// Persists a media/group message both locally and to Supabase, then
+  /// updates the UI. Shared by the image / video / document senders.
+  Future<void> _persistGroupMediaMessage(Message msg) async {
+    if (mounted) {
+      setState(() => _messages.add(msg));
+      _scrollToBottom();
+    }
+    try {
+      await LocalDbService().insertGroupMessage({
+        'id': msg.id,
+        'group_id': widget.groupId,
+        'sender_username': msg.senderUsername,
+        'text': msg.text,
+        'media_url': msg.mediaUrl,
+        'file_name': msg.fileName,
+        'message_type': msg.messageType.value,
+        'timestamp': msg.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Error saving group media message locally: $e');
+    }
+    try {
+      await Supabase.instance.client.from('group_messages').insert({
+        'id': msg.id,
+        'group_id': widget.groupId,
+        'sender_username': msg.senderUsername.toLowerCase(),
+        'text': msg.text,
+        'media_url': msg.mediaUrl,
+        'file_name': msg.fileName,
+        'message_type': msg.messageType.value,
+        'timestamp': msg.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Error sending group media message to Supabase: $e');
+      if (mounted) _showError('Failed to send: $e');
+    }
+  }
+
+  Future<void> _sendGroupImage(ImageSource source) async {
+    Navigator.pop(context);
+    try {
+      List<XFile> pickedFiles = [];
+      if (source == ImageSource.gallery) {
+        pickedFiles = await ImagePicker().pickMultiImage();
+      } else {
+        final picked = await ImagePicker().pickImage(source: source);
+        if (picked != null) pickedFiles.add(picked);
+      }
+      if (pickedFiles.isEmpty) return;
+
+      setState(() { _isSendingMedia = true; _uploadProgress = 0; });
+      for (final picked in pickedFiles) {
+        try {
+          final url = await MediaUploadService().uploadChatImage(File(picked.path));
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          await _persistGroupMediaMessage(Message(
+            id: '${widget.myUsername}_$timestamp',
+            senderUsername: widget.myUsername,
+            receiverUsername: widget.groupId,
+            mediaUrl: url,
+            localPath: picked.path,
+            messageType: MessageType.image,
+            isMe: true,
+            timestamp: timestamp,
+          ));
+        } catch (e) {
+          if (mounted) _showError('Failed to upload image: $e');
+        }
+      }
+      if (mounted) setState(() => _isSendingMedia = false);
+    } catch (e) {
+      if (mounted) setState(() => _isSendingMedia = false);
+      if (mounted) _showError('Image selection failed: $e');
+    }
+  }
+
+  Future<void> _sendGroupVideo() async {
+    Navigator.pop(context);
+    try {
+      final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+      if (picked == null) return;
+      setState(() { _isSendingMedia = true; _uploadProgress = 0; });
+      final url = await MediaUploadService().uploadChatVideo(
+        File(picked.path),
+        onProgress: (p) { if (mounted) setState(() => _uploadProgress = p); },
+      );
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      await _persistGroupMediaMessage(Message(
+        id: '${widget.myUsername}_$timestamp',
+        senderUsername: widget.myUsername,
+        receiverUsername: widget.groupId,
+        mediaUrl: url,
+        localPath: picked.path,
+        messageType: MessageType.video,
+        isMe: true,
+        timestamp: timestamp,
+      ));
+      if (mounted) setState(() => _isSendingMedia = false);
+    } catch (e) {
+      if (mounted) setState(() => _isSendingMedia = false);
+      if (mounted) _showError('Video upload failed: $e');
+    }
+  }
+
+  Future<void> _sendGroupDocument() async {
+    Navigator.pop(context);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      setState(() { _isSendingMedia = true; _uploadProgress = 0; });
+      for (final f in result.files) {
+        if (f.path == null) continue;
+        try {
+          final url = await MediaUploadService().uploadDocument(File(f.path!), f.name);
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          await _persistGroupMediaMessage(Message(
+            id: '${widget.myUsername}_$timestamp',
+            senderUsername: widget.myUsername,
+            receiverUsername: widget.groupId,
+            fileName: f.name,
+            mediaUrl: url,
+            messageType: MessageType.document,
+            isMe: true,
+            timestamp: timestamp,
+          ));
+        } catch (e) {
+          if (mounted) _showError('Failed to upload ${f.name}: $e');
+        }
+      }
+      if (mounted) setState(() => _isSendingMedia = false);
+    } catch (e) {
+      if (mounted) setState(() => _isSendingMedia = false);
+      if (mounted) _showError('Document selection failed: $e');
+    }
+  }
+
+  void _showAttachmentSheet() {
+    final cs = _cs;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 36, height: 4,
+                  decoration: BoxDecoration(
+                      color: cs.outlineVariant,
+                      borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _attachOption(Icons.photo_library_outlined, 'Gallery', () => _sendGroupImage(ImageSource.gallery), cs),
+                  _attachOption(Icons.camera_alt_outlined, 'Camera', () => _sendGroupImage(ImageSource.camera), cs),
+                  _attachOption(Icons.videocam_outlined, 'Video', _sendGroupVideo, cs),
+                  _attachOption(Icons.insert_drive_file_outlined, 'Document', _sendGroupDocument, cs),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _attachOption(IconData icon, String label, VoidCallback onTap, ColorScheme cs) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56, height: 56,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: cs.onSurface, size: 26),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: cs.onSurfaceVariant)),
+        ],
+      ),
+    );
   }
 
   // ──────────────────────────── UI Helpers ────────────────────────────
@@ -394,10 +922,17 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final items = _buildMessageListWithDates();
     return Scaffold(
       backgroundColor: _cs.surface,
-      appBar: _buildAppBar(),
+      appBar: _selectionMode ? _buildSelectionAppBar() : _buildAppBar(),
       body: SafeArea(
         child: Column(
           children: [
+            if (_isSendingMedia)
+              LinearProgressIndicator(
+                value: _uploadProgress > 0 ? _uploadProgress : null,
+                backgroundColor: _cs.surfaceContainerHighest,
+                color: _cs.primary,
+                minHeight: 4,
+              ),
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
@@ -410,6 +945,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 },
               ),
             ),
+            if (_replyTo != null) _buildReplyPreviewBar(),
             _buildInputBar(),
             if (_showEmojiPicker)
               SizedBox(
@@ -585,13 +1121,232 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         _messages[msgIndex - 1].senderUsername.toLowerCase() != message.senderUsername.toLowerCase() ||
         _messages[msgIndex - 1].isMe);
 
-    return Align(
+    final selected = _selectedIds.contains(message.id);
+
+    Widget bubble = Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(bottom: 8, top: showSenderName ? 4 : 0),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-        child: _buildTextBubble(message, isMe, timeString, showSenderName),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: () => _toggleSelect(message),
+        onTap: _selectionMode ? () => _toggleSelect(message) : null,
+        child: Container(
+          margin: EdgeInsets.only(bottom: 8, top: showSenderName ? 4 : 0),
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+          child: AbsorbPointer(
+            absorbing: _selectionMode,
+            child: _buildBubbleForType(message, isMe, timeString, showSenderName),
+          ),
+        ),
       ),
+    );
+
+    Widget row = Container(
+      color: selected ? _cs.primary.withValues(alpha: 0.12) : Colors.transparent,
+      child: bubble,
+    );
+
+    if (!_selectionMode) {
+      row = Dismissible(
+        key: ValueKey('greply_${message.id}'),
+        direction: DismissDirection.startToEnd,
+        dismissThresholds: const {DismissDirection.startToEnd: 0.25},
+        confirmDismiss: (_) async {
+          _startReply(message);
+          return false;
+        },
+        background: Padding(
+          padding: const EdgeInsets.only(left: 24),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Icon(Icons.reply_rounded, color: _cs.primary),
+          ),
+        ),
+        child: row,
+      );
+    }
+    return row;
+  }
+
+  /// Chooses the correct bubble widget based on the message content type.
+  Widget _buildBubbleForType(Message message, bool isMe, String timeString, bool showSenderName) {
+    switch (message.messageType) {
+      case MessageType.image:
+        return _buildGroupImageBubble(message, isMe, timeString, showSenderName);
+      case MessageType.video:
+        return _buildGroupVideoBubble(message, isMe, timeString, showSenderName);
+      case MessageType.document:
+        return _buildGroupDocumentBubble(message, isMe, timeString, showSenderName);
+      case MessageType.text:
+      default:
+        return _buildTextBubble(message, isMe, timeString, showSenderName);
+    }
+  }
+
+  /// A small sender-name label shown above non-self media bubbles in groups.
+  Widget _senderLabel(Message message, bool isMe, bool showSenderName) {
+    if (isMe || !showSenderName) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 2),
+      child: Text(
+        _getSenderDisplayName(message.senderUsername),
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: _getSenderColor(message.senderUsername),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildGroupImageBubble(Message message, bool isMe, String timeString, bool showSenderName) {
+    final cs = _cs;
+    final localPath = message.localPath;
+    final networkUrl = message.mediaUrl;
+    final heroTag = 'gmedia_${message.id}';
+
+    Widget imageWidget;
+    if (localPath != null && File(localPath).existsSync()) {
+      imageWidget = Image.file(File(localPath),
+          width: 220, height: 220, fit: BoxFit.cover, cacheWidth: 440, cacheHeight: 440,
+          errorBuilder: (_, __, ___) => Container(width: 220, height: 220, color: cs.surfaceContainerHigh,
+              child: Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant)));
+    } else if (networkUrl != null && networkUrl.startsWith('http')) {
+      imageWidget = CachedNetworkImage(
+        imageUrl: networkUrl,
+        width: 220, height: 220, fit: BoxFit.cover, memCacheWidth: 440, memCacheHeight: 440,
+        placeholder: (_, __) => Container(width: 220, height: 220, color: cs.surfaceContainerHigh,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary))),
+        errorWidget: (_, __, ___) => Container(width: 220, height: 100, color: cs.surfaceContainerHigh,
+            child: Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant)),
+      );
+    } else {
+      imageWidget = Container(width: 220, height: 220, color: cs.surfaceContainerHigh,
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
+    }
+
+    return Column(
+      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        _senderLabel(message, isMe, showSenderName),
+        _buildReplyChip(message, isMe),
+        ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
+          ),
+          child: GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => MediaViewerScreen(heroTag: heroTag, localPath: localPath, networkUrl: networkUrl))),
+            child: Stack(children: [
+              Hero(tag: heroTag, child: imageWidget),
+              Positioned(bottom: 8, right: 10, child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12)),
+                child: Text(timeString, style: GoogleFonts.inter(color: Colors.white, fontSize: 11)),
+              )),
+            ]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroupVideoBubble(Message message, bool isMe, String timeString, bool showSenderName) {
+    final cs = _cs;
+    return Column(
+      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        _senderLabel(message, isMe, showSenderName),
+        _buildReplyChip(message, isMe),
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => MediaViewerScreen(
+              heroTag: 'gmedia_${message.id}', localPath: message.localPath,
+              networkUrl: message.mediaUrl, isVideo: true))),
+          child: Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: isMe ? cs.primary : cs.surface,
+              border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+                bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Hero(
+                    tag: 'gmedia_${message.id}',
+                    child: Container(
+                      height: 100,
+                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16)),
+                      child: const Center(child: Icon(Icons.play_circle_filled_rounded, size: 48, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.videocam_outlined, size: 16, color: isMe ? cs.onPrimary : cs.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Text('Video', style: GoogleFonts.inter(fontSize: 14, color: isMe ? cs.onPrimary : cs.onSurface, fontWeight: FontWeight.w500)),
+                    const Spacer(),
+                    _buildTimestamp(timeString, isMe, cs),
+                  ]),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroupDocumentBubble(Message message, bool isMe, String timeString, bool showSenderName) {
+    final cs = _cs;
+    return Column(
+      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        _senderLabel(message, isMe, showSenderName),
+        _buildReplyChip(message, isMe),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+          decoration: BoxDecoration(
+            color: isMe ? cs.primary : cs.surface,
+            border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+              bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: (isMe ? cs.onPrimary : cs.primary).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.insert_drive_file_outlined, color: isMe ? cs.onPrimary : cs.primary, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(message.fileName ?? 'Document', maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: isMe ? cs.onPrimary : cs.onSurface)),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              _buildTimestamp(timeString, isMe, cs),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -627,8 +1382,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             ),
             const SizedBox(height: 4),
           ],
-          Text(message.text ?? '', style: GoogleFonts.inter(
-              color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, height: 1.4)),
+          _buildReplyChip(message, isMe),
+          LinkifiedText(
+            text: message.text ?? '',
+            style: GoogleFonts.inter(
+                color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, height: 1.4),
+            linkColor: isMe ? cs.onPrimary : cs.primary,
+          ),
           const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerRight,
@@ -710,6 +1470,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                           isDense: true,
                         ),
                       ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.attach_file_rounded, color: cs.onSurfaceVariant, size: 24),
+                      tooltip: 'Attach',
+                      onPressed: _isSendingMedia ? null : _showAttachmentSheet,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                     ),
                     const SizedBox(width: 4),
                   ],

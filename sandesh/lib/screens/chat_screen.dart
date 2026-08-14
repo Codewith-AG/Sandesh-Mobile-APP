@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart' hide Config;
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,6 +21,7 @@ import 'call_screen.dart';
 import '../services/call_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/linkified_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -66,6 +68,19 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Cached ColorScheme — set at the top of build() so all helper methods can use it.
   late ColorScheme _cs;
 
+  /// #1 Selection mode — ids of messages currently multi-selected.
+  final Set<String> _selectedIds = {};
+  bool get _selectionMode => _selectedIds.isNotEmpty;
+
+  /// #2 The message currently being replied to (null when not replying).
+  Message? _replyTo;
+
+  /// #4 Listens for delivery/read receipts of our sent messages.
+  StreamSubscription<MessageStatusUpdate>? _statusSub;
+
+  /// #1 Listens for delete-for-everyone signals from the peer.
+  StreamSubscription<String>? _deletionSub;
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +93,22 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageSubscription = SupabaseBroadcastService()
         .messageStream
         .listen(_handleNewMessage);
+    // #4: repaint ticks when a receipt for one of our messages arrives.
+    _statusSub = SupabaseBroadcastService().statusStream.listen((u) {
+      if (!mounted) return;
+      final i = _messages.indexWhere((m) => m.id == u.messageId);
+      if (i != -1) {
+        setState(() => _messages[i] = _messages[i].copyWith(status: u.status));
+      }
+    });
+    // #1: remove a message live when the peer deletes it for everyone.
+    _deletionSub = SupabaseBroadcastService().deletionStream.listen((id) {
+      if (!mounted) return;
+      setState(() {
+        _messages.removeWhere((m) => m.id == id);
+        _selectedIds.remove(id);
+      });
+    });
     _scrollController.addListener(_onScroll);
     _textController.addListener(() {
       final hasText = _textController.text.trim().isNotEmpty;
@@ -196,6 +227,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _presenceSubscription?.cancel();
     SupabaseBroadcastService().activeChatUser = null;
     _messageSubscription?.cancel();
+    _statusSub?.cancel();
+    _deletionSub?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -210,7 +243,21 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(message);
       }
     });
+    // #4: chat is open, so tell the sender we've read it right away.
+    SupabaseBroadcastService()
+        .sendReadReceipt(message.id, widget.receiverUsername);
     _scrollToBottom();
+  }
+
+  /// #4: mark every message received from the peer as read, so their ticks
+  /// turn blue. Called whenever this chat is opened / messages (re)load.
+  void _markPeerMessagesRead() {
+    for (final m in _messages) {
+      if (!m.isMe) {
+        SupabaseBroadcastService()
+            .sendReadReceipt(m.id, widget.receiverUsername);
+      }
+    }
   }
 
   Future<void> _loadMessages() async {
@@ -220,6 +267,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages = messages.reversed.toList();
         _hasMore = messages.length == 50;
       });
+      _markPeerMessagesRead();
       _scrollToBottom();
     }
   }
@@ -261,6 +309,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     _textController.clear();
+    final reply = _replyTo;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final msg = Message(
       id: '${widget.myUsername}_$timestamp',
@@ -270,10 +319,151 @@ class _ChatScreenState extends State<ChatScreen> {
       messageType: MessageType.text,
       isMe: true,
       timestamp: timestamp,
+      status: 'sent',
+      replyToId: reply?.id,
+      replyToSender: reply == null
+          ? null
+          : (reply.isMe ? widget.myUsername : widget.receiverUsername),
+      replyToText: reply == null ? null : _replyPreviewText(reply),
+      replyToType: reply?.messageType.value,
     );
-    setState(() => _messages.add(msg));
+    setState(() {
+      _messages.add(msg);
+      _replyTo = null;
+    });
     _scrollToBottom();
     await SupabaseBroadcastService().sendMessage(msg);
+  }
+
+  /// #2/#3: short human-readable preview of a message for the reply chip.
+  String _replyPreviewText(Message m) {
+    switch (m.messageType) {
+      case MessageType.image:
+        return '📷 Photo';
+      case MessageType.video:
+        return '🎥 Video';
+      case MessageType.document:
+        return '📄 ${m.fileName ?? 'Document'}';
+      default:
+        return m.text ?? '';
+    }
+  }
+
+  /// #2: begin replying to [m] — shows the reply preview bar above the input.
+  void _startReply(Message m) {
+    if (m.messageType == MessageType.call) return; // can't reply to a call
+    setState(() {
+      _replyTo = m;
+      _selectedIds.clear();
+    });
+    _focusNode.requestFocus();
+  }
+
+  // ──────────────────────────── #1 Selection ────────────────────────────
+
+  void _toggleSelect(Message m) {
+    setState(() {
+      if (_selectedIds.contains(m.id)) {
+        _selectedIds.remove(m.id);
+      } else {
+        _selectedIds.add(m.id);
+      }
+    });
+  }
+
+  void _clearSelection() => setState(() => _selectedIds.clear());
+
+  List<Message> get _selectedMessages =>
+      _messages.where((m) => _selectedIds.contains(m.id)).toList();
+
+  void _copySelected() {
+    final text = _selectedMessages
+        .where((m) => m.messageType == MessageType.text || m.text != null)
+        .map((m) => m.text ?? '')
+        .where((t) => t.isNotEmpty)
+        .join('\n');
+    if (text.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: text));
+    }
+    _clearSelection();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Copied', style: GoogleFonts.inter()),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  void _showDeleteSelectedSheet() {
+    final cs = _cs;
+    final selected = _selectedMessages;
+    if (selected.isEmpty) return;
+    final allMine = selected.every((m) => m.isMe);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 8),
+            if (allMine)
+              ListTile(
+                leading: Icon(Icons.delete_forever_outlined, color: cs.error),
+                title: Text('Delete for everyone',
+                    style: GoogleFonts.inter(
+                        color: cs.error, fontWeight: FontWeight.w600)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final ids = selected.map((m) => m.id).toSet();
+                  for (final m in selected) {
+                    await SupabaseBroadcastService()
+                        .deleteMessageForEveryone(m);
+                  }
+                  if (mounted) {
+                    setState(() {
+                      _messages.removeWhere((m) => ids.contains(m.id));
+                      _selectedIds.clear();
+                    });
+                  }
+                },
+              ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: cs.onSurface),
+              title: Text('Delete for me',
+                  style: GoogleFonts.inter(color: cs.onSurface)),
+              onTap: () async {
+                Navigator.pop(context);
+                final ids = selected.map((m) => m.id).toSet();
+                for (final id in ids) {
+                  await LocalDbService().deleteMessageById(id);
+                }
+                if (mounted) {
+                  setState(() {
+                    _messages.removeWhere((m) => ids.contains(m.id));
+                    _selectedIds.clear();
+                  });
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.close, color: cs.onSurfaceVariant),
+              title: Text('Cancel',
+                  style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
+              onTap: () => Navigator.pop(context),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _sendImage(ImageSource source) async {
@@ -721,13 +911,174 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // ──────────────────────────── #2/#3 Reply widgets ────────────────────────────
+
+  /// The small quoted-reply chip shown INSIDE a bubble when it is a reply.
+  Widget _buildReplyChip(Message message, bool isMe) {
+    if (message.replyToId == null) return const SizedBox.shrink();
+    final cs = _cs;
+    final onBubble = isMe ? cs.onPrimary : cs.onSurface;
+    final accent = isMe ? cs.onPrimary : cs.primary;
+    final who = (message.replyToSender != null &&
+            message.replyToSender!.toLowerCase() ==
+                widget.myUsername.toLowerCase())
+        ? 'You'
+        : (_displayName ?? message.replyToSender ?? widget.receiverUsername);
+    final type = message.replyToType;
+    IconData? icon;
+    if (type == 'image') {
+      icon = Icons.photo_outlined;
+    } else if (type == 'video') {
+      icon = Icons.videocam_outlined;
+    } else if (type == 'document') {
+      icon = Icons.insert_drive_file_outlined;
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: (isMe ? cs.onPrimary : cs.primary).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border(left: BorderSide(color: accent, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(who,
+              style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: accent)),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: onBubble.withValues(alpha: 0.8)),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: Text(
+                  message.replyToText ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: onBubble.withValues(alpha: 0.85)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// #4: renders the correct tick(s) for one of OUR messages based on status.
+  Widget _statusTicks(String? status, {required bool onColored}) {
+    // Read → blue double tick. Delivered → grey/onColor double tick.
+    // Sent (or legacy null) → single tick.
+    final base = onColored ? _cs.onPrimary.withValues(alpha: 0.8) : _cs.onSurfaceVariant;
+    switch (status) {
+      case 'read':
+        return const Icon(Icons.done_all, size: 14, color: Color(0xFF34B7F1));
+      case 'delivered':
+        return Icon(Icons.done_all, size: 14, color: base);
+      case 'sent':
+        return Icon(Icons.done, size: 14, color: base);
+      default:
+        // Legacy messages with no tracked status — show delivered-style.
+        return Icon(Icons.done_all, size: 14, color: base);
+    }
+  }
+
+  /// #2: the reply preview bar shown above the input while composing a reply.
+  Widget _buildReplyPreviewBar() {
+    final cs = _cs;
+    final r = _replyTo!;
+    final who = r.isMe ? 'You' : (_displayName ?? widget.receiverUsername);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        border: Border(
+          top: BorderSide(color: cs.outlineVariant),
+          left: BorderSide(color: cs.primary, width: 4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Replying to $who',
+                    style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary)),
+                const SizedBox(height: 2),
+                Text(_replyPreviewText(r),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.close, size: 20, color: cs.onSurfaceVariant),
+            onPressed: () => setState(() => _replyTo = null),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// #1: the contextual app bar shown while messages are selected.
+  PreferredSizeWidget _buildSelectionAppBar() {
+    final cs = _cs;
+    final selected = _selectedMessages;
+    final anyText =
+        selected.any((m) => m.messageType == MessageType.text || m.text != null);
+    return AppBar(
+      backgroundColor: cs.surfaceContainerLowest,
+      leading: IconButton(
+        icon: Icon(Icons.close, color: cs.onSurface),
+        onPressed: _clearSelection,
+      ),
+      title: Text('${_selectedIds.length}',
+          style: GoogleFonts.inter(
+              fontWeight: FontWeight.w700, color: cs.onSurface)),
+      actions: [
+        if (selected.length == 1)
+          IconButton(
+            tooltip: 'Reply',
+            icon: Icon(Icons.reply_rounded, color: cs.onSurface),
+            onPressed: () => _startReply(selected.first),
+          ),
+        if (anyText)
+          IconButton(
+            tooltip: 'Copy',
+            icon: Icon(Icons.copy_rounded, color: cs.onSurface),
+            onPressed: _copySelected,
+          ),
+        IconButton(
+          tooltip: 'Delete',
+          icon: Icon(Icons.delete_outline, color: cs.onSurface),
+          onPressed: _showDeleteSelectedSheet,
+        ),
+        const SizedBox(width: 4),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _cs = Theme.of(context).colorScheme;
     final items = _buildMessageListWithDates();
     return Scaffold(
       backgroundColor: _cs.surfaceContainerLow,
-      appBar: _buildAppBar(),
+      appBar: _selectionMode ? _buildSelectionAppBar() : _buildAppBar(),
       body: SafeArea(
         child: Column(
           children: [
@@ -784,8 +1135,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   ],
                 ),
               )
-            else
+            else ...[
+              if (_replyTo != null) _buildReplyPreviewBar(),
               _buildInputBar(),
+            ],
             if (_showEmojiPicker)
               SizedBox(
                 height: 250,
@@ -947,14 +1300,52 @@ class _ChatScreenState extends State<ChatScreen> {
         content = _buildTextContent(message, isMe, timeString);
     }
 
-    return Align(
+    final selected = _selectedIds.contains(message.id);
+
+    // #1 tap/long-press selection + highlight, #2 swipe-right-to-reply.
+    Widget bubble = Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-        child: content,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: () => _toggleSelect(message),
+        onTap: _selectionMode ? () => _toggleSelect(message) : null,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+          // In selection mode we absorb inner taps (e.g. opening media) so the
+          // whole row toggles selection instead.
+          child: AbsorbPointer(absorbing: _selectionMode, child: content),
+        ),
       ),
     );
+
+    // Whole-width row so the highlight + swipe cover the full line.
+    Widget row = Container(
+      color: selected ? _cs.primary.withValues(alpha: 0.12) : Colors.transparent,
+      child: bubble,
+    );
+
+    if (!_selectionMode && message.messageType != MessageType.call) {
+      row = Dismissible(
+        key: ValueKey('reply_${message.id}'),
+        direction: DismissDirection.startToEnd,
+        dismissThresholds: const {DismissDirection.startToEnd: 0.25},
+        confirmDismiss: (_) async {
+          _startReply(message);
+          return false; // snap back — we only want the swipe as a trigger
+        },
+        background: Padding(
+          padding: const EdgeInsets.only(left: 24),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Icon(Icons.reply_rounded, color: _cs.primary),
+          ),
+        ),
+        child: row,
+      );
+    }
+    return row;
   }
 
   Widget _buildTextContent(Message message, bool isMe, String timeString) {
@@ -970,12 +1361,21 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message.text ?? '', style: GoogleFonts.inter(
-              color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, height: 1.4)),
+          _buildReplyChip(message, isMe),
+          LinkifiedText(
+            text: message.text ?? '',
+            style: GoogleFonts.inter(
+                color: isMe ? cs.onPrimary : cs.onSurface, fontSize: 16, height: 1.4),
+            linkColor: isMe ? cs.onPrimary : cs.primary,
+          ),
           const SizedBox(height: 6),
-          _buildTimestamp(timeString, isMe, cs),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _buildTimestamp(timeString, isMe, cs, status: message.status),
+          ),
         ],
       ),
     );
@@ -1046,7 +1446,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          _buildTimestamp(timeString, isMe, cs),
+          _buildTimestamp(timeString, isMe, cs, status: message.status),
         ],
       ),
     );
@@ -1097,7 +1497,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
-    return ClipRRect(
+    final clip = ClipRRect(
       borderRadius: BorderRadius.only(
         topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
         bottomLeft: Radius.circular(isMe ? 18 : 4), bottomRight: Radius.circular(isMe ? 4 : 18),
@@ -1118,9 +1518,34 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Stack(
           children: [
             Hero(tag: heroTag, child: imageWidget),
-            Positioned(bottom: 8, right: 10, child: _buildTimestampOverlay(timeString, isMe)),
+            Positioned(
+                bottom: 8,
+                right: 10,
+                child: _buildTimestampOverlay(timeString, isMe,
+                    status: message.status)),
           ],
         ),
+      ),
+    );
+    if (message.replyToId == null) return clip;
+    // #3: media that is itself a reply gets the quoted chip above it.
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isMe ? cs.primary : cs.surface,
+        border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
+            child: _buildReplyChip(message, isMe),
+          ),
+          clip,
+        ],
       ),
     );
   }
@@ -1155,8 +1580,9 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _buildReplyChip(message, isMe),
               Hero(
                 tag: 'media_${message.id}',
                 child: Container(
@@ -1179,7 +1605,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Text('Video', style: GoogleFonts.inter(
                       fontSize: 14, color: isMe ? cs.onPrimary : cs.onSurface, fontWeight: FontWeight.w500)),
                   const Spacer(),
-                  _buildTimestamp(timeString, isMe, cs),
+                  _buildTimestamp(timeString, isMe, cs, status: message.status),
                 ],
               ),
             ],
@@ -1202,8 +1628,10 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
+          _buildReplyChip(message, isMe),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1227,13 +1655,14 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          _buildTimestamp(timeString, isMe, cs),
+          _buildTimestamp(timeString, isMe, cs, status: message.status),
         ],
       ),
     );
   }
 
-  Widget _buildTimestamp(String timeString, bool isMe, ColorScheme cs) {
+  Widget _buildTimestamp(String timeString, bool isMe, ColorScheme cs,
+      {String? status}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1242,13 +1671,22 @@ class _ChatScreenState extends State<ChatScreen> {
             fontSize: 11, fontWeight: FontWeight.w500)),
         if (isMe) ...[
           const SizedBox(width: 4),
-          Icon(Icons.done_all, size: 14, color: cs.onPrimary.withValues(alpha: 0.8)),
+          _statusTicks(status, onColored: true),
         ],
       ],
     );
   }
 
-  Widget _buildTimestampOverlay(String timeString, bool isMe) {
+  Widget _buildTimestampOverlay(String timeString, bool isMe, {String? status}) {
+    // On dark image overlays, read stays blue but sent/delivered are white.
+    Widget ticks;
+    if (status == 'read') {
+      ticks = const Icon(Icons.done_all, size: 14, color: Color(0xFF34B7F1));
+    } else if (status == 'sent') {
+      ticks = const Icon(Icons.done, size: 14, color: Colors.white);
+    } else {
+      ticks = const Icon(Icons.done_all, size: 14, color: Colors.white);
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1261,7 +1699,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Text(timeString, style: GoogleFonts.inter(color: Colors.white, fontSize: 11)),
           if (isMe) ...[
             const SizedBox(width: 4),
-            const Icon(Icons.done_all, size: 14, color: Colors.white),
+            ticks,
           ],
         ],
       ),

@@ -57,13 +57,24 @@ class PeriodicUpdateCheckWorker(
                 currentPackageInfo.versionCode.toLong()
             }
 
-            if (remoteVersionCode > currentVersionCode) {
-                Log.i("PeriodicUpdateCheck", "New version $remoteVersionCode found! Enqueueing UpdateWorker.")
+            // Respect the user's toggles. Flutter's shared_preferences plugin
+            // stores values on Android in "FlutterSharedPreferences" with a
+            // "flutter." key prefix. Defaults mirror the Dart side (both true).
+            val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val autoUpdateEnabled = flutterPrefs.getBoolean("flutter.update_auto_update", true)
+            val wifiOnly = flutterPrefs.getBoolean("flutter.update_wifi_only", true)
+
+            if (remoteVersionCode > currentVersionCode && autoUpdateEnabled) {
+                Log.i("PeriodicUpdateCheck", "New version $remoteVersionCode found (autoUpdate=$autoUpdateEnabled, wifiOnly=$wifiOnly)! Enqueueing UpdateWorker.")
                 
                 val workManager = WorkManager.getInstance(context)
 
+                // Wi-Fi-only ON  -> UNMETERED: WorkManager holds the job until an
+                //                  unmetered Wi-Fi network is available, i.e.
+                //                  "no Wi-Fi -> wait -> download when Wi-Fi returns".
+                // Wi-Fi-only OFF -> CONNECTED: download over any network.
                 val constraintsBuilder = Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.UNMETERED) // Always Wi-Fi for periodic
+                    .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
                 
                 val workRequest = OneTimeWorkRequestBuilder<UpdateWorker>()
                     .setConstraints(constraintsBuilder.build())
@@ -76,7 +87,7 @@ class PeriodicUpdateCheckWorker(
                             UpdateWorker.KEY_DOWNLOAD_URL to downloadUrl,
                             UpdateWorker.KEY_SHA256 to sha256,
                             UpdateWorker.KEY_VERSION_CODE to remoteVersionCode,
-                            "wifiOnly" to true
+                            "wifiOnly" to wifiOnly
                         )
                     )
                     .addTag("version_$remoteVersionCode")

@@ -79,6 +79,17 @@ class Message {
   final bool isMe;
   final int timestamp;
 
+  /// Reply metadata (denormalized so the reply preview survives even after the
+  /// original message row has been cleaned up by store-and-forward).
+  final String? replyToId;
+  final String? replyToSender;
+  final String? replyToText;
+  final String? replyToType;
+
+  /// Delivery status for OWN (sent) messages: 'sent' | 'delivered' | 'read'.
+  /// Null for received messages.
+  final String? status;
+
   Message({
     required this.id,
     required this.senderUsername,
@@ -92,8 +103,39 @@ class Message {
     MessageType? messageType,
     required this.isMe,
     required this.timestamp,
+    this.replyToId,
+    this.replyToSender,
+    this.replyToText,
+    this.replyToType,
+    this.status,
   }) : messageType = messageType ??
             (mediaUrl != null ? MessageType.image : MessageType.text);
+
+  Message copyWith({
+    String? localPath,
+    String? status,
+    String? text,
+  }) {
+    return Message(
+      id: id,
+      senderUsername: senderUsername,
+      receiverUsername: receiverUsername,
+      text: text ?? this.text,
+      mediaBase64: mediaBase64,
+      mediaUrl: mediaUrl,
+      fileName: fileName,
+      localPath: localPath ?? this.localPath,
+      callType: callType,
+      messageType: messageType,
+      isMe: isMe,
+      timestamp: timestamp,
+      replyToId: replyToId,
+      replyToSender: replyToSender,
+      replyToText: replyToText,
+      replyToType: replyToType,
+      status: status ?? this.status,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -109,6 +151,11 @@ class Message {
       'message_type': messageType.value,
       'is_me': isMe ? 1 : 0,
       'timestamp': timestamp,
+      'reply_to_id': replyToId,
+      'reply_to_sender': replyToSender,
+      'reply_to_text': replyToText,
+      'reply_to_type': replyToType,
+      'status': status,
     };
   }
 
@@ -126,6 +173,11 @@ class Message {
       messageType: MessageTypeX.fromString(map['message_type'] as String?),
       isMe: (map['is_me'] as int) == 1,
       timestamp: map['timestamp'] as int,
+      replyToId: map['reply_to_id'] as String?,
+      replyToSender: map['reply_to_sender'] as String?,
+      replyToText: map['reply_to_text'] as String?,
+      replyToType: map['reply_to_type'] as String?,
+      status: map['status'] as String?,
     );
   }
 }
