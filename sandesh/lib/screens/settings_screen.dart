@@ -75,47 +75,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Settings', style: GoogleFonts.outfit()),
+        title: Text('Settings', style: GoogleFonts.inter()),
         backgroundColor: Colors.transparent,
       ),
       body: ListView(
         children: [
-          const SizedBox(height: 16),
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: cs.primary,
-              child: Icon(Icons.person, color: cs.onPrimary),
-            ),
-            title: Text('Profile',
-                style: GoogleFonts.outfit(
-                    fontSize: 18, fontWeight: FontWeight.w500)),
-            subtitle: Text('Change your name, about, or avatar',
-                style: GoogleFonts.outfit(
-                    color: cs.onSurfaceVariant, fontSize: 14)),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
-          ),
-          const Divider(),
+
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
-              'Appearance',
-              style: GoogleFonts.outfit(
+              'APPEARANCE',
+              style: GoogleFonts.inter(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
                 color: cs.primary,
               ),
             ),
           ),
           SwitchListTile(
-            title: Text('Dark Mode', style: GoogleFonts.outfit(fontSize: 16)),
+            title: Text('Dark Mode', style: GoogleFonts.inter(fontSize: 16)),
             subtitle: Text('Enable dark theme across the app',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     color: cs.onSurfaceVariant, fontSize: 14)),
             value: _isDarkMode,
             onChanged: _toggleDarkMode,
@@ -128,19 +110,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
-              'App Updates',
-              style: GoogleFonts.outfit(
+              'APP UPDATES',
+              style: GoogleFonts.inter(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
                 color: cs.primary,
               ),
             ),
           ),
           SwitchListTile(
             title: Text('Auto-update Sandesh',
-                style: GoogleFonts.outfit(fontSize: 16)),
+                style: GoogleFonts.inter(fontSize: 16)),
             subtitle: Text('Automatically download and install updates',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     color: cs.onSurfaceVariant, fontSize: 14)),
             value: _autoUpdate,
             onChanged: _toggleAutoUpdate,
@@ -149,9 +132,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           SwitchListTile(
             title: Text('Update using Wi-Fi only',
-                style: GoogleFonts.outfit(fontSize: 16)),
+                style: GoogleFonts.inter(fontSize: 16)),
             subtitle: Text('Only download updates over Wi-Fi',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     color: cs.onSurfaceVariant, fontSize: 14)),
             value: _wifiOnly,
             onChanged: _toggleWifiOnly,
@@ -161,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: Icon(Icons.system_update, color: cs.primary),
             title: Text('Check for updates',
-                style: GoogleFonts.outfit(fontSize: 16)),
+                style: GoogleFonts.inter(fontSize: 16)),
             trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
             onTap: () {
               Navigator.push(
@@ -173,17 +156,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: Icon(Icons.info_outline, color: cs.primary),
             title: Text('Current version',
-                style: GoogleFonts.outfit(fontSize: 16)),
+                style: GoogleFonts.inter(fontSize: 16)),
             subtitle: Text(_appVersion,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     color: cs.onSurfaceVariant, fontSize: 14)),
           ),
           ListTile(
             leading: Icon(Icons.schedule, color: cs.primary),
             title: Text('Last update check',
-                style: GoogleFonts.outfit(fontSize: 16)),
+                style: GoogleFonts.inter(fontSize: 16)),
             subtitle: Text(_lastCheckText,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     color: cs.onSurfaceVariant, fontSize: 14)),
           ),
           const SizedBox(height: 32),
@@ -193,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Text(
                   'Made with ',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                     fontSize: 14,
                     color: cs.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
@@ -206,7 +189,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 Text(
                   ' in India',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                     fontSize: 14,
                     color: cs.onSurfaceVariant,
                     fontWeight: FontWeight.w500,

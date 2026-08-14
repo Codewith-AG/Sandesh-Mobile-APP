@@ -11,6 +11,7 @@ import '../services/media_upload_service.dart';
 import '../widgets/user_avatar.dart';
 // app_theme.dart intentionally not imported — all colors from Theme.of(context)
 import 'login_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? peerUsername;
@@ -165,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Photo selected — tap Save Profile to upload',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -220,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Profile saved!',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -232,7 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final cs = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving profile: $e', style: GoogleFonts.outfit()),
+            content: Text('Error saving profile: $e', style: GoogleFonts.inter()),
             backgroundColor: cs.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -252,23 +253,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           backgroundColor: dcs.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text('Logout',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontWeight: FontWeight.w700, color: dcs.onSurface)),
           content: Text(
             'Are you sure you want to logout? Your chat history will be preserved locally.',
-            style: GoogleFonts.outfit(color: dcs.onSurfaceVariant),
+            style: GoogleFonts.inter(color: dcs.onSurfaceVariant),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text('Cancel',
-                  style: GoogleFonts.outfit(color: dcs.outline)),
+                  style: GoogleFonts.inter(color: dcs.outline)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(backgroundColor: dcs.error),
               child: Text('Logout',
-                  style: GoogleFonts.outfit(color: dcs.onError)),
+                  style: GoogleFonts.inter(color: dcs.onError)),
             ),
           ],
         );
@@ -297,12 +298,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_pendingAvatarFile != null) {
       // Locally picked but not yet uploaded — show preview from disk
       avatarContent = CircleAvatar(
-        radius: 56,
+        radius: 50,
         backgroundImage: FileImage(_pendingAvatarFile!),
       );
     } else if (_isUploadingAvatar) {
       avatarContent = CircleAvatar(
-        radius: 56,
+        radius: 50,
         backgroundColor: cs.surfaceContainerHighest,
         child: const CircularProgressIndicator(strokeWidth: 2),
       );
@@ -313,7 +314,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? _profile!.avatarUrl
             : null,
         name: _peerDisplayName ?? _profile?.username ?? '',
-        radius: 56,
+        radius: 50,
       );
     }
 
@@ -356,7 +357,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ? _usernameController.text
                       : (widget.peerUsername ?? 'Profile')))
               : 'Profile',
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
               color: cs.onSurface)),
         iconTheme: IconThemeData(color: cs.onSurface),
@@ -372,88 +373,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (_isUploadingAvatar) ...[
                     const SizedBox(height: 8),
                     Text('Uploading avatar...',
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.inter(
                             fontSize: 12, color: cs.onSurfaceVariant)),
                   ],
-                  const SizedBox(height: 32),
-
-                  _buildField(
-                    cs: cs,
-                    controller: _usernameController,
-                    label: 'Username',
-                    icon: Icons.person_outline,
-                    readOnly: true,
-                  ),
                   const SizedBox(height: 16),
-
-                  _buildField(
-                    cs: cs,
-                    controller: _phoneController,
-                    label: 'Phone',
-                    icon: Icons.phone_outlined,
-                    readOnly: true,
+                  Center(
+                    child: Text(
+                      _isReadOnly
+                          ? (_peerDisplayName ?? (_profile?.username ?? _usernameController.text))
+                          : (_usernameController.text.isEmpty ? 'Profile' : _usernameController.text),
+                      style: GoogleFonts.inter(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  if (_phoneController.text.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Center(
+                      child: Text(
+                        _phoneController.text,
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
 
-                  _buildField(
-                    cs: cs,
-                    controller: _bioController,
-                    label: 'Bio',
-                    icon: Icons.edit_note_outlined,
-                    readOnly: _isReadOnly,
-                    maxLines: 3,
-                    hintText: 'Tell something about yourself...',
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'About',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: cs.primary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_isReadOnly)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerLowest,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              _bioController.text.isNotEmpty ? _bioController.text : 'No bio provided',
+                              style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
+                            ),
+                          )
+                        else
+                          TextFormField(
+                            controller: _bioController,
+                            maxLines: null,
+                            style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
+                            decoration: InputDecoration(
+                              hintText: 'Add a little bit about yourself...',
+                              hintStyle: GoogleFonts.inter(color: cs.outline),
+                              suffixIcon: Icon(Icons.edit_outlined, color: cs.primary, size: 20),
+                              filled: true,
+                              fillColor: cs.surfaceContainerLow,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide(color: cs.primary, width: 2),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 32),
 
                   if (!_isReadOnly) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton.icon(
-                        onPressed: _isSaving ? null : _saveProfile,
-                        icon: _isSaving
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: cs.onPrimary,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Icon(Icons.check_circle_outline,
-                                color: cs.onPrimary),
-                        label: Text(
-                          _isUploadingAvatar ? 'Uploading...' : 'Save Profile',
-                          style: GoogleFonts.outfit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onPrimary,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSaving ? null : _saveProfile,
+                          icon: _isSaving
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: cs.onPrimary,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(Icons.check_circle_outline,
+                                  color: cs.onPrimary),
+                          label: Text(
+                            _isUploadingAvatar ? 'Uploading...' : 'Save Profile',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onPrimary,
+                            ),
                           ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: cs.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: cs.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 32),
 
-                    TextButton.icon(
-                      onPressed: _logout,
-                      icon: Icon(Icons.logout, color: cs.error),
-                      label: Text(
-                        'Logout',
-                        style: GoogleFonts.outfit(
-                          color: cs.error,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: Icon(Icons.settings_outlined, color: cs.onSurfaceVariant),
+                      title: Text('Settings', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500)),
+                      trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                      },
                     ),
-                  ],
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: Icon(Icons.logout, color: cs.error),
+                      title: Text('Logout', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500, color: cs.error)),
+                      onTap: _logout,
+                    ),
+                    const Divider(height: 1),
+                  ],      ],
                 ],
               ),
             ),
@@ -476,7 +535,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
             label,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: cs.onSurfaceVariant,
@@ -488,10 +547,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           controller: controller,
           readOnly: readOnly,
           maxLines: maxLines,
-          style: GoogleFonts.outfit(fontSize: 15, color: cs.onSurface),
+          style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: GoogleFonts.outfit(color: cs.outline),
+            hintStyle: GoogleFonts.inter(color: cs.outline),
             prefixIcon: Icon(icon, color: cs.onSurfaceVariant, size: 20),
             filled: true,
             fillColor: readOnly
