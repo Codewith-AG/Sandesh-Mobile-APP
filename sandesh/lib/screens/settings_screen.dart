@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../services/update_preferences.dart';
-import 'profile_screen.dart';
 import 'update_screen.dart';
 import 'notification_settings_screen.dart';
 

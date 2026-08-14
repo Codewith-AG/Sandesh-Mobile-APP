@@ -588,54 +588,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildField({
-    required ColorScheme cs,
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool readOnly = false,
-    int maxLines = 1,
-    String? hintText,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurfaceVariant,
-              letterSpacing: 0.4,
-            ),
-          ),
-        ),
-        TextFormField(
-          controller: controller,
-          readOnly: readOnly,
-          maxLines: maxLines,
-          style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: GoogleFonts.inter(color: cs.outline),
-            prefixIcon: Icon(icon, color: cs.onSurfaceVariant, size: 20),
-            filled: true,
-            fillColor: readOnly
-                ? cs.surfaceContainerLowest
-                : cs.surfaceContainer,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: cs.primary, width: 1.5),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+
 }
