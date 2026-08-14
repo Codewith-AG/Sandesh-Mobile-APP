@@ -400,7 +400,9 @@ class UpdateService {
 
 /// Top-level function required by [compute] — runs SHA-256 in a separate isolate
 /// to avoid blocking the UI thread and to handle large APKs without OOM.
-String _sha256OfFile(String filePath) {
-  final bytes = File(filePath).readAsBytesSync();
-  return sha256.convert(bytes).toString();
+Future<String> _sha256OfFile(String filePath) async {
+  final file = File(filePath);
+  var stream = file.openRead();
+  var hash = await sha256.bind(stream).first;
+  return hash.toString();
 }
