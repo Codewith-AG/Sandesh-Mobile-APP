@@ -6,7 +6,7 @@ import 'package:video_player/video_player.dart';
 /// Full-screen "review before send" screen for a captured/picked photo or video.
 ///
 /// Mirrors `Sandesh_UI/video-sharing-ui-3.html`: a black canvas, a header with a
-/// close button and a "Send to <name>" label, the media filling the screen
+/// close button and a "Send to &lt;name&gt;" label, the media filling the screen
 /// (video autoplays muted + looped), and a footer with a translucent glass
 /// caption field and a circular accent send button.
 ///

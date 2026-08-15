@@ -98,7 +98,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// background isolate. Used only for DATA-ONLY pushes (see the caller). Honors
 /// the cached message/sound/vibrate toggles and tags the notification with the
 /// message id so any Layer-4 backstop collapses onto the same notification.
-Future<void> _showBackgroundChatNotification(Map<String, String> data) async {
+Future<void> _showBackgroundChatNotification(Map<String, dynamic> data) async {
   try {
     final sender = data['sender_username'] ?? '';
     final messageId = data['id'] ?? '';
@@ -187,7 +187,7 @@ Future<void> _showBackgroundChatNotification(Map<String, String> data) async {
 /// Writes a `delivered` receipt from the FCM background isolate so the sender's
 /// verified backstop (renotify) is cancelled. Bootstraps Supabase if this
 /// isolate hasn't initialized it yet (restores the persisted auth session).
-Future<void> _sendDeliveredReceiptFromBackground(Map<String, String> data) async {
+Future<void> _sendDeliveredReceiptFromBackground(Map<String, dynamic> data) async {
   try {
     final messageId = data['id'] ?? '';
     final sender = data['sender_username'] ?? '';
