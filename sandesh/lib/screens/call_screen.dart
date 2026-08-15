@@ -98,22 +98,42 @@ class _CallScreenState extends State<CallScreen> {
 
     if (isVideo) {
       await engine.enableVideo();
-      // HD + low-latency encoder config. WITHOUT this, Agora falls back to its
-      // low default profile (~360p, low bitrate) which looks blurry/pixelated
-      // on modern phones. 720p30 with a balanced degradation preference keeps
-      // the picture sharp while gracefully dropping quality (not freezing) on a
-      // weak network. The Communication channel profile (set in joinChannel)
-      // already optimises for low end-to-end latency.
+
+      // 1) Capture at Full-HD so the encoder receives a sharp 1080p source
+      //    frame. Without an explicit capturer config Agora may capture at a
+      //    low resolution, which no amount of encoder tuning can un-blur.
+      await engine.setCameraCapturerConfiguration(
+        const CameraCapturerConfiguration(
+          cameraDirection: CameraDirection.cameraFront,
+          format: VideoFormat(width: 1920, height: 1080, fps: 30),
+        ),
+      );
+
+      // 2) Full-HD (1080p30) encoder config with an explicit, high target
+      //    bitrate. WITHOUT this, Agora falls back to its low default profile
+      //    (~360-720p, low bitrate) which looks blurry/pixelated on modern
+      //    phones. 1080p30 @ ~2.26 Mbps keeps the picture crisp.
+      //    - maintainFramerate degradation => on a weak network Agora scales
+      //      resolution DOWN but keeps the frame rate high, which preserves
+      //      smooth, LOW-LATENCY motion instead of freezing.
+      //    - The Communication channel profile (set in joinChannel) already
+      //      optimises the transport for low end-to-end latency.
       await engine.setVideoEncoderConfiguration(
         const VideoEncoderConfiguration(
-          dimensions: VideoDimensions(width: 1280, height: 720),
+          dimensions: VideoDimensions(width: 1920, height: 1080),
           frameRate: 30,
-          bitrate: 0, // 0 = Agora standard bitrate for the resolution (~1.13 Mbps @720p30)
+          bitrate: 2260, // Agora recommended target for 1080p30 (Kbps)
+          minBitrate: 1200,
           orientationMode: OrientationMode.orientationModeAdaptive,
-          degradationPreference: DegradationPreference.maintainBalanced,
+          degradationPreference: DegradationPreference.maintainFramerate,
           mirrorMode: VideoMirrorModeType.videoMirrorModeAuto,
         ),
       );
+
+      // 3) Ask Agora for its lowest-latency real-time tuning for the local
+      //    camera stream (favours latency over pure image smoothing).
+      await engine.setParameters('{"rtc.video.low_latency":1}');
+
       await engine.startPreview();
     } else {
       // Audio call: explicitly disable video so the camera is never used

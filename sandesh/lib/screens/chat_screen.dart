@@ -1735,12 +1735,14 @@ class _ChatScreenState extends State<ChatScreen> {
             // ── The typing pill: emoji · roomy text field · attach · camera ──
             Expanded(
               child: Container(
-                // Roomier: taller minimum, grows up to ~6 lines before scrolling.
-                constraints: const BoxConstraints(minHeight: 52, maxHeight: 140),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                // Large & horizontal: taller minimum, grows up to ~6 lines
+                // before scrolling. Everything (emoji · text · attach · camera ·
+                // mic/send) lives inside this one roomy bar.
+                constraints: const BoxConstraints(minHeight: 56, maxHeight: 160),
+                padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(28),
                   border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Row(
@@ -1814,45 +1816,52 @@ class _ChatScreenState extends State<ChatScreen> {
                           const BoxConstraints(minWidth: 40, minHeight: 44),
                     ),
                     const SizedBox(width: 2),
+                    // ── Mic / Send — merged INTO the bar as a filled circle so
+                    //    the composer is one large horizontal control ──
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2))
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: _isSendingMedia
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      color: cs.onPrimary, strokeWidth: 2))
+                              : Icon(
+                                  _hasText
+                                      ? Icons.send_rounded
+                                      : Icons.mic_none_rounded,
+                                  color: cs.onPrimary,
+                                  size: 22),
+                          onPressed: _isSendingMedia
+                              ? null
+                              : (_hasText
+                                  ? _sendMessage
+                                  : () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Voice messages coming soon')));
+                                    }),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // ── Send / mic button ──
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: cs.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2))
-                ],
-              ),
-              child: IconButton(
-                icon: _isSendingMedia
-                    ? SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            color: cs.onPrimary, strokeWidth: 2))
-                    : Icon(_hasText ? Icons.send_rounded : Icons.mic_none_rounded,
-                        color: cs.onPrimary, size: 22),
-                onPressed: _isSendingMedia
-                    ? null
-                    : (_hasText
-                        ? _sendMessage
-                        : () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content:
-                                        Text('Voice messages coming soon')));
-                          }),
-                padding: EdgeInsets.zero,
               ),
             ),
           ],
