@@ -40,3 +40,5 @@ sandesh/supabase/.temp/
 postman/
 *.postman*
 
+# Exclude graphify output
+graphify-out/
