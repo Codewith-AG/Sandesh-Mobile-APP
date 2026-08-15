@@ -9,8 +9,14 @@ import '../models/contact_model.dart';
 import '../models/user_profile_model.dart';
 import 'local_db_service.dart';
 import 'media_upload_service.dart';
+import 'notification_prefs.dart';
 import 'package:gal/gal.dart';
 import 'call_service.dart';
+
+/// Notification action id for the inline "Reply" button (notification-text-reply-2).
+/// Shared by [SupabaseBroadcastService] (which attaches the action) and
+/// main.dart (which handles the typed reply text).
+const String kReplyActionId = 'reply_action';
 
 /// Emitted on [SupabaseBroadcastService.statusStream] when a delivery receipt
 /// for one of OUR sent messages arrives (delivered / read). The open chat
@@ -44,6 +50,11 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
   /// The Realtime channel will fire for these when the app comes online, but
   /// we must NOT show a second local notification for them.
   final Set<String> _bgHandlerSavedIds = {};
+
+  /// LAYER 4 (verified backstop): message id → pending backstop timer. If a
+  /// `delivered` receipt arrives before the timer fires, it is cancelled
+  /// (the peer already received the message, so no backstop push is needed).
+  final Map<String, Timer> _backstopTimers = {};
 
   /// The single Postgres realtime channel that listens for all incoming messages
   RealtimeChannel? _inboxChannel;
@@ -234,6 +245,11 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
 
     // STEP 4: Get FCM token and save it to Supabase
     _syncFcmToken();
+
+    // Pull the user's notification toggles into the local cache so a fresh
+    // install / reinstall honours their saved preferences on the very first
+    // incoming message (before they ever open the settings screen).
+    NotificationPrefs.syncFromServer();
   }
 
   // ──────────────────────────── #4 Read Receipts ────────────────────────────
@@ -269,6 +285,9 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     final id = row['message_id'] as String?;
     final status = row['status'] as String?;
     if (id == null || status == null) return;
+    // Confirmed delivered/read — cancel any pending Layer-4 backstop so we
+    // never double-notify the peer.
+    _backstopTimers.remove(id)?.cancel();
     LocalDbService().updateMessageStatus(id, status);
     if (!_statusStreamController.isClosed) {
       _statusStreamController.add(MessageStatusUpdate(id, status));
@@ -587,7 +606,11 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
       // notifications for new messages if syncPendingMessages() happened to
       // still be running in the background.
       if (activeChatUser?.toLowerCase() != message.senderUsername.toLowerCase()) {
-        if (!_isSyncing) {
+        // Respect the user's "1-on-1 Messages" notification toggle. When it is
+        // OFF we still saved the message + notified the UI above; we simply
+        // suppress the heads-up notification.
+        final messagesEnabled = await NotificationPrefs.messagesEnabled();
+        if (!_isSyncing && messagesEnabled) {
           // WhatsApp-style: show the saved contact name instead of raw username
           final displayName = await LocalDbService()
               .getContactDisplayName(message.senderUsername);
@@ -617,15 +640,37 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     required String body,
     required String senderUsername,
   }) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    // Honour the user's In-App Sounds / Vibrate toggles for realtime (in-app)
+    // notifications. (Killed-app FCM pushes are gated separately server-side.)
+    final soundsEnabled = await NotificationPrefs.soundsEnabled();
+    final vibrateEnabled = await NotificationPrefs.vibrateEnabled();
+
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'messages_channel',
       'Messages',
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
+      playSound: soundsEnabled,
+      enableVibration: vibrateEnabled,
+      // Inline "Reply" action (notification-text-reply-2). Tapping Reply opens an
+      // on-notification text field; the typed text is delivered to the app's
+      // notification-response handler which sends it via store-and-forward.
+      actions: <AndroidNotificationAction>[
+        const AndroidNotificationAction(
+          kReplyActionId,
+          'Reply',
+          inputs: <AndroidNotificationActionInput>[
+            AndroidNotificationActionInput(label: 'Message'),
+          ],
+          // Keep the app in the background — we just send the reply, no UI.
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+      ],
     );
-    const NotificationDetails platformChannelSpecifics =
+    final NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
     try {
       // Use the same global plugin instance as main.dart so the tap callback
@@ -707,7 +752,7 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     // The send-notification function is idempotent — a duplicate FCM push
     // just shows one extra notification which is far better than zero.
     if (insertOk) {
-      _sendDirectPushFallback(message, senderLower, receiverLower);
+      _scheduleDeliveryBackstop(message, senderLower, receiverLower);
     }
 
     if (!insertOk) {
@@ -717,16 +762,26 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
     return insertOk;
   }
 
-  /// Fire-and-forget: Calls the send-notification Edge Function directly
-  /// so the receiver gets an FCM push even if the Database Webhook is broken.
-  void _sendDirectPushFallback(Message message, String sender, String receiver) {
-    Future(() async {
-      try {
-        // Wait a short moment to let the webhook fire first
-        await Future.delayed(const Duration(seconds: 2));
+  /// LAYER 4 (verified backstop). After a message is sent, wait a few seconds
+  /// for a `delivered` receipt from the peer. The receipt is written by the
+  /// peer's Realtime path or its FCM background isolate the moment it receives
+  /// the message. If NO receipt arrives in time — meaning the peer's app could
+  /// not be woken (common on aggressive-OEM killed apps) — we invoke `renotify`
+  /// to send a guaranteed system notification-shape push.
+  ///
+  /// Because it only fires when the message is UNconfirmed, there is no
+  /// duplicate notification in the normal (fast-path) case. The timer is
+  /// cancelled in [_applyReceipt] as soon as a receipt lands.
+  void _scheduleDeliveryBackstop(Message message, String sender, String receiver) {
+    // Call signals are ephemeral and handled elsewhere — never back them up.
+    if (message.messageType.isCallSignal) return;
 
-        final response = await _client.functions.invoke(
-          'send-notification',
+    _backstopTimers[message.id]?.cancel();
+    _backstopTimers[message.id] = Timer(const Duration(seconds: 4), () async {
+      _backstopTimers.remove(message.id);
+      try {
+        await _client.functions.invoke(
+          'renotify',
           body: {
             'sender_username': sender,
             'receiver_username': receiver,
@@ -736,11 +791,10 @@ class SupabaseBroadcastService with WidgetsBindingObserver {
             'timestamp': message.timestamp.toString(),
           },
         );
-
-        debugPrint('[sendMessage] Direct push fallback response: ${response.status}');
+        debugPrint('[backstop] renotify fired for ${message.id} (no delivered receipt in 4s)');
       } catch (e) {
-        // Swallow — this is a best-effort fallback
-        debugPrint('[sendMessage] Direct push fallback error (non-fatal): $e');
+        // Best-effort — the store-and-forward layer still guarantees the message.
+        debugPrint('[backstop] renotify error (non-fatal): $e');
       }
     });
   }

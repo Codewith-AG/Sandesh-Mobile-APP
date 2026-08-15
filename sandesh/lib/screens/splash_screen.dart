@@ -47,7 +47,9 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateAfterDelay() async {
-    await Future.delayed(const Duration(milliseconds: 2500));
+    // Shorter hold so the app reaches the first real screen faster on low-end
+    // devices (the fade/scale intro still plays underneath).
+    await Future.delayed(const Duration(milliseconds: 1400));
     if (!mounted) return;
 
     final supabase = Supabase.instance.client;
@@ -167,6 +169,11 @@ class _SplashScreenState extends State<SplashScreen>
                             'assets/logo.png',
                             width: 100,
                             height: 100,
+                            // Decode the 1.2 MB source PNG down to the display
+                            // size (~3x for hi-dpi) instead of full resolution,
+                            // so it costs far less memory/CPU on startup.
+                            cacheWidth: 300,
+                            cacheHeight: 300,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) => Center(
                               child: Icon(

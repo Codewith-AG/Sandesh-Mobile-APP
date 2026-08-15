@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/message_model.dart';
 import 'supabase_broadcast_service.dart';
 import 'local_db_service.dart';
+import 'notification_prefs.dart';
 
 /// Wraps a CallToken result with an optional error message.
 /// When [token] is null, [error] explains why.
@@ -296,8 +297,9 @@ class CallService {
         status: 'incoming',
         ts: DateTime.now().millisecondsSinceEpoch,
       );
-      // Let main.dart / root listener show IncomingCallScreen
-      if (!_incomingCtrl.isClosed) _incomingCtrl.add(event);
+      // Let main.dart / root listener show IncomingCallScreen — but only if the
+      // user's "Incoming Calls" toggle is on. Call history is still logged above.
+      _announceIncomingIfEnabled(event);
     } else {
       // callAccepted / callRejected / callEnded — also clear dedup so a future
       // invite on the same channel name (rare, but possible) is allowed through.
@@ -318,7 +320,21 @@ class CallService {
     _purgeOldInvites();
     if (_recentInvites.containsKey(event.channelName)) return;
     _recentInvites[event.channelName] = DateTime.now();
-    if (!_incomingCtrl.isClosed) _incomingCtrl.add(event);
+    _announceIncomingIfEnabled(event);
+  }
+
+  /// Emits the incoming-call event only if the user's "Incoming Calls" toggle
+  /// is enabled. The preference read is async, so we run it without blocking
+  /// the (sync) call-signal handlers. When disabled the call is silently
+  /// ignored (WhatsApp-style DND for calls) — history is still recorded.
+  void _announceIncomingIfEnabled(CallEvent event) {
+    NotificationPrefs.callsEnabled().then((enabled) {
+      if (!enabled) {
+        debugPrint('CallService: incoming call suppressed (calls_enabled = false)');
+        return;
+      }
+      if (!_incomingCtrl.isClosed) _incomingCtrl.add(event);
+    });
   }
 
   // ════════════════════════════════════════════════════════════════════════════

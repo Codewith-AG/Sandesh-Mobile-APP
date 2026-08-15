@@ -18,6 +18,7 @@ import 'screens/incoming_call_screen.dart';
 import 'navigation/navigator_key.dart';
 import 'services/call_service.dart';
 import 'services/supabase_broadcast_service.dart';
+import 'services/notification_prefs.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 import 'services/update_service.dart';
 import 'services/update_preferences.dart';
@@ -71,9 +72,154 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             DateTime.now().millisecondsSinceEpoch,
       );
       await LocalDbService().insertMessage(msg);
+
+      // ── LAYER 1 (custom notification) ──────────────────────────────────────
+      // If this is a DATA-ONLY push (no system `notification` block), the app
+      // must draw its own notification — this is what carries the inline Reply
+      // action. If a `notification` block IS present (legacy notification-shape
+      // push, the current send-push), Android already displayed it, so we skip
+      // to avoid a duplicate. This makes the code safe to ship BEFORE send-push
+      // is switched to data-only.
+      if (message.notification == null) {
+        await _showBackgroundChatNotification(data);
+      }
+
+      // ── LAYER 4 signal ─────────────────────────────────────────────────────
+      // Acknowledge delivery so the sender's verified backstop (renotify) is
+      // cancelled and we don't double-notify.
+      await _sendDeliveredReceiptFromBackground(data);
     } catch (e) {
       debugPrint('Background handler DB error: $e');
     }
+  }
+}
+
+/// Draws a custom chat notification (with an inline Reply action) from the FCM
+/// background isolate. Used only for DATA-ONLY pushes (see the caller). Honors
+/// the cached message/sound/vibrate toggles and tags the notification with the
+/// message id so any Layer-4 backstop collapses onto the same notification.
+Future<void> _showBackgroundChatNotification(Map<String, String> data) async {
+  try {
+    final sender = data['sender_username'] ?? '';
+    final messageId = data['id'] ?? '';
+    if (sender.isEmpty) return;
+
+    // A group push carries type == 'group_message' (and a group_id); a direct
+    // message does not. Gate each on its OWN toggle so "Group Messages" and
+    // "1-on-1 Messages" work independently (see notification_settings_screen).
+    final isGroup = data['type'] == 'group_message' ||
+        (data['group_id'] != null && data['group_id']!.isNotEmpty);
+    if (isGroup) {
+      if (!await NotificationPrefs.groupsEnabled()) return;
+    } else {
+      if (!await NotificationPrefs.messagesEnabled()) return;
+    }
+    final soundsEnabled = await NotificationPrefs.soundsEnabled();
+    final vibrateEnabled = await NotificationPrefs.vibrateEnabled();
+
+    // The background isolate has its own plugin instance — initialize it.
+    final plugin = FlutterLocalNotificationsPlugin();
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await plugin.initialize(
+      settings: const InitializationSettings(android: androidInit),
+    );
+
+    final senderName =
+        await LocalDbService().getContactDisplayName(sender) ?? sender;
+    final rawText = data['text'];
+    final rawBody =
+        (rawText != null && rawText.trim().isNotEmpty && rawText != 'null')
+            ? rawText
+            : 'Sent an attachment';
+    // Group notifications show the group name as the title and prefix the body
+    // with the sender (matching send-group-push's server-side notification).
+    final title = isGroup ? (data['group_name'] ?? 'Group') : senderName;
+    final body = isGroup ? '$senderName: $rawBody' : rawBody;
+
+    final androidDetails = AndroidNotificationDetails(
+      'messages_channel',
+      'Messages',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      playSound: soundsEnabled,
+      enableVibration: vibrateEnabled,
+      // Same tag as the Layer-4 backstop → Android shows at most one.
+      tag: messageId.isNotEmpty ? messageId : null,
+      // The inline Reply action is only wired for 1-on-1 chats (the reply is
+      // routed to a single receiver_username). Group reply routing isn't built
+      // yet, so we omit the action for group pushes to avoid misrouted replies.
+      actions: isGroup
+          ? const <AndroidNotificationAction>[]
+          : <AndroidNotificationAction>[
+              const AndroidNotificationAction(
+                kReplyActionId,
+                'Reply',
+                inputs: <AndroidNotificationActionInput>[
+                  AndroidNotificationActionInput(label: 'Message'),
+                ],
+                showsUserInterface: false,
+                cancelNotification: true,
+              ),
+            ],
+    );
+
+    await plugin.show(
+      id: (messageId.isNotEmpty ? messageId : sender).hashCode,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(android: androidDetails),
+      // Group taps carry group_id so routing can open the group chat; 1-on-1
+      // taps carry the sender so routing opens the direct conversation.
+      payload: jsonEncode(isGroup
+          ? {
+              'type': 'group_message',
+              'group_id': data['group_id'] ?? '',
+              'group_name': data['group_name'] ?? '',
+            }
+          : {'type': 'message', 'sender_username': sender}),
+    );
+  } catch (e) {
+    debugPrint('[bg-notif] error: $e');
+  }
+}
+
+/// Writes a `delivered` receipt from the FCM background isolate so the sender's
+/// verified backstop (renotify) is cancelled. Bootstraps Supabase if this
+/// isolate hasn't initialized it yet (restores the persisted auth session).
+Future<void> _sendDeliveredReceiptFromBackground(Map<String, String> data) async {
+  try {
+    final messageId = data['id'] ?? '';
+    final sender = data['sender_username'] ?? '';
+    if (messageId.isEmpty || sender.isEmpty) return;
+
+    bool inited = true;
+    try {
+      Supabase.instance.client; // throws if not initialized in this isolate
+    } catch (_) {
+      inited = false;
+    }
+    if (!inited) {
+      await dotenv.load(fileName: ".env");
+      await Supabase.initialize(
+        url: dotenv.env['SUPABASE_URL']!,
+        anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+      );
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final me = (prefs.getString('username') ?? '').toLowerCase();
+    if (me.isEmpty) return;
+
+    await Supabase.instance.client.from('message_receipts').upsert({
+      'message_id': messageId,
+      'sender_username': sender.toLowerCase(),
+      'reader_username': me,
+      'status': 'delivered',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'message_id,reader_username');
+  } catch (e) {
+    debugPrint('[bg-receipt] error: $e');
   }
 }
 
@@ -113,6 +259,9 @@ void main() async {
   await flutterLocalNotificationsPlugin.initialize(
     settings: initializationSettings,
     onDidReceiveNotificationResponse: _onLocalNotificationTap,
+    // Handles the inline "Reply" action when the tap is delivered to a
+    // background isolate (app process not in the foreground).
+    onDidReceiveBackgroundNotificationResponse: _onLocalNotificationBackgroundTap,
   );
 
   await flutterLocalNotificationsPlugin
@@ -133,15 +282,112 @@ void main() async {
   runApp(const SandeshApp());
 }
 
-// Routes a local-notification tap to the correct screen.
+// Routes a local-notification tap to the correct screen — or, if the user used
+// the inline "Reply" action, sends their typed reply without opening the app.
 Future<void> _onLocalNotificationTap(NotificationResponse response) async {
   final payload = response.payload;
   if (payload == null || payload.isEmpty) return;
+
+  // ── Inline reply (notification-text-reply-2) ──────────────────────────────
+  if (response.actionId == kReplyActionId) {
+    final text = response.input?.trim() ?? '';
+    if (text.isEmpty) return;
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final sender = (data['sender_username'] ?? '').toString();
+      if (sender.isNotEmpty) {
+        await _sendNotificationReply(receiver: sender, text: text);
+      }
+    } catch (e) {
+      debugPrint('Inline reply (foreground) error: $e');
+    }
+    return; // do NOT navigate — the reply is the whole interaction
+  }
+
   try {
     final data = jsonDecode(payload) as Map<String, dynamic>;
     await _routeFromNotificationData(data.map((k, v) => MapEntry(k, v.toString())));
   } catch (e) {
     debugPrint('Local notification payload parse error: $e');
+  }
+}
+
+// Handles the inline "Reply" action when it is delivered to a background
+// isolate (app process not currently in the foreground). Runs as its own
+// entry point, so it must bootstrap the plugins it needs before sending.
+@pragma('vm:entry-point')
+Future<void> _onLocalNotificationBackgroundTap(NotificationResponse response) async {
+  if (response.actionId != kReplyActionId) return;
+  final text = response.input?.trim() ?? '';
+  final payload = response.payload;
+  if (text.isEmpty || payload == null || payload.isEmpty) return;
+
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
+    await dotenv.load(fileName: ".env");
+    // Restores the persisted auth session so the messages insert passes RLS.
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+    await LocalDbService().database;
+
+    final data = jsonDecode(payload) as Map<String, dynamic>;
+    final sender = (data['sender_username'] ?? '').toString();
+    if (sender.isNotEmpty) {
+      await _sendNotificationReply(receiver: sender, text: text);
+    }
+  } catch (e) {
+    debugPrint('Inline reply (background) error: $e');
+  }
+}
+
+/// Sends a text reply typed into a notification's inline reply field to
+/// [receiver], via the same store-and-forward path a normal message uses:
+/// save locally + insert into the cloud `messages` table (which fires the
+/// send-push webhook to deliver an FCM push to the receiver).
+Future<void> _sendNotificationReply({
+  required String receiver,
+  required String text,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final me = (prefs.getString('username') ?? '').toLowerCase();
+  if (me.isEmpty) return;
+
+  final to = receiver.toLowerCase();
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  final id = '${me}_$ts';
+
+  final msg = Message(
+    id: id,
+    senderUsername: me,
+    receiverUsername: to,
+    text: text,
+    messageType: MessageTypeX.fromString('text'),
+    isMe: true,
+    timestamp: ts,
+  );
+
+  // Optimistic local save so the reply shows in our own chat history.
+  try {
+    await LocalDbService().insertMessage(msg);
+  } catch (_) {}
+
+  // Durable cloud delivery — the messages AFTER-INSERT webhook fires send-push
+  // which delivers the FCM notification to the receiver.
+  try {
+    await Supabase.instance.client.from('messages').insert({
+      'id': id,
+      'sender_username': me,
+      'receiver_username': to,
+      'text': text,
+      'message_type': 'text',
+      'timestamp': ts,
+    });
+    debugPrint('[reply] Sent inline reply to $to');
+  } catch (e) {
+    debugPrint('[reply] cloud insert failed: $e');
   }
 }
 

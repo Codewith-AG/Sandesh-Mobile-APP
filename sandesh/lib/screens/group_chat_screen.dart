@@ -398,10 +398,45 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         'reply_to_text': msg.replyToText,
         'reply_to_type': msg.replyToType,
       });
+
+      // Fan out an FCM push to the other members. The server-side function
+      // skips any member whose "Group Messages" toggle is off. Fire-and-forget.
+      _sendGroupPushFallback(
+        messageId: msg.id,
+        text: msg.text ?? '',
+        messageType: msg.messageType.value,
+      );
     } catch (e) {
       debugPrint('Error sending group message to Supabase: $e');
       if (mounted) _showError('Failed to send message: $e');
     }
+  }
+
+  /// Fire-and-forget: asks the `send-group-push` Edge Function to deliver an
+  /// FCM push to every OTHER group member. The function verifies the caller and
+  /// skips members whose `groups_enabled` toggle is off. Never blocks sending.
+  void _sendGroupPushFallback({
+    required String messageId,
+    required String text,
+    required String messageType,
+  }) {
+    Future(() async {
+      try {
+        await Supabase.instance.client.functions.invoke(
+          'send-group-push',
+          body: {
+            'group_id': widget.groupId,
+            'group_name': widget.groupName,
+            'sender_username': widget.myUsername.toLowerCase(),
+            'message_id': messageId,
+            'text': text,
+            'message_type': messageType,
+          },
+        );
+      } catch (e) {
+        debugPrint('[group-push] non-fatal: $e');
+      }
+    });
   }
 
   /// #2/#3: short human-readable preview of a message for the reply chip.

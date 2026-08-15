@@ -17,6 +17,7 @@ import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'profile_screen.dart';
 import 'media_viewer_screen.dart';
 import 'camera_screen.dart';
+import 'media_preview_screen.dart';
 import 'call_screen.dart';
 import '../services/call_service.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -479,8 +480,9 @@ class _ChatScreenState extends State<ChatScreen> {
       if (pickedFiles.isEmpty) return;
 
       if (!mounted) return;
-      final confirmed = await _showImagePreview(File(pickedFiles.first.path));
-      if (confirmed != true) return;
+      // Full-screen preview + optional caption (video-sharing-ui-3.html).
+      final caption = await _showMediaPreview(File(pickedFiles.first.path), isVideo: false);
+      if (caption == null) return; // user cancelled
 
       setState(() { _isSendingMedia = true; _uploadProgress = 0; });
       
@@ -488,11 +490,13 @@ class _ChatScreenState extends State<ChatScreen> {
         final picked = pickedFiles[i];
         try {
           final url = await MediaUploadService().uploadChatImage(File(picked.path));
-          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final timestamp = DateTime.now().millisecondsSinceEpoch + i;
           final msg = Message(
             id: '${widget.myUsername}_$timestamp',
             senderUsername: widget.myUsername,
             receiverUsername: widget.receiverUsername,
+            // Caption applies to the first image only (WhatsApp-style).
+            text: (i == 0 && caption.isNotEmpty) ? caption : null,
             mediaUrl: url,
             localPath: picked.path,
             messageType: MessageType.image,
@@ -522,8 +526,9 @@ class _ChatScreenState extends State<ChatScreen> {
       if (picked == null) return;
 
       if (!mounted) return;
-      final confirmed = await _showVideoPreview(File(picked.path));
-      if (confirmed != true) return;
+      // Full-screen video preview (autoplay/loop/muted) + optional caption.
+      final caption = await _showMediaPreview(File(picked.path), isVideo: true);
+      if (caption == null) return; // user cancelled
 
       setState(() { _isSendingMedia = true; _uploadProgress = 0; });
       final url = await MediaUploadService().uploadChatVideo(
@@ -535,6 +540,7 @@ class _ChatScreenState extends State<ChatScreen> {
         id: '${widget.myUsername}_$timestamp',
         senderUsername: widget.myUsername,
         receiverUsername: widget.receiverUsername,
+        text: caption.isNotEmpty ? caption : null,
         mediaUrl: url,
         localPath: picked.path,
         messageType: MessageType.video,
@@ -593,73 +599,19 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<bool?> _showImagePreview(File imageFile) {
-    return showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.file(imageFile, fit: BoxFit.contain),
-            Positioned(
-              bottom: 32,
-              left: 0, right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    label: Text('Cancel', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600)),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black54, shape: const StadiumBorder()),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    icon: const Icon(Icons.send_rounded, color: Colors.white),
-                    label: Text('Send', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700)),
-                    style: ElevatedButton.styleFrom(backgroundColor: _cs.primary, shape: const StadiumBorder()),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 40, left: 16,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                onPressed: () => Navigator.pop(ctx, false),
-              ),
-            ),
-          ],
+  /// Full-screen "review before send" for a photo or video, matching
+  /// `Sandesh_UI/video-sharing-ui-3.html` (media + "Add a caption..." field +
+  /// circular send). Returns the trimmed caption (possibly empty `''`) when the
+  /// user taps Send, or `null` if they cancel / back out.
+  Future<String?> _showMediaPreview(File file, {required bool isVideo}) {
+    return Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        fullscreenDialog: true,
+        builder: (_) => MediaPreviewScreen(
+          file: file,
+          isVideo: isVideo,
+          sendToLabel: _displayName ?? widget.receiverUsername,
         ),
-      ),
-    );
-  }
-
-  Future<bool?> _showVideoPreview(File videoFile) {
-    final cs = _cs;
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cs.surface,
-        title: Text('Send Video?', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface)),
-        content: Row(
-          children: [
-            Icon(Icons.videocam_outlined, size: 40, color: cs.primary),
-            const SizedBox(width: 12),
-            Expanded(child: Text('The video will be compressed and sent.', style: GoogleFonts.inter(color: cs.onSurfaceVariant))),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter(color: cs.outline))),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: cs.primary),
-            child: Text('Send', style: GoogleFonts.inter(color: cs.onPrimary, fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
     );
   }
@@ -1457,6 +1409,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final localPath = message.localPath;
     final networkUrl = message.mediaUrl;
     final heroTag = 'media_${message.id}';
+    final hasCaption = message.text != null && message.text!.trim().isNotEmpty;
 
     Widget imageWidget;
     if (localPath != null && File(localPath).existsSync()) {
@@ -1518,17 +1471,22 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Stack(
           children: [
             Hero(tag: heroTag, child: imageWidget),
-            Positioned(
-                bottom: 8,
-                right: 10,
-                child: _buildTimestampOverlay(timeString, isMe,
-                    status: message.status)),
+            // When a caption is present the time/ticks move BELOW the caption,
+            // so we drop the on-image overlay to avoid showing the time twice.
+            if (!hasCaption)
+              Positioned(
+                  bottom: 8,
+                  right: 10,
+                  child: _buildTimestampOverlay(timeString, isMe,
+                      status: message.status)),
           ],
         ),
       ),
     );
-    if (message.replyToId == null) return clip;
-    // #3: media that is itself a reply gets the quoted chip above it.
+    // Plain photo (no caption, not a reply) → just the rounded image w/ overlay.
+    if (message.replyToId == null && !hasCaption) return clip;
+    // Otherwise wrap the photo in a bubble so the quoted reply chip and/or the
+    // caption (+ time/ticks) can sit above/below it (WhatsApp-style).
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -1540,11 +1498,31 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
-            child: _buildReplyChip(message, isMe),
-          ),
+          if (message.replyToId != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
+              child: _buildReplyChip(message, isMe),
+            ),
           clip,
+          if (hasCaption)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: Text(
+                message.text!.trim(),
+                style: GoogleFonts.inter(
+                    fontSize: 15,
+                    height: 1.35,
+                    color: isMe ? cs.onPrimary : cs.onSurface),
+              ),
+            ),
+          if (hasCaption)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _buildTimestamp(timeString, isMe, cs, status: message.status),
+              ),
+            ),
         ],
       ),
     );
@@ -1568,7 +1546,7 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       },
       child: Container(
-        width: 220,
+        width: 260,
         decoration: BoxDecoration(
           color: isMe ? cs.primary : cs.surface,
           border: isMe ? null : Border.all(color: cs.outlineVariant, width: 1),
@@ -1578,35 +1556,70 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildReplyChip(message, isMe),
+              if (message.replyToId != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
+                  child: _buildReplyChip(message, isMe),
+                ),
+              // 180px rounded video thumbnail with a circular play overlay
+              // (video-sharing-ui-3.html .video-thumb + .play-overlay).
               Hero(
                 tag: 'media_${message.id}',
-                child: Container(
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.play_circle_filled_rounded, size: 48, color: Colors.white),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    height: 180,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0xFF2A2A2E), Color(0xFF000000)],
+                            ),
+                          ),
+                        ),
+                        Center(
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.play_arrow_rounded,
+                                color: Colors.white, size: 32),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.videocam_outlined, size: 16, color: isMe ? cs.onPrimary : cs.onSurfaceVariant),
-                  const SizedBox(width: 6),
-                  Text('Video', style: GoogleFonts.inter(
-                      fontSize: 14, color: isMe ? cs.onPrimary : cs.onSurface, fontWeight: FontWeight.w500)),
-                  const Spacer(),
-                  _buildTimestamp(timeString, isMe, cs, status: message.status),
-                ],
+              if (message.text != null && message.text!.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: Text(
+                    message.text!.trim(),
+                    style: GoogleFonts.inter(
+                        fontSize: 15,
+                        height: 1.35,
+                        color: isMe ? cs.onPrimary : cs.onSurface),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _buildTimestamp(timeString, isMe, cs, status: message.status),
+                ),
               ),
             ],
           ),
@@ -1872,8 +1885,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (path == null || path.isEmpty) return;
     if (!mounted) return;
 
-    final confirmed = await _showImagePreview(File(path));
-    if (confirmed != true) return;
+    final caption = await _showMediaPreview(File(path), isVideo: false);
+    if (caption == null) return; // user cancelled
 
     setState(() {
       _isSendingMedia = true;
@@ -1886,6 +1899,7 @@ class _ChatScreenState extends State<ChatScreen> {
         id: '${widget.myUsername}_$timestamp',
         senderUsername: widget.myUsername,
         receiverUsername: widget.receiverUsername,
+        text: caption.isNotEmpty ? caption : null,
         mediaUrl: url,
         localPath: path,
         messageType: MessageType.image,

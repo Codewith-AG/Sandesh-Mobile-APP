@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/notification_prefs.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -53,6 +54,16 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           _vibrateEnabled = data['vibrate_enabled'] ?? true;
         });
       }
+
+      // Mirror the loaded settings into the local cache so the realtime /
+      // notification / call code paths can read them without a network call.
+      await NotificationPrefs.cacheAll(
+        messages: _messagesEnabled,
+        groups: _groupsEnabled,
+        calls: _callsEnabled,
+        sounds: _soundsEnabled,
+        vibrate: _vibrateEnabled,
+      );
     } catch (e) {
       debugPrint('Error loading notification settings: $e');
     } finally {
@@ -92,6 +103,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             key: value,
             'updated_at': DateTime.now().toIso8601String(),
           });
+
+      // Keep the local cache in sync so the change takes effect immediately.
+      await NotificationPrefs.setOne(key, value);
     } catch (e) {
       debugPrint('Error saving notification setting: $e');
       // Revert on failure

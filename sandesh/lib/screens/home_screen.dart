@@ -29,7 +29,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   String _myUsername = '';
   String _myAvatarUrl = '';
   List<Contact> _contacts = [];
@@ -48,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() => _currentTab = _tabController.index);
@@ -62,10 +64,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _messageSubscription?.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the app returns to the foreground, messages that arrived via FCM
+    // while it was backgrounded were saved to the local DB by the background
+    // handler — but the Realtime insert event was already consumed, so the
+    // message stream never fires on resume. Without this, the new chat/message
+    // only appeared after a manual app restart. Re-sync + reload so everything
+    // shows up instantly on resume (no manual reload needed).
+    if (state == AppLifecycleState.resumed && _myUsername.isNotEmpty) {
+      // Make sure the realtime channel is still alive (idempotent).
+      SupabaseBroadcastService().initialize(_myUsername);
+      // Pull anything still sitting in the cloud, then refresh the lists.
+      SupabaseBroadcastService().syncPendingMessages();
+      _loadContacts();
+      _loadGroups();
+    }
   }
 
   Future<void> _loadInitialData() async {

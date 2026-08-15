@@ -98,6 +98,22 @@ class _CallScreenState extends State<CallScreen> {
 
     if (isVideo) {
       await engine.enableVideo();
+      // HD + low-latency encoder config. WITHOUT this, Agora falls back to its
+      // low default profile (~360p, low bitrate) which looks blurry/pixelated
+      // on modern phones. 720p30 with a balanced degradation preference keeps
+      // the picture sharp while gracefully dropping quality (not freezing) on a
+      // weak network. The Communication channel profile (set in joinChannel)
+      // already optimises for low end-to-end latency.
+      await engine.setVideoEncoderConfiguration(
+        const VideoEncoderConfiguration(
+          dimensions: VideoDimensions(width: 1280, height: 720),
+          frameRate: 30,
+          bitrate: 0, // 0 = Agora standard bitrate for the resolution (~1.13 Mbps @720p30)
+          orientationMode: OrientationMode.orientationModeAdaptive,
+          degradationPreference: DegradationPreference.maintainBalanced,
+          mirrorMode: VideoMirrorModeType.videoMirrorModeAuto,
+        ),
+      );
       await engine.startPreview();
     } else {
       // Audio call: explicitly disable video so the camera is never used

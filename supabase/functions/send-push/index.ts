@@ -177,6 +177,28 @@ serve(async (req) => {
     // Build notification + data payload
     const isCallInvite = message_type === "call_invite";
 
+    // ── Respect the receiver's notification settings ─────────────────────────
+    // Killed-app pushes carry a `notification` block that Android displays on
+    // its own, so the client can't suppress them. This is the only place we can
+    // honour the receiver's "1-on-1 Messages" / "Incoming Calls" toggles for
+    // background delivery. Missing row (null) means defaults = enabled.
+    const { data: notifSettings } = await supabase
+      .from("notification_settings")
+      .select("messages_enabled, calls_enabled")
+      .ilike("username", receiver_username)
+      .maybeSingle();
+
+    if (notifSettings) {
+      if (isCallInvite && notifSettings.calls_enabled === false) {
+        console.log("[send-push] Receiver disabled call notifications — skipping");
+        return new Response("calls disabled", { status: 200 });
+      }
+      if (!isCallInvite && notifSettings.messages_enabled === false) {
+        console.log("[send-push] Receiver disabled message notifications — skipping");
+        return new Response("messages disabled", { status: 200 });
+      }
+    }
+
     let notificationTitle: string;
     let notificationBody: string;
     let dataPayload: Record<string, string>;
