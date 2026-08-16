@@ -93,8 +93,29 @@ class _CallScreenState extends State<CallScreen> {
       ),
     );
 
-    // Audio is always required for both call types
+    // ── Audio: robust, drop-out-resistant voice ─────────────────────────
+    // audioProfileSpeechStandard keeps the voice bitrate low and resilient,
+    // and the chatroom scenario keeps a stable real-time audio session
+    // (constant capture, no aggressive auto-ducking) — this is what stops
+    // the audio cutting out mid-call. Applied to BOTH audio & video calls.
     await engine.enableAudio();
+    await engine.setAudioProfile(
+      profile: AudioProfileType.audioProfileSpeechStandard,
+      scenario: AudioScenarioType.audioScenarioChatroom,
+    );
+
+    // Network-resilience fallback ladder (engine-wide):
+    //  - if OUR uplink collapses, keep publishing AUDIO ONLY instead of
+    //    dropping the call — the single most effective fix for audio cuts.
+    //  - if the REMOTE downlink is weak, auto-switch to their low-res stream
+    //    rather than freezing.
+    await engine.setLocalPublishFallbackOption(
+        StreamFallbackOptions.streamFallbackOptionAudioOnly);
+    await engine.setRemoteSubscribeFallbackOption(
+        StreamFallbackOptions.streamFallbackOptionVideoStreamLow);
+
+    // Video calls default to the loudspeaker; audio calls to the earpiece.
+    await engine.setDefaultAudioRouteToSpeakerphone(isVideo);
 
     if (isVideo) {
       await engine.enableVideo();
@@ -112,27 +133,43 @@ class _CallScreenState extends State<CallScreen> {
       // 2) Full-HD (1080p30) encoder config with an explicit, high target
       //    bitrate. WITHOUT this, Agora falls back to its low default profile
       //    (~360-720p, low bitrate) which looks blurry/pixelated on modern
-      //    phones. 1080p30 @ ~2.26 Mbps keeps the picture crisp.
-      //    - maintainFramerate degradation => on a weak network Agora scales
-      //      resolution DOWN but keeps the frame rate high, which preserves
-      //      smooth, LOW-LATENCY motion instead of freezing.
-      //    - The Communication channel profile (set in joinChannel) already
-      //      optimises the transport for low end-to-end latency.
+      //    phones.
+      //    - bitrate 4000 Kbps gives 1080p30 generous headroom for a crisp,
+      //      sharp picture (Agora's 1080p30 reference is ~3150 Kbps; we sit a
+      //      little above it for detail). NOTE: pushing tens of Mbps (e.g.
+      //      33000) is NOT useful on a mobile RTC uplink — it only adds
+      //      latency, packet loss and instability, so ~4 Mbps is the practical
+      //      high-quality ceiling that still feels fast, not bulky.
+      //    - maintainBalanced degradation => under congestion Agora trades a
+      //      little of BOTH resolution and frame-rate rather than collapsing
+      //      resolution first (which was the main cause of the far side
+      //      looking blurry). Together with dual-stream (below) the peer keeps
+      //      the sharpest picture their link can carry.
+      //    - advanceOptions.preferLowLatency favours low end-to-end latency
+      //      over maximum compression — the documented, typed low-latency
+      //      control in agora_rtc_engine 6.x (keeps the call snappy).
       await engine.setVideoEncoderConfiguration(
         const VideoEncoderConfiguration(
           dimensions: VideoDimensions(width: 1920, height: 1080),
           frameRate: 30,
-          bitrate: 2260, // Agora recommended target for 1080p30 (Kbps)
+          bitrate: 4000, // strong 1080p30 target (Kbps) for a crisp picture
           minBitrate: 1200,
           orientationMode: OrientationMode.orientationModeAdaptive,
-          degradationPreference: DegradationPreference.maintainFramerate,
+          degradationPreference: DegradationPreference.maintainBalanced,
           mirrorMode: VideoMirrorModeType.videoMirrorModeAuto,
+          advanceOptions: AdvanceOptions(
+            compressionPreference: CompressionPreference.preferLowLatency,
+          ),
         ),
       );
 
-      // 3) Ask Agora for its lowest-latency real-time tuning for the local
-      //    camera stream (favours latency over pure image smoothing).
-      await engine.setParameters('{"rtc.video.low_latency":1}');
+      // 3) Dual-stream / simulcast (multi-bitrate). We publish a full-res HIGH
+      //    stream AND a small LOW stream simultaneously. When the peer's
+      //    connection drops, Agora automatically serves them the low stream
+      //    (via the remote-subscribe fallback configured above) instead of
+      //    freezing or smearing — this is the "use a lower bitrate when the
+      //    connection drops" behaviour, done the SDK-native way.
+      await engine.enableDualStreamMode(enabled: true);
 
       await engine.startPreview();
     } else {

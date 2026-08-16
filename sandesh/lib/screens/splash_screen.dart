@@ -47,79 +47,75 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateAfterDelay() async {
-    // Shorter hold so the app reaches the first real screen faster on low-end
-    // devices (the fade/scale intro still plays underneath).
-    await Future.delayed(const Duration(milliseconds: 1400));
+    // Resolve the destination (auth/profile check) AND the minimum splash hold
+    // concurrently, then navigate as soon as both are done. This removes the
+    // old fixed 1.4s dead-wait: on fast devices launch is gated only by the
+    // short 700ms hold (so the intro animation is still seen), and on slow
+    // networks it's gated only by the real auth work — never both stacked.
+    final results = await Future.wait<Object>([
+      _resolveDestination(),
+      Future<void>.delayed(const Duration(milliseconds: 700)),
+    ]);
     if (!mounted) return;
+    final destination = results[0] as Widget;
 
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => destination,
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
+  }
+
+  /// Decides the first real screen based on auth session + phone-setup state.
+  Future<Widget> _resolveDestination() async {
     final supabase = Supabase.instance.client;
     final session = supabase.auth.currentSession;
 
-    Widget destination;
+    // Not authenticated — go to login
+    if (session == null) return const LoginScreen();
 
-    if (session != null) {
-      // User is authenticated — check if phone setup is done
-      final prefs = await SharedPreferences.getInstance();
-      final phoneE164 = prefs.getString('phone_e164') ?? '';
+    // User is authenticated — check if phone setup is done
+    final prefs = await SharedPreferences.getInstance();
+    final phoneE164 = prefs.getString('phone_e164') ?? '';
+    if (phoneE164.isNotEmpty) {
+      // Fully set up — go to HomeScreen
+      return const HomeScreen();
+    }
 
-      if (phoneE164.isNotEmpty) {
-        // Fully set up — go to HomeScreen
-        destination = const HomeScreen();
-      } else {
-        // Authenticated but phone not set up yet — check Supabase profile
-        try {
-          final profileData = await supabase
-              .from('profiles')
-              .select('username, phone_e164')
-              .eq('id', session.user.id)
-              .maybeSingle();
+    // Authenticated but phone not set up yet — check Supabase profile
+    try {
+      final profileData = await supabase
+          .from('profiles')
+          .select('username, phone_e164')
+          .eq('id', session.user.id)
+          .maybeSingle();
 
-          if (profileData != null &&
-              (profileData['phone_e164'] as String? ?? '').isNotEmpty) {
-            // Profile exists in DB — cache locally and go home
-            await prefs.setString(
-                'username', profileData['username'] as String? ?? '');
-            await prefs.setString(
-                'phone_e164', profileData['phone_e164'] as String);
-            destination = const HomeScreen();
-          } else {
-            // Authenticated but no phone — send to phone setup
-            final meta = session.user.userMetadata ?? {};
-            final googleName = (meta['full_name'] as String? ??
-                    meta['name'] as String? ??
-                    session.user.email?.split('@').first ??
-                    'User')
-                .trim();
-            destination = PhoneSetupScreen(googleName: googleName);
-          }
-        } catch (_) {
-          // On error, fallback to phone setup
-          final meta = session.user.userMetadata ?? {};
-          final googleName = (meta['full_name'] as String? ??
-                  meta['name'] as String? ??
-                  session.user.email?.split('@').first ??
-                  'User')
-              .trim();
-          destination = PhoneSetupScreen(googleName: googleName);
-        }
+      if (profileData != null &&
+          (profileData['phone_e164'] as String? ?? '').isNotEmpty) {
+        // Profile exists in DB — cache locally and go home
+        await prefs.setString(
+            'username', profileData['username'] as String? ?? '');
+        await prefs.setString(
+            'phone_e164', profileData['phone_e164'] as String);
+        return const HomeScreen();
       }
-    } else {
-      // Not authenticated — go to login
-      destination = const LoginScreen();
+    } catch (_) {
+      // fall through to phone setup on any error
     }
 
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => destination,
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-    }
+    // Authenticated but no phone — send to phone setup
+    final meta = session.user.userMetadata ?? {};
+    final googleName = (meta['full_name'] as String? ??
+            meta['name'] as String? ??
+            session.user.email?.split('@').first ??
+            'User')
+        .trim();
+    return PhoneSetupScreen(googleName: googleName);
   }
 
   @override

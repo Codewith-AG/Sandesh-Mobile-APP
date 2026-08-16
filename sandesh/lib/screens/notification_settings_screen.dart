@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/notification_prefs.dart';
 
@@ -12,6 +13,8 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
   bool _isLoading = true;
+  /// Cached username so we don't re-query `profiles` on every toggle.
+  String? _username;
   bool _messagesEnabled = true;
   bool _groupsEnabled = true;
   bool _callsEnabled = true;
@@ -21,23 +24,59 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _seedFromCache(); // instant paint from local cache (no network spinner)
+    _loadSettings(); // reconcile with the server in the background
+  }
+
+  /// Paint the toggles instantly from the local cache so the screen opens with
+  /// no spinner; [_loadSettings] then reconciles with the server in the
+  /// background.
+  Future<void> _seedFromCache() async {
+    final results = await Future.wait([
+      NotificationPrefs.messagesEnabled(),
+      NotificationPrefs.groupsEnabled(),
+      NotificationPrefs.callsEnabled(),
+      NotificationPrefs.soundsEnabled(),
+      NotificationPrefs.vibrateEnabled(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _messagesEnabled = results[0];
+      _groupsEnabled = results[1];
+      _callsEnabled = results[2];
+      _soundsEnabled = results[3];
+      _vibrateEnabled = results[4];
+      _isLoading = false;
+    });
+  }
+
+  /// Resolves the current username once and caches it. Prefers the value stored
+  /// at login (SharedPreferences) and only falls back to a `profiles` query if
+  /// that's missing — so toggling a switch no longer costs a network round-trip
+  /// just to look the username up.
+  Future<String?> _resolveUsername() async {
+    if (_username != null && _username!.isNotEmpty) return _username;
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('username');
+    if (cached != null && cached.isNotEmpty) {
+      _username = cached;
+      return _username;
+    }
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return null;
+    final profile = await Supabase.instance.client
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .maybeSingle();
+    _username = profile?['username'] as String?;
+    return _username;
   }
 
   Future<void> _loadSettings() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-      
-      // Need to get username first
-      final profile = await Supabase.instance.client
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .maybeSingle();
-          
-      if (profile == null) return;
-      final username = profile['username'] as String;
+      final username = await _resolveUsername();
+      if (username == null) return;
 
       final data = await Supabase.instance.client
           .from('notification_settings')
@@ -84,17 +123,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     });
 
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-      
-      final profile = await Supabase.instance.client
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .maybeSingle();
-          
-      if (profile == null) return;
-      final username = profile['username'] as String;
+      final username = await _resolveUsername();
+      if (username == null) return;
 
       await Supabase.instance.client
           .from('notification_settings')

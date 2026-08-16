@@ -228,25 +228,34 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  final prefs = await SharedPreferences.getInstance();
+  // ── Fast cold start: kick off all independent initialisers concurrently
+  //    instead of awaiting them one-by-one. Firebase, the .env file, the
+  //    SharedPreferences load and the local SQLite DB have no ordering
+  //    dependency between them, so we start them together and only await
+  //    where a real dependency exists (dotenv → Supabase, Firebase → handler).
+  //    This overlaps the disk/IO work and noticeably shortens launch time.
+  final prefsFuture = SharedPreferences.getInstance();
+  final firebaseFuture = Firebase.initializeApp();
+  final dotenvFuture = dotenv.load(fileName: ".env");
+  final dbFuture = LocalDbService().database; // SQLite open, independent
+
+  final prefs = await prefsFuture;
   final isDark = prefs.getBool('isDarkMode') ?? false;
   themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
 
-  // Initialize Firebase and setup background handler
-  await Firebase.initializeApp();
+  // Firebase must be ready before we register the background message handler.
+  await firebaseFuture;
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-
-  // Initialize Supabase
+  // Supabase needs the .env values, so await the (already in-flight) load.
+  await dotenvFuture;
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL']!,
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
-  // Initialize Local SQLite Database
-  await LocalDbService().database;
+  // Ensure the local DB (opened in parallel above) is ready before the UI.
+  await dbFuture;
 
   // Initialize Local Notifications. The onDidReceiveNotificationResponse callback
   // routes the user to the right chat / call screen when they tap a notification

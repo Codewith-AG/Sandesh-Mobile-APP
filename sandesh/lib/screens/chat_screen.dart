@@ -1737,9 +1737,11 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Container(
                 // Large & horizontal: taller minimum, grows up to ~6 lines
                 // before scrolling. Everything (emoji · text · attach · camera ·
-                // mic/send) lives inside this one roomy bar.
+                // mic/send) lives inside this one roomy bar. Side icons are kept
+                // compact so the text field keeps the maximum horizontal room
+                // and can be typed in freely.
                 constraints: const BoxConstraints(minHeight: 56, maxHeight: 160),
-                padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(28),
@@ -1765,7 +1767,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       }),
                       padding: EdgeInsets.zero,
                       constraints:
-                          const BoxConstraints(minWidth: 40, minHeight: 44),
+                          const BoxConstraints(minWidth: 36, minHeight: 44),
                     ),
                     Expanded(
                       child: TextField(
@@ -1803,7 +1805,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       onPressed: _isSendingMedia ? null : _showAttachmentSheet,
                       padding: EdgeInsets.zero,
                       constraints:
-                          const BoxConstraints(minWidth: 40, minHeight: 44),
+                          const BoxConstraints(minWidth: 36, minHeight: 44),
                     ),
                     // Camera — opens the in-app camera capture screen.
                     IconButton(
@@ -1813,7 +1815,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       onPressed: _isSendingMedia ? null : _openCamera,
                       padding: EdgeInsets.zero,
                       constraints:
-                          const BoxConstraints(minWidth: 40, minHeight: 44),
+                          const BoxConstraints(minWidth: 36, minHeight: 44),
                     ),
                     const SizedBox(width: 2),
                     // ── Mic / Send — merged INTO the bar as a filled circle so

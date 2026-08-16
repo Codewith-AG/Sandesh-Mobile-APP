@@ -209,20 +209,30 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
-  /// Pre-loads display names for all unique senders in the current messages
+  /// Pre-loads display names for all unique senders in the current messages.
+  /// Resolves every (uncached) sender CONCURRENTLY and applies them in a single
+  /// setState — instead of a sequential DB read + a separate rebuild per sender,
+  /// which was slow and janky in groups with many participants.
   Future<void> _preloadSenderNames() async {
     final senders = _messages
         .where((m) => !m.isMe)
         .map((m) => m.senderUsername.toLowerCase())
+        .where((s) => !_senderDisplayNames.containsKey(s))
         .toSet();
-    for (final sender in senders) {
-      if (!_senderDisplayNames.containsKey(sender)) {
-        final name = await LocalDbService().getContactDisplayName(sender);
-        if (name != null && mounted) {
-          setState(() => _senderDisplayNames[sender] = name);
-        }
-      }
-    }
+    if (senders.isEmpty) return;
+
+    final entries = await Future.wait(senders.map((s) async {
+      final name = await LocalDbService().getContactDisplayName(s);
+      return MapEntry(s, name);
+    }));
+    if (!mounted) return;
+
+    final resolved = <String, String>{
+      for (final e in entries)
+        if (e.value != null) e.key: e.value!,
+    };
+    if (resolved.isEmpty) return;
+    setState(() => _senderDisplayNames.addAll(resolved));
   }
 
   /// Resolves display name for a sender: cached display name > username
