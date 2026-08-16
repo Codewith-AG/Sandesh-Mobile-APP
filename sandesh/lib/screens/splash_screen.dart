@@ -52,9 +52,9 @@ class _SplashScreenState extends State<SplashScreen>
     // old fixed 1.4s dead-wait: on fast devices launch is gated only by the
     // short 700ms hold (so the intro animation is still seen), and on slow
     // networks it's gated only by the real auth work — never both stacked.
-    final results = await Future.wait<Object>([
+    final results = await Future.wait<dynamic>([
       _resolveDestination(),
-      Future<void>.delayed(const Duration(milliseconds: 700)),
+      Future<dynamic>.delayed(const Duration(milliseconds: 700)),
     ]);
     if (!mounted) return;
     final destination = results[0] as Widget;
