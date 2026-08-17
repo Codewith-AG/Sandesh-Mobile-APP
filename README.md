@@ -6,6 +6,11 @@
 
 Sandesh is a modern, cross-platform messaging application built with **Flutter** (optimized for Android). It provides secure 1:1 and group chats, voice and video calling, rich media sharing, and features a completely self-hosted in-app update system.
 
+## 📥 Download the App
+
+You can download the latest compiled APK for Android from our dedicated releases repository:  
+👉 **[Download Latest Sandesh Release](https://github.com/Codewith-AG/Sandesh-Releases/releases/latest)**
+
 ## 🚀 Key Features
 
 *   **1:1 and Group Chat:** Real-time messaging with read and delivery receipts.
