@@ -3,6 +3,7 @@ package com.example.sandesh
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -63,7 +64,7 @@ class UpdateWorker(
         // the app is swiped away / in Doze. Without this, a large (100MB+) APK
         // download is throttled and terminated once the app is closed.
         try {
-            setForeground(buildForegroundInfo(0))
+            setForeground(buildForegroundInfo(0, 0L, 0L))
         } catch (e: Exception) {
             // setForeground can throw if foreground-service start is restricted;
             // continue as a best-effort background download in that case.
@@ -186,8 +187,27 @@ class UpdateWorker(
                 return Result.success()
             }
 
-            // Install APK — from background, use a notification that launches
-            // the installer from a foreground context (avoids Android 12+ BAL block).
+            // Fully automatic install (Issue 1.4): stream the validated APK into
+            // a PackageInstaller session and commit it WITHOUT requiring the user
+            // to tap an "Install" button. Backed by the
+            // UPDATE_PACKAGES_WITHOUT_USER_ACTION permission + USER_ACTION_NOT_REQUIRED,
+            // the OS installs same-signature updates of our own package hands-off.
+            // Progress/results flow back through PackageInstallerReceiver, which
+            // launches the system confirm screen only if the OEM still demands it.
+            val sessionStarted = installApkViaSession(context, apkFile)
+            if (sessionStarted) {
+                // Content is fully copied into the session; the cached .apk is no
+                // longer needed. Remove it (and any leftovers) so we don't keep a
+                // stale/old APK on disk after installing the new one.
+                apkFile.delete()
+                partFile.delete()
+                return Result.success()
+            }
+
+            // Fallback: if the silent session couldn't be created (older OS / OEM
+            // restriction), post the tap-to-install notification instead so the
+            // update is never lost.
+            Log.w("UpdateWorker", "Silent session install unavailable — falling back to tap-to-install notification")
             showInstallNotification(context, apkFile)
             return Result.success()
 
@@ -200,9 +220,19 @@ class UpdateWorker(
 
     // Required by WorkManager for expedited/foreground execution. Returns the
     // ongoing notification shown while the update downloads in the background.
-    override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo(0)
+    override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo(0, 0L, 0L)
 
-    private fun buildForegroundInfo(progress: Int): ForegroundInfo {
+    /**
+     * Build the ongoing download notification.
+     *
+     * [progress]   0–100 percentage (<=0 renders an indeterminate bar).
+     * [downloaded] bytes received so far.
+     * [total]      total bytes expected (0 if unknown).
+     *
+     * When the size is known the notification body shows "12.3 MB / 62.4 MB"
+     * so the user can see exactly how much has downloaded (Issue 1.1).
+     */
+    private fun buildForegroundInfo(progress: Int, downloaded: Long, total: Long): ForegroundInfo {
         val channelId = "update_download_channel"
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
@@ -223,11 +253,20 @@ class UpdateWorker(
             android.app.Notification.Builder(context)
         }
 
+        // Show "<downloaded> / <total>" (and the %) once we know the size, else
+        // a generic message while we wait for the first bytes / headers.
+        val contentText = if (total > 0) {
+            "${formatBytes(downloaded)} / ${formatBytes(total)}  •  ${progress.coerceIn(0, 100)}%"
+        } else {
+            "The update is downloading in the background…"
+        }
+
         val notification = builder
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("Downloading Sandesh update")
-            .setContentText("The update is downloading in the background…")
+            .setContentText(contentText)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setProgress(100, progress, progress <= 0)
             .build()
 
@@ -237,6 +276,74 @@ class UpdateWorker(
             ForegroundInfo(1003, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
             ForegroundInfo(1003, notification)
+        }
+    }
+
+    /** Human-readable byte size, e.g. 65_012_345 -> "62.0 MB". */
+    private fun formatBytes(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB")
+        var size = bytes.toDouble()
+        var unit = 0
+        while (size >= 1024 && unit < units.size - 1) {
+            size /= 1024
+            unit++
+        }
+        return if (unit == 0) "${size.toInt()} ${units[unit]}"
+               else String.format("%.1f %s", size, units[unit])
+    }
+
+    /**
+     * Stream the validated [apkFile] into a PackageInstaller session and commit
+     * it requesting NO user action, so the update installs hands-off without the
+     * user tapping an "Install" button (Issue 1.4). Returns true if the session
+     * was created and committed; false if it could not be started (caller then
+     * falls back to a tap-to-install notification).
+     */
+    private fun installApkViaSession(context: Context, apkFile: File): Boolean {
+        return try {
+            val installer = context.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams.MODE_FULL_INSTALL
+            ).apply {
+                setAppPackageName(context.packageName)
+                // On Android 12+ request a fully silent (no-confirm) install. Backed
+                // by UPDATE_PACKAGES_WITHOUT_USER_ACTION for same-signature self-updates.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                }
+            }
+
+            val sessionId = installer.createSession(params)
+            installer.openSession(sessionId).use { session ->
+                apkFile.inputStream().use { input ->
+                    session.openWrite("sandesh_update", 0, apkFile.length()).use { output ->
+                        input.copyTo(output, bufferSize = 64 * 1024)
+                        session.fsync(output)
+                    }
+                }
+
+                // Result/status (including any OEM-mandated confirm screen) is
+                // delivered to PackageInstallerReceiver.
+                val statusIntent = Intent(context, PackageInstallerReceiver::class.java).apply {
+                    action = PackageInstallerReceiver.ACTION_INSTALL_COMPLETE
+                    setPackage(context.packageName)
+                }
+                // The system fills EXTRA_STATUS into this PendingIntent, so it must
+                // be MUTABLE on Android 12+.
+                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+                val pendingIntent = PendingIntent.getBroadcast(context, sessionId, statusIntent, flags)
+                session.commit(pendingIntent.intentSender)
+            }
+            Log.i("UpdateWorker", "PackageInstaller session committed — installing without user tap")
+            true
+        } catch (e: Exception) {
+            Log.e("UpdateWorker", "Silent session install failed", e)
+            false
         }
     }
 
@@ -362,7 +469,7 @@ class UpdateWorker(
                             val pct = ((downloaded * 100) / total).toInt()
                             if (pct != lastPct) {
                                 lastPct = pct
-                                try { setForeground(buildForegroundInfo(pct)) } catch (_: Exception) {}
+                                try { setForeground(buildForegroundInfo(pct, downloaded, total)) } catch (_: Exception) {}
                             }
                         }
                     }

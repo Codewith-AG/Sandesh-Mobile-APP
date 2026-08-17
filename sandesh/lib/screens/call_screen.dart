@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +11,7 @@ import '../services/call_service.dart';
 import '../services/supabase_broadcast_service.dart';
 import '../models/message_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/user_avatar.dart';
 
 class CallScreen extends StatefulWidget {
   final String myUsername;
@@ -41,10 +44,20 @@ class _CallScreenState extends State<CallScreen> {
 
   // ── UI state ───────────────────────────────────────────────────────────────
   bool _isMuted = false;
-  bool _isCameraOff = false;
+  bool _isCameraOff = false; // our own camera muted
+  bool _remoteCameraOff = false; // peer's camera muted (show their avatar)
   bool _callConnected = false; // true once remote peer joins
   bool _isOutgoing = false;
   bool _callEnded = false;
+
+  // WhatsApp-style picture-in-picture swap: when true the LOCAL feed fills the
+  // screen and the REMOTE feed shrinks into the corner tile.
+  bool _localIsMain = false;
+  // Controls auto-hide on tap (like WhatsApp) so video can go truly full-screen.
+  bool _controlsVisible = true;
+
+  // Peer's profile picture (fetched from `profiles`); null/empty => show initial.
+  String? _peerAvatarUrl;
 
   // ── Signal subscription ────────────────────────────────────────────────────
   StreamSubscription<CallEvent>? _signalSub;
@@ -57,10 +70,27 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _isOutgoing = widget.isOutgoing;
+    _fetchPeerAvatar();
     _initAgora();
 
     // Listen for remote signals
     _signalSub = CallService().callSignalStream.listen(_onSignal);
+  }
+
+  /// Best-effort fetch of the peer's profile picture so the call screen can
+  /// show their real avatar (Issue 2 · UI-1.1). Never throws / blocks the call.
+  Future<void> _fetchPeerAvatar() async {
+    try {
+      final row = await Supabase.instance.client
+          .from('profiles')
+          .select('avatar_url')
+          .eq('username', widget.peerUsername.toLowerCase())
+          .maybeSingle();
+      final url = (row?['avatar_url'] as String?) ?? '';
+      if (mounted && url.isNotEmpty) setState(() => _peerAvatarUrl = url);
+    } catch (e) {
+      debugPrint('CallScreen: peer avatar fetch failed (non-fatal): $e');
+    }
   }
 
   Future<void> _initAgora() async {
@@ -89,6 +119,24 @@ class _CallScreenState extends State<CallScreen> {
           if (mounted) setState(() => _remoteUid = null);
           // Remote peer left the channel — end this side too
           _leaveAndPop();
+        },
+        // Track when the peer turns their camera on/off so we can show their
+        // avatar on a dark placeholder instead of a frozen/black frame
+        // (Issue 2 · UI-1.3).
+        onRemoteVideoStateChanged: (conn, uid, state, reason, elapsed) {
+          if (!mounted) return;
+          // Peer muted their camera → show their avatar placeholder.
+          final mutedOff = state == RemoteVideoState.remoteVideoStateStopped &&
+              reason ==
+                  RemoteVideoStateReason.remoteVideoStateReasonRemoteMuted;
+          // Peer's video resumed → go back to the live feed.
+          final resumed = state == RemoteVideoState.remoteVideoStateDecoding ||
+              state == RemoteVideoState.remoteVideoStateStarting;
+          if (mutedOff && !_remoteCameraOff) {
+            setState(() => _remoteCameraOff = true);
+          } else if (resumed && _remoteCameraOff) {
+            setState(() => _remoteCameraOff = false);
+          }
         },
       ),
     );
@@ -307,45 +355,72 @@ class _CallScreenState extends State<CallScreen> {
   @override
   Widget build(BuildContext context) {
     final isVideo = widget.callType == 'video';
+    final hasRemoteVideo = isVideo && _remoteUid != null && !_remoteCameraOff;
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // ── Remote / Background view ──────────────────────────────────────
-          if (isVideo && _remoteUid != null)
-            _remoteVideoView()
-          else
-            _audioBackground(),
+      body: GestureDetector(
+        // Tap anywhere to toggle overlays so video can go truly full-screen
+        // (WhatsApp-style). Audio calls keep the controls always visible.
+        onTap: isVideo ? _toggleControls : null,
+        child: Stack(
+          children: [
+            // ── Main full-screen feed / background ────────────────────────
+            Positioned.fill(child: _mainView(isVideo, hasRemoteVideo)),
 
-          // ── Local video preview (PiP corner) ─────────────────────────────
-          if (isVideo && _localJoined)
-            Positioned(
-              top: 56,
-              right: 16,
-              child: _localVideoPreview(),
+            // ── Floating PiP tile (connected video call only) ─────────────
+            if (isVideo && _localJoined && _callConnected)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 12,
+                right: 16,
+                child: _pipTile(hasRemoteVideo),
+              ),
+
+            // ── Peer name + status (fades with controls) ──────────────────
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _controlsVisible ? 1 : 0,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: _topInfo(),
+              ),
             ),
 
-          // ── Peer name + status overlay ────────────────────────────────────
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _topInfo(),
-          ),
-
-          // ── Bottom control bar ─────────────────────────────────────────────
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _controlBar(isVideo),
-          ),
-        ],
+            // ── Bottom control bar (slides out when hidden) ───────────────
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              left: 0,
+              right: 0,
+              bottom: _controlsVisible ? 0 : -220,
+              child: _controlBar(isVideo),
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  void _toggleControls() => setState(() => _controlsVisible = !_controlsVisible);
+
   // ── Subwidgets ─────────────────────────────────────────────────────────────
+
+  /// The full-screen feed. Video calls show the remote feed (or the local feed
+  /// when swapped), falling back to an avatar placeholder when the relevant
+  /// camera is off or the peer hasn't joined yet.
+  Widget _mainView(bool isVideo, bool hasRemoteVideo) {
+    if (!isVideo) return _audioBackground();
+
+    if (_localIsMain) {
+      return _isCameraOff
+          ? _cameraOffPlaceholder(isSelf: true)
+          : _localVideoFull();
+    }
+    if (hasRemoteVideo) return _remoteVideoView();
+    return _callConnected
+        ? _cameraOffPlaceholder(isSelf: false)
+        : _audioBackground();
+  }
 
   Widget _remoteVideoView() {
     return SizedBox.expand(
@@ -359,10 +434,89 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
+  Widget _localVideoFull() {
+    return SizedBox.expand(
+      child: AgoraVideoView(
+        controller: VideoViewController(
+          rtcEngine: CallService().engine,
+          canvas: const VideoCanvas(uid: 0),
+        ),
+      ),
+    );
+  }
+
+  /// A dark screen with the person's avatar, shown when a camera is off.
+  Widget _cameraOffPlaceholder({required bool isSelf, bool compact = false}) {
+    final name = isSelf ? widget.myUsername : widget.peerUsername;
+    final url = isSelf ? null : _peerAvatarUrl;
+    return Container(
+      color: const Color(0xFF0E0E11),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            UserAvatar(name: name, imageUrl: url, radius: compact ? 26 : 56),
+            if (!compact) ...[
+              const SizedBox(height: 16),
+              Text(
+                isSelf ? 'Your camera is off' : 'Camera is off',
+                style: GoogleFonts.inter(color: Colors.white54, fontSize: 15),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Audio-call / pre-connect background: the peer's profile picture blurred
+  /// behind a large, crisp avatar (Issue 2 · UI-1.1 & 1.4). Falls back to a
+  /// themed gradient when no picture is available.
   Widget _audioBackground() {
-    final initial = widget.peerUsername.isNotEmpty
-        ? widget.peerUsername[0].toUpperCase()
-        : '?';
+    final hasPic = _peerAvatarUrl != null && _peerAvatarUrl!.isNotEmpty;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (hasPic)
+          Image(
+            image: CachedNetworkImageProvider(_peerAvatarUrl!),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _gradientBackdrop(),
+          )
+        else
+          _gradientBackdrop(),
+        // Darkened blur over the picture for readable overlays.
+        if (hasPic)
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            child: Container(color: Colors.black.withValues(alpha: 0.5)),
+          ),
+        // Foreground: large avatar with a soft glow.
+        Align(
+          alignment: const Alignment(0, -0.18),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withValues(alpha: 0.35),
+                  blurRadius: 44,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+            child: UserAvatar(
+              name: widget.peerUsername,
+              imageUrl: _peerAvatarUrl,
+              radius: 76,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _gradientBackdrop() {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -371,47 +525,42 @@ class _CallScreenState extends State<CallScreen> {
           colors: [AppTheme.primary, AppTheme.background],
         ),
       ),
-      child: Center(
-        child: Container(
-          width: 144,
-          height: 144,
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceVariant,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.2),
-                blurRadius: 32,
-                spreadRadius: 8,
-              ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              initial,
-              style: GoogleFonts.inter(
-                fontSize: 64,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.primary,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _localVideoPreview() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 96,
-        height: 140,
-        child: AgoraVideoView(
-          controller: VideoViewController(
-            rtcEngine: CallService().engine,
-            canvas: const VideoCanvas(uid: 0),
-          ),
+  /// Small rounded corner tile. Shows the feed NOT currently in the main view,
+  /// and tapping it swaps the two (WhatsApp-style · Issue 2 · UI-1.3).
+  Widget _pipTile(bool hasRemoteVideo) {
+    final Widget content;
+    if (_localIsMain) {
+      // Main = my camera → PiP shows the remote peer.
+      content = hasRemoteVideo
+          ? _remoteVideoView()
+          : _cameraOffPlaceholder(isSelf: false, compact: true);
+    } else {
+      // Main = remote → PiP shows my own camera.
+      content = _isCameraOff
+          ? _cameraOffPlaceholder(isSelf: true, compact: true)
+          : _localVideoFull();
+    }
+    return GestureDetector(
+      onTap: () => setState(() => _localIsMain = !_localIsMain),
+      child: Container(
+        width: 106,
+        height: 152,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: content,
         ),
       ),
     );
@@ -474,7 +623,8 @@ class _CallScreenState extends State<CallScreen> {
           _ControlBtn(
             icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
             label: _isMuted ? 'Unmute' : 'Mute',
-            active: !_isMuted,
+            // Filled (solid white) when the toggle is engaged, like WhatsApp.
+            filled: _isMuted,
             onTap: _toggleMute,
           ),
           if (isVideo)
@@ -482,8 +632,8 @@ class _CallScreenState extends State<CallScreen> {
               icon: _isCameraOff
                   ? Icons.videocam_off_rounded
                   : Icons.videocam_rounded,
-              label: _isCameraOff ? 'Cam Off' : 'Camera',
-              active: !_isCameraOff,
+              label: _isCameraOff ? 'Camera on' : 'Camera off',
+              filled: _isCameraOff,
               onTap: _toggleCamera,
             ),
           // End call (large red centre)
@@ -511,11 +661,10 @@ class _CallScreenState extends State<CallScreen> {
             _ControlBtn(
               icon: Icons.flip_camera_ios_rounded,
               label: 'Flip',
-              active: true,
               onTap: _switchCamera,
             )
           else
-            const SizedBox(width: 56), // balance row
+            const SizedBox(width: 58), // balance row
         ],
       ),
     );
@@ -525,13 +674,16 @@ class _CallScreenState extends State<CallScreen> {
 class _ControlBtn extends StatelessWidget {
   final IconData icon;
   final String label;
-  final bool active;
+
+  /// When true the button is a solid white pill (engaged state, e.g. muted /
+  /// camera off); otherwise it's a translucent glass circle.
+  final bool filled;
   final VoidCallback? onTap;
 
   const _ControlBtn({
     required this.icon,
     required this.label,
-    required this.active,
+    this.filled = false,
     this.onTap,
   });
 
@@ -542,30 +694,31 @@ class _ControlBtn extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 56,
-            height: 56,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              color: active
-                  ? Colors.white.withValues(alpha: 0.15)
-                  : Colors.white.withValues(alpha: 0.08),
+              color: filled
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.16),
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withValues(alpha: active ? 0.3 : 0.12),
+                color: Colors.white.withValues(alpha: filled ? 0.0 : 0.25),
                 width: 1,
               ),
             ),
             child: Icon(
               icon,
-              color: active ? Colors.white : Colors.white38,
-              size: 24,
+              color: filled ? Colors.black87 : Colors.white,
+              size: 26,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             label,
             style: GoogleFonts.inter(
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: FontWeight.w500,
               color: Colors.white70,
             ),

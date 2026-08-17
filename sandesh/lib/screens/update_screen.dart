@@ -171,6 +171,19 @@ class _UpdateScreenState extends State<UpdateScreen> {
             const SizedBox(height: 8),
             Text('Version: ${info.versionName} (${info.versionCode})',
                 style: GoogleFonts.inter(fontSize: 14)),
+            if (info.formattedSize != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.sd_storage_outlined,
+                      size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Text('Download size: ${info.formattedSize}',
+                      style: GoogleFonts.inter(
+                          fontSize: 14, color: cs.onSurfaceVariant)),
+                ],
+              ),
+            ],
             if (info.releaseNotes.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text("What's new:",

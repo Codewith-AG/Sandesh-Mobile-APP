@@ -27,6 +27,19 @@ class UpdateAvailableDialog extends StatelessWidget {
         children: [
           Text('Sandesh v${updateInfo.versionName} is now available.',
               style: GoogleFonts.inter()),
+          if (updateInfo.formattedSize != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.sd_storage_outlined,
+                    size: 16, color: cs.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text('Download size: ${updateInfo.formattedSize}',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ],
           if (updateInfo.releaseNotes.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text('What\'s new:',
