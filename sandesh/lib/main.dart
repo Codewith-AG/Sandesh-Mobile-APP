@@ -28,14 +28,31 @@ import 'widgets/update_dialog.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
+/// High-importance channel for full-screen incoming-call notifications
+/// (function sub-issue-2.2). Importance.max + the `call` category + a
+/// full-screen intent is what lets Android surface the call UI over the lock
+/// screen like WhatsApp. Defined once and reused by both isolates.
+const AndroidNotificationChannel kCallsNotificationChannel =
+    AndroidNotificationChannel(
+  'calls_channel',
+  'Incoming Calls',
+  description: 'Full-screen incoming voice/video call alerts',
+  importance: Importance.max,
+);
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
   final data = message.data;
-  // Call signals — do NOT save to DB.
-  if (data['type'] == 'call' || data['msg_type'] == 'call_invite') return;
+  // Call signals — do NOT save to DB. Instead, when the app is killed/background
+  // draw a FULL-SCREEN call notification so the incoming-call UI pops up like
+  // WhatsApp (function sub-issue-2.2) instead of a silent tray notification.
+  if (data['type'] == 'call' || data['msg_type'] == 'call_invite') {
+    await _showIncomingCallNotification(data);
+    return;
+  }
 
   // NOTE: We do NOT show a local notification here because the FCM payload
   // already includes a `notification` block that Android displays automatically
@@ -91,6 +108,68 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     } catch (e) {
       debugPrint('Background handler DB error: $e');
     }
+  }
+}
+
+/// Draws a FULL-SCREEN incoming-call notification from the FCM background
+/// isolate when the app is killed/background (function sub-issue-2.2). The
+/// `fullScreenIntent` + `category: call` on a high-importance channel is what
+/// makes Android surface the call UI over the lock screen like WhatsApp; when
+/// the user taps it, the app launches and the tap payload routes to
+/// IncomingCallScreen via [_routeFromNotificationData].
+Future<void> _showIncomingCallNotification(Map<String, dynamic> data) async {
+  try {
+    // Respect the user's "Incoming Calls" toggle (WhatsApp-style call DND).
+    if (!await NotificationPrefs.callsEnabled()) return;
+
+    final caller = (data['callerUsername'] ?? data['sender_username'] ?? '')
+        .toString();
+    final channelName = (data['channelName'] ?? '').toString();
+    if (caller.isEmpty || channelName.isEmpty) return;
+    final callType = (data['callType'] ?? 'audio').toString();
+
+    final plugin = FlutterLocalNotificationsPlugin();
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await plugin.initialize(
+      settings: const InitializationSettings(android: androidInit),
+    );
+    // Ensure the high-importance calls channel exists in this isolate too.
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(kCallsNotificationChannel);
+
+    final androidDetails = AndroidNotificationDetails(
+      'calls_channel',
+      'Incoming Calls',
+      channelDescription: 'Full-screen incoming voice/video call alerts',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true, // pop the call UI over the lock screen
+      ongoing: true,
+      autoCancel: false,
+      playSound: true,
+      enableVibration: true,
+      timeoutAfter: 45000, // auto-dismiss a missed call after 45s
+    );
+
+    await plugin.show(
+      id: 'sandesh_incoming_call'.hashCode,
+      title: caller,
+      body: callType == 'video' ? 'Incoming video call' : 'Incoming voice call',
+      notificationDetails: NotificationDetails(android: androidDetails),
+      payload: jsonEncode({
+        'type': 'call',
+        'callerUsername': caller,
+        'receiverUsername':
+            data['receiverUsername'] ?? data['receiver_username'] ?? '',
+        'channelName': channelName,
+        'callType': callType,
+      }),
+    );
+  } catch (e) {
+    debugPrint('[bg-call-notif] error: $e');
   }
 }
 
@@ -282,6 +361,13 @@ void main() async {
         description: 'This channel is used for chat message notifications.',
         importance: Importance.max,
       ));
+
+  // Full-screen incoming-call channel (function sub-issue-2.2). Registered at
+  // startup so a killed-app call push can pop the call UI over the lock screen.
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(kCallsNotificationChannel);
 
   // ── Eager FCM token sync — runs at every cold start so the token is always
   //    fresh in Supabase before any peer tries to send a message. This is the

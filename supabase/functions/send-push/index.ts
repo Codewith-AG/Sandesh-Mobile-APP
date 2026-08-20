@@ -243,28 +243,57 @@ serve(async (req) => {
       };
     }
 
-    // FCM HTTP v1 payload
+    // FCM HTTP v1 payload.
+    //
+    // ── Call invites are sent DATA-ONLY (Issue 2 · function sub-issue-2.2) ──
+    // A message that carries a `notification` block is drawn by the Android
+    // system tray while the app is killed/background, and the Flutter
+    // background handler is NOT invoked — so the app can't draw the
+    // full-screen, over-the-lock-screen incoming-call UI (the WhatsApp
+    // behaviour). By omitting the `notification` block for call invites and
+    // keeping android.priority=high, FCM wakes the background isolate, which
+    // then shows the full-screen call notification via
+    // `_showIncomingCallNotification` in main.dart.
+    //
+    // ⚠️ RELEASE ORDERING: this data-only call push MUST go live only AFTER the
+    // APK that contains the full-screen-intent background handler (v2.0.8+40)
+    // is shipped and adopted. On an OLD client a data-only call push would draw
+    // nothing. Deploy this function only once the new APK is out (mirrors the
+    // send-push data-only ordering in NOTIFICATION_DELIVERY_PLAN.md).
     const fcmPayload = {
       message: {
         token: profile.fcm_token,
-        notification: {
-          title: notificationTitle,
-          body: notificationBody,
-        },
+        // Chat/group messages keep the notification block (unchanged);
+        // call invites are data-only so the app draws the full-screen UI.
+        ...(isCallInvite
+          ? {}
+          : {
+              notification: {
+                title: notificationTitle,
+                body: notificationBody,
+              },
+            }),
         data: dataPayload,
         android: {
           priority: "high",
-          notification: {
-            channel_id: "messages_channel",
-            sound: "default",
-            click_action: "FLUTTER_NOTIFICATION_CLICK",
-            notification_priority: "PRIORITY_MAX",
-            visibility: "PUBLIC",
-            ...(isCallInvite ? { tag: dataPayload.channelName } : {}),
-          },
+          ...(isCallInvite
+              ? {}
+              : {
+                  notification: {
+                    channel_id: "messages_channel",
+                    sound: "default",
+                    click_action: "FLUTTER_NOTIFICATION_CLICK",
+                    notification_priority: "PRIORITY_MAX",
+                    visibility: "PUBLIC",
+                  },
+                }),
         },
         apns: {
-          headers: { "apns-priority": "10" },
+          headers: {
+            "apns-priority": "10",
+            // A data-only (background) push on iOS must be content-available.
+            ...(isCallInvite ? { "apns-push-type": "background" } : {}),
+          },
           payload: { aps: { sound: "default", "content-available": 1 } },
         },
       },

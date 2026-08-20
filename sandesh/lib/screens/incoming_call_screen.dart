@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +24,11 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   StreamSubscription<CallEvent>? _signalSub;
   bool _handling = false;
 
+  // Loops a phone-buzz vibration alongside the ringtone so the phone actually
+  // "rings" for an incoming call (function sub-issue-2.2).
+  Timer? _vibrateTimer;
+  bool _ringing = false;
+
   @override
   void initState() {
     super.initState();
@@ -33,18 +40,44 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
 
+    // Start ringing the moment the incoming-call screen appears.
+    _startRinging();
+
     // Listen for call_ended / call_rejected from caller side (caller cancelled)
     _signalSub = CallService().callSignalStream.listen((e) {
       if (!mounted) return;
       if (e.channelName == widget.event.channelName &&
           (e.isEnded || e.isRejected)) {
+        _stopRinging();
         Navigator.of(context).pop();
       }
     });
   }
 
+  /// Plays the device ringtone on a loop and vibrates every ~1.5 s until the
+  /// call is answered, declined or cancelled — WhatsApp-style ringing.
+  void _startRinging() {
+    if (_ringing) return;
+    _ringing = true;
+    FlutterRingtonePlayer().playRingtone(looping: true, volume: 1.0);
+    HapticFeedback.heavyImpact();
+    _vibrateTimer = Timer.periodic(
+      const Duration(milliseconds: 1500),
+      (_) => HapticFeedback.heavyImpact(),
+    );
+  }
+
+  void _stopRinging() {
+    if (!_ringing) return;
+    _ringing = false;
+    _vibrateTimer?.cancel();
+    _vibrateTimer = null;
+    FlutterRingtonePlayer().stop();
+  }
+
   @override
   void dispose() {
+    _stopRinging();
     _pulseCtrl.dispose();
     _signalSub?.cancel();
     super.dispose();
@@ -53,6 +86,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   Future<void> _accept() async {
     if (_handling) return;
     setState(() => _handling = true);
+    _stopRinging();
 
     // ── Step 1: Request only the permissions we need for this call type ────
     final isVideo = widget.event.callType == 'video';

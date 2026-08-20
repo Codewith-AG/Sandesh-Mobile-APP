@@ -4,6 +4,7 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
@@ -49,6 +50,12 @@ class _CallScreenState extends State<CallScreen> {
   bool _callConnected = false; // true once remote peer joins
   bool _isOutgoing = false;
   bool _callEnded = false;
+  // Loudspeaker toggle. Defaults ON for video (hands-free) and OFF for audio
+  // (earpiece), matching WhatsApp. Exposed as a control-bar button so the user
+  // can switch to the loudspeaker during an audio call (function sub-issue-2.1).
+  bool _isSpeakerOn = false;
+  // Guards against playing/stopping the outgoing ringback tone more than once.
+  bool _ringbackPlaying = false;
 
   // WhatsApp-style picture-in-picture swap: when true the LOCAL feed fills the
   // screen and the REMOTE feed shrinks into the corner tile.
@@ -73,8 +80,28 @@ class _CallScreenState extends State<CallScreen> {
     _fetchPeerAvatar();
     _initAgora();
 
+    // Outgoing calls play a looping ringback tone until the peer answers, so
+    // the caller can HEAR that it's ringing — not just see "Calling..."
+    // (function sub-issue-2.2). Stopped in _stopRingback() once connected/ended.
+    if (_isOutgoing) _startRingback();
+
     // Listen for remote signals
     _signalSub = CallService().callSignalStream.listen(_onSignal);
+  }
+
+  // ── Outgoing ringback tone ──────────────────────────────────────────────────
+  void _startRingback() {
+    if (_ringbackPlaying) return;
+    _ringbackPlaying = true;
+    // Quieter than the incoming ringtone — this is the caller's "it's ringing"
+    // feedback, played through the media/ringtone channel, looped until answer.
+    FlutterRingtonePlayer().playRingtone(looping: true, volume: 0.4);
+  }
+
+  void _stopRingback() {
+    if (!_ringbackPlaying) return;
+    _ringbackPlaying = false;
+    FlutterRingtonePlayer().stop();
   }
 
   /// Best-effort fetch of the peer's profile picture so the call screen can
@@ -107,6 +134,8 @@ class _CallScreenState extends State<CallScreen> {
           if (mounted) setState(() => _localJoined = true);
         },
         onUserJoined: (conn, uid, elapsed) {
+          // Peer answered → stop the ringback tone and start the call timer.
+          _stopRingback();
           if (mounted) {
             setState(() {
               _remoteUid = uid;
@@ -141,16 +170,30 @@ class _CallScreenState extends State<CallScreen> {
       ),
     );
 
-    // ── Audio: robust, drop-out-resistant voice ─────────────────────────
-    // audioProfileSpeechStandard keeps the voice bitrate low and resilient,
-    // and the chatroom scenario keeps a stable real-time audio session
-    // (constant capture, no aggressive auto-ducking) — this is what stops
-    // the audio cutting out mid-call. Applied to BOTH audio & video calls.
+    // ── Audio: high-quality, audible, drop-out-resistant voice ──────────
+    // FIX (function sub-issue-2.3 / optimisation sub-issue-3.6): previously
+    // only the VIDEO path was tuned and audio used the very low
+    // `audioProfileSpeechStandard` (~18-24 Kbps), which is why voice sounded
+    // thin/quiet — and in a video call the encoder took all the bandwidth so
+    // audio was barely audible. We now:
+    //   • use `audioProfileMusicHighQuality` — 48 kHz, mono, up to ~96 Kbps —
+    //     a genuinely different, HIGHER audio bitrate than before, giving
+    //     clear voice on BOTH audio and video calls (this is the separate
+    //     "audio category" bitrate vs the video encoder bitrate below —
+    //     function sub-issue-2.4);
+    //   • use the `audioScenarioMeeting` scenario, tuned for real-time voice:
+    //     constant capture, echo-cancellation, no aggressive auto-ducking —
+    //     stops the audio cutting out mid-call.
     await engine.enableAudio();
     await engine.setAudioProfile(
-      profile: AudioProfileType.audioProfileSpeechStandard,
-      scenario: AudioScenarioType.audioScenarioChatroom,
+      profile: AudioProfileType.audioProfileMusicHighQuality,
+      scenario: AudioScenarioType.audioScenarioMeeting,
     );
+    // Guarantee we actually SUBSCRIBE to and PLAY the peer's audio at full
+    // volume — the concrete "I can't hear the other person" fix.
+    await engine.muteAllRemoteAudioStreams(false);
+    await engine.adjustPlaybackSignalVolume(100); // 0-400; 100 = unity
+    await engine.adjustRecordingSignalVolume(100);
 
     // Network-resilience fallback ladder (engine-wide):
     //  - if OUR uplink collapses, keep publishing AUDIO ONLY instead of
@@ -162,46 +205,48 @@ class _CallScreenState extends State<CallScreen> {
     await engine.setRemoteSubscribeFallbackOption(
         StreamFallbackOptions.streamFallbackOptionVideoStreamLow);
 
-    // Video calls default to the loudspeaker; audio calls to the earpiece.
+    // Video calls default to the loudspeaker (hands-free); audio calls to the
+    // earpiece. The user can flip this at any time with the Speaker button
+    // (function sub-issue-2.1). Keep _isSpeakerOn in sync with the default.
     await engine.setDefaultAudioRouteToSpeakerphone(isVideo);
+    _isSpeakerOn = isVideo;
 
     if (isVideo) {
       await engine.enableVideo();
 
-      // 1) Capture at Full-HD so the encoder receives a sharp 1080p source
-      //    frame. Without an explicit capturer config Agora may capture at a
-      //    low resolution, which no amount of encoder tuning can un-blur.
+      // 1) Capture at 720p. On a mobile RTC uplink 720p is the sweet spot:
+      //    sharp on a phone screen, but far cheaper to encode/transmit than
+      //    1080p — which means LOWER latency, LESS battery/CPU, and it holds up
+      //    on weak networks (optimisation sub-issue-3.1 & 3.5). Capturing at
+      //    1080p only to send it over a congested mobile link added latency and
+      //    caused the freezing/cut-outs the user reported.
       await engine.setCameraCapturerConfiguration(
         const CameraCapturerConfiguration(
           cameraDirection: CameraDirection.cameraFront,
-          format: VideoFormat(width: 1920, height: 1080, fps: 30),
+          format: VideoFormat(width: 1280, height: 720, fps: 30),
         ),
       );
 
-      // 2) Full-HD (1080p30) encoder config with an explicit, high target
-      //    bitrate. WITHOUT this, Agora falls back to its low default profile
-      //    (~360-720p, low bitrate) which looks blurry/pixelated on modern
-      //    phones.
-      //    - bitrate 4000 Kbps gives 1080p30 generous headroom for a crisp,
-      //      sharp picture (Agora's 1080p30 reference is ~3150 Kbps; we sit a
-      //      little above it for detail). NOTE: pushing tens of Mbps (e.g.
-      //      33000) is NOT useful on a mobile RTC uplink — it only adds
-      //      latency, packet loss and instability, so ~4 Mbps is the practical
-      //      high-quality ceiling that still feels fast, not bulky.
-      //    - maintainBalanced degradation => under congestion Agora trades a
-      //      little of BOTH resolution and frame-rate rather than collapsing
-      //      resolution first (which was the main cause of the far side
-      //      looking blurry). Together with dual-stream (below) the peer keeps
-      //      the sharpest picture their link can carry.
-      //    - advanceOptions.preferLowLatency favours low end-to-end latency
-      //      over maximum compression — the documented, typed low-latency
-      //      control in agora_rtc_engine 6.x (keeps the call snappy).
+      // 2) 720p30 encoder config — a SEPARATE, explicit VIDEO bitrate ladder
+      //    (distinct from the audio bitrate set above — function sub-issue-2.4):
+      //    - bitrate 1800 Kbps is a crisp 720p30 target (Agora's 720p30
+      //      reference is ~1710 Kbps) that a typical mobile uplink can actually
+      //      sustain, so the picture stays sharp WITHOUT the stutter that a
+      //      too-high 1080p/4 Mbps target caused.
+      //    - minBitrate 320 lets Agora ride out congestion by dropping bitrate
+      //      (not the whole call) so video "doesn't lag or cut" on low network
+      //      (optimisation sub-issue-3.5).
+      //    - maintainBalanced => under congestion Agora trades a little of BOTH
+      //      resolution and frame-rate rather than collapsing one, keeping the
+      //      far side watchable.
+      //    - preferLowLatency favours low end-to-end latency over maximum
+      //      compression (optimisation sub-issue-3.1).
       await engine.setVideoEncoderConfiguration(
         const VideoEncoderConfiguration(
-          dimensions: VideoDimensions(width: 1920, height: 1080),
+          dimensions: VideoDimensions(width: 1280, height: 720),
           frameRate: 30,
-          bitrate: 4000, // strong 1080p30 target (Kbps) for a crisp picture
-          minBitrate: 1200,
+          bitrate: 1800, // sustainable 720p30 target (Kbps)
+          minBitrate: 320,
           orientationMode: OrientationMode.orientationModeAdaptive,
           degradationPreference: DegradationPreference.maintainBalanced,
           mirrorMode: VideoMirrorModeType.videoMirrorModeAuto,
@@ -281,6 +326,14 @@ class _CallScreenState extends State<CallScreen> {
     await CallService().engine.switchCamera();
   }
 
+  /// Toggle the loudspeaker on/off (function sub-issue-2.1). Works for both
+  /// audio (earpiece ⇄ speaker) and video calls.
+  Future<void> _toggleSpeaker() async {
+    _isSpeakerOn = !_isSpeakerOn;
+    await CallService().engine.setEnableSpeakerphone(_isSpeakerOn);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _endCall() async {
     await CallService().endCall(
       peerUsername: widget.peerUsername,
@@ -293,6 +346,7 @@ class _CallScreenState extends State<CallScreen> {
   void _leaveAndPop({String? reason}) async {
     if (_callEnded) return;
     _callEnded = true;
+    _stopRingback();
     
     if (widget.isOutgoing) {
       String status;
@@ -347,6 +401,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    _stopRingback();
     _signalSub?.cancel();
     _durationTimer?.cancel();
     super.dispose();
@@ -617,8 +672,13 @@ class _CallScreenState extends State<CallScreen> {
           colors: [Colors.black.withValues(alpha: 0.85), Colors.transparent],
         ),
       ),
+      // Buttons are laid out in an evenly-spaced row with the red End button
+      // as the visual anchor in the centre, so nothing looks stray/unaligned
+      // (function sub-issue-2.1). Audio calls show Mute · Speaker · End · Flip-
+      // placeholder; video calls show Mute · Camera · End · Flip.
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           _ControlBtn(
             icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
@@ -635,8 +695,18 @@ class _CallScreenState extends State<CallScreen> {
               label: _isCameraOff ? 'Camera on' : 'Camera off',
               filled: _isCameraOff,
               onTap: _toggleCamera,
+            )
+          else
+            // Speaker toggle — the new button requested for audio calls.
+            _ControlBtn(
+              icon: _isSpeakerOn
+                  ? Icons.volume_up_rounded
+                  : Icons.hearing_rounded,
+              label: _isSpeakerOn ? 'Speaker' : 'Earpiece',
+              filled: _isSpeakerOn,
+              onTap: _toggleSpeaker,
             ),
-          // End call (large red centre)
+          // End call (large red centre) — the anchor of the row.
           GestureDetector(
             onTap: _endCall,
             child: Container(
@@ -664,7 +734,9 @@ class _CallScreenState extends State<CallScreen> {
               onTap: _switchCamera,
             )
           else
-            const SizedBox(width: 58), // balance row
+            // Audio call: a Camera-style spot isn't needed, so we keep a fourth
+            // slot balanced with a spacer that matches a control button's width.
+            const SizedBox(width: 58),
         ],
       ),
     );
